@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useDashboardStore } from '../store/dashboardStore';
 import {
   TrendingUp,
@@ -50,11 +51,11 @@ function ShareBar({ pct, max }: { pct: number; max: number }) {
 }
 
 function SortIcon({ active, asc }: { active: boolean; asc: boolean }) {
-  if (!active) return <Minus className="w-3 h-3 text-gray-600" />;
+  if (!active) return <Minus className="w-3 h-3 text-gray-600" aria-hidden="true" />;
   return asc ? (
-    <ChevronUp className="w-3 h-3 text-brand-400" />
+    <ChevronUp className="w-3 h-3 text-brand-400" aria-hidden="true" />
   ) : (
-    <ChevronDown className="w-3 h-3 text-brand-400" />
+    <ChevronDown className="w-3 h-3 text-brand-400" aria-hidden="true" />
   );
 }
 
@@ -89,6 +90,7 @@ function TH({
 const PAGE_SIZE = 10;
 
 function MetaTable({ snapshots }: { snapshots: MetaSnapshot[] }) {
+  const { t } = useTranslation('meta');
   const [sortKey, setSortKey] = useState<SortKey>('frequencyPct');
   const [asc, setAsc] = useState(false);
   const [namesOpen, setNamesOpen] = useState(false);
@@ -121,9 +123,7 @@ function MetaTable({ snapshots }: { snapshots: MetaSnapshot[] }) {
   return (
     <div className="-m-4">
       {sorted.length === 0 ? (
-        <div className="py-16 text-center text-gray-500 text-sm">
-          No meta data yet. Click "Sync Live Meta" in the sidebar.
-        </div>
+        <div className="py-16 text-center text-gray-500 text-sm">{t('metaTable.empty')}</div>
       ) : (
         <>
           <div className="relative">
@@ -151,17 +151,18 @@ function MetaTable({ snapshots }: { snapshots: MetaSnapshot[] }) {
                       <button
                         onClick={() => setNamesOpen((v) => !v)}
                         className="flex items-center gap-1 hover:text-gray-200 transition-colors"
-                        title={namesOpen ? 'Hide names' : 'Show names'}
+                        title={namesOpen ? t('metaTable.hideNames') : t('metaTable.showNames')}
                       >
                         <ChevronRight
                           className="w-3 h-3 shrink-0 transition-transform duration-200"
                           style={{ transform: namesOpen ? 'rotate(180deg)' : 'none' }}
+                          aria-hidden="true"
                         />
-                        <span>{namesOpen ? 'Hide' : 'Names'}</span>
+                        <span>{namesOpen ? t('metaTable.hide') : t('metaTable.names')}</span>
                       </button>
                     </th>
                     <TH
-                      label="Share"
+                      label={t('metaTable.headers.share')}
                       sortK="frequencyPct"
                       right={false}
                       sortKey={sortKey}
@@ -169,17 +170,17 @@ function MetaTable({ snapshots }: { snapshots: MetaSnapshot[] }) {
                       onSort={handleSort}
                     />
                     <TH
-                      label="Players"
+                      label={t('metaTable.headers.players')}
                       sortK="playerCount"
                       sortKey={sortKey}
                       asc={asc}
                       onSort={handleSort}
                     />
                     <th className="px-3 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">
-                      W-L
+                      {t('metaTable.headers.record')}
                     </th>
                     <TH
-                      label="Win %"
+                      label={t('metaTable.headers.winPct')}
                       sortK="winRatePct"
                       sortKey={sortKey}
                       asc={asc}
@@ -246,8 +247,11 @@ function MetaTable({ snapshots }: { snapshots: MetaSnapshot[] }) {
                 <ChevronRight
                   className="w-3 h-3 transition-transform duration-200"
                   style={{ transform: expanded ? 'rotate(270deg)' : 'rotate(90deg)' }}
+                  aria-hidden="true"
                 />
-                {expanded ? `Show top ${PAGE_SIZE}` : `Show all ${sorted.length} decks`}
+                {expanded
+                  ? t('metaTable.showTop', { count: PAGE_SIZE })
+                  : t('metaTable.showAll', { count: sorted.length })}
               </button>
               <span className="text-xs text-gray-600">
                 {expanded ? sorted.length : Math.min(PAGE_SIZE, sorted.length)} / {sorted.length}
@@ -263,6 +267,8 @@ function MetaTable({ snapshots }: { snapshots: MetaSnapshot[] }) {
 // ─── Recent tournaments ───────────────────────────────────────────────────────
 
 function TournamentCard({ t }: { t: RecentTournament }) {
+  // Aliased to avoid clashing with the `t` prop (the tournament object)
+  const { t: tMeta } = useTranslation('meta');
   const date = new Date(t.date);
   const daysAgo = Math.floor((Date.now() - date.getTime()) / 86_400_000);
 
@@ -274,11 +280,15 @@ function TournamentCard({ t }: { t: RecentTournament }) {
           <div className="flex items-center gap-3 mt-1">
             <span className="flex items-center gap-1 text-xs text-gray-500">
               <Users className="w-3 h-3" />
-              {t.players} players
+              {tMeta('tournaments.players', { count: t.players })}
             </span>
             <span className="flex items-center gap-1 text-xs text-gray-500">
               <Calendar className="w-3 h-3" />
-              {daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : `${daysAgo}d ago`}
+              {daysAgo === 0
+                ? tMeta('tournaments.today')
+                : daysAgo === 1
+                  ? tMeta('tournaments.yesterday')
+                  : tMeta('tournaments.daysAgo', { count: daysAgo })}
             </span>
           </div>
         </div>
@@ -286,9 +296,10 @@ function TournamentCard({ t }: { t: RecentTournament }) {
           href={`https://play.limitlesstcg.com/tournament/${t.id}/standings`}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label={tMeta('tournaments.openStandings')}
           className="text-gray-600 hover:text-brand-400 transition-colors shrink-0"
         >
-          <ExternalLink className="w-3.5 h-3.5" />
+          <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
         </a>
       </div>
 
@@ -302,7 +313,9 @@ function TournamentCard({ t }: { t: RecentTournament }) {
               )}
               <PokemonIcon archetype={arch.name} size="sm" dual />
               <span className="flex-1 text-xs text-gray-300 truncate">{arch.name}</span>
-              <span className="text-xs text-gray-500">{arch.count}x</span>
+              <span className="text-xs text-gray-500">
+                {tMeta('tournaments.timesPlayed', { count: arch.count })}
+              </span>
               <WinRateBadge pct={arch.winRate} />
             </div>
           ))}
@@ -313,6 +326,7 @@ function TournamentCard({ t }: { t: RecentTournament }) {
 }
 
 function RecentTournaments() {
+  const { t } = useTranslation('meta');
   const { recentTournaments, isFetchingTournaments, tournamentsError, loadRecentTournaments } =
     useDashboardStore();
   const [days, setDays] = useState(7);
@@ -326,13 +340,13 @@ function RecentTournaments() {
       <div className="card p-4">
         <h3 className="card-header mb-3 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-brand-400" />
-          Recent Tournaments
+          {t('tournaments.title')}
         </h3>
 
         {/* Filters */}
         <div className="flex flex-wrap items-end gap-3 mb-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Past (days)</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('tournaments.pastDays')}</label>
             <select
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
@@ -345,7 +359,9 @@ function RecentTournaments() {
             </select>
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Min. players</label>
+            <label className="block text-xs text-gray-500 mb-1">
+              {t('tournaments.minPlayers')}
+            </label>
             <select
               value={minPlayers}
               onChange={(e) => setMinPlayers(Number(e.target.value))}
@@ -363,15 +379,18 @@ function RecentTournaments() {
               onChange={(e) => setOnlineOnly(e.target.checked)}
               className="rounded accent-brand-500"
             />
-            <span className="text-xs text-gray-400">Online only</span>
+            <span className="text-xs text-gray-400">{t('tournaments.onlineOnly')}</span>
           </label>
           <button
             onClick={handleFetch}
             disabled={isFetchingTournaments}
             className="btn-primary text-xs ml-auto disabled:opacity-50"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isFetchingTournaments ? 'animate-spin' : ''}`} />
-            {isFetchingTournaments ? 'Loading…' : 'Load'}
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${isFetchingTournaments ? 'animate-spin' : ''}`}
+              aria-hidden="true"
+            />
+            {isFetchingTournaments ? t('loading', { ns: 'common' }) : t('tournaments.load')}
           </button>
         </div>
 
@@ -391,9 +410,7 @@ function RecentTournaments() {
       )}
 
       {!isFetchingTournaments && recentTournaments.length === 0 && !tournamentsError && (
-        <p className="text-center text-gray-600 text-sm py-8">
-          Click "Load" to fetch recent tournaments from Limitless TCG.
-        </p>
+        <p className="text-center text-gray-600 text-sm py-8">{t('tournaments.emptyHint')}</p>
       )}
     </div>
   );
@@ -402,19 +419,20 @@ function RecentTournaments() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function MetaPage() {
+  const { t } = useTranslation('meta');
   const { metaSnapshots } = useDashboardStore();
   const sourceNote = metaSnapshots[0]?.sourceNote;
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-white">Meta</h2>
-        <p className="text-sm text-gray-500 mt-0.5">Live competitive data from Limitless TCG</p>
+        <h2 className="text-xl font-bold text-white">{t('page.title')}</h2>
+        <p className="text-sm text-gray-500 mt-0.5">{t('page.subtitle')}</p>
       </div>
 
       <div className="space-y-3">
         <CollapsibleSection
-          title="Matchup Matrix"
+          title={t('page.matchupMatrix')}
           icon={<Grid3X3 className="w-4 h-4 text-brand-400" />}
           defaultOpen
         >
@@ -422,7 +440,11 @@ export function MetaPage() {
         </CollapsibleSection>
 
         <CollapsibleSection
-          title={`Tournament Meta${metaSnapshots.length > 0 ? ` (${metaSnapshots.length})` : ''}`}
+          title={
+            metaSnapshots.length > 0
+              ? t('page.tournamentMetaCount', { count: metaSnapshots.length })
+              : t('page.tournamentMeta')
+          }
           icon={<TrendingUp className="w-4 h-4 text-brand-400" />}
           rightSlot={sourceNote && <span className="text-xs text-gray-500">{sourceNote}</span>}
           defaultOpen

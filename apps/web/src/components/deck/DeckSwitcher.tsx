@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, X, Star, Pencil, Check, Search } from 'lucide-react';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { PokemonIcon } from '../shared/PokemonIcon';
@@ -11,11 +12,13 @@ export type DeckSection = 'deck' | 'analytics' | 'log';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function WrPill({ rate, games }: { rate: number; games: number }) {
-  if (games === 0) return <span className="text-[10px] text-white/25">Keine Spiele</span>;
+  const { t } = useTranslation('deck');
+  if (games === 0)
+    return <span className="text-[10px] text-white/25">{t('switcher.noGames')}</span>;
   const cls = rate >= 55 ? 'text-emerald-400' : rate >= 45 ? 'text-yellow-400' : 'text-red-400';
   return (
     <span className={`text-[10px] font-semibold tabular-nums ${cls}`}>
-      {rate}% · {games}g
+      {t('switcher.wrPill', { rate, count: games })}
     </span>
   );
 }
@@ -29,6 +32,7 @@ function deckLabel(deck: { archetypeName: string; variant: string }): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function DeckSwitcher() {
+  const { t } = useTranslation('deck');
   const { decks, activeDeckId, opponentLogs, setActiveDeck, removeDecks, updateCurrentDeck } =
     useDashboardStore();
 
@@ -98,21 +102,19 @@ export function DeckSwitcher() {
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
           <span className="text-[11px] font-semibold text-blue-300/70 uppercase tracking-widest">
-            My Decks
+            {t('switcher.myDecks')}
           </span>
           <button
             onClick={() => setShowCreate(true)}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-brand-500/15 hover:bg-brand-500/25 text-brand-300 border border-brand-400/25 transition-colors"
           >
-            <Plus className="w-3 h-3" /> New
+            <Plus className="w-3 h-3" aria-hidden="true" /> {t('switcher.new')}
           </button>
         </div>
 
         {/* ── Deck rows ── */}
         {decks.length === 0 ? (
-          <div className="px-4 py-8 text-center text-white/30 text-sm">
-            No decks yet. Create one to get started.
-          </div>
+          <div className="px-4 py-8 text-center text-white/30 text-sm">{t('switcher.empty')}</div>
         ) : (
           <div className="divide-y divide-white/[0.04]">
             {decks.map((deck) => {
@@ -160,7 +162,7 @@ export function DeckSwitcher() {
                   >
                     {deleting ? (
                       <div className="flex items-center gap-1.5 bg-red-500/10 border border-red-500/25 rounded-lg px-2 py-1">
-                        <span className="text-xs text-red-300">Delete?</span>
+                        <span className="text-xs text-red-300">{t('switcher.deletePrompt')}</span>
                         <button
                           onClick={() => {
                             if (deck.id) removeDecks(deck.id);
@@ -168,13 +170,14 @@ export function DeckSwitcher() {
                           }}
                           className="text-xs text-red-400 hover:text-red-200 font-medium px-1.5 py-0.5 rounded bg-red-500/20"
                         >
-                          Yes
+                          {t('switcher.yes')}
                         </button>
                         <button
                           onClick={() => setConfirmDelete(null)}
+                          aria-label={t('cancel', { ns: 'common' })}
                           className="text-white/30 hover:text-white/70"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                       </div>
                     ) : (
@@ -186,16 +189,18 @@ export function DeckSwitcher() {
                               ? 'text-brand-300 bg-brand-500/15'
                               : 'text-white/25 hover:text-brand-300 hover:bg-brand-500/10'
                           }`}
-                          title="Change archetype"
+                          title={t('switcher.changeArchetype')}
+                          aria-label={t('switcher.changeArchetype')}
                         >
-                          <Pencil className="w-3.5 h-3.5" />
+                          <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                         <button
                           onClick={() => deck.id && setConfirmDelete(deck.id)}
                           className="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                          title="Delete deck"
+                          title={t('switcher.deleteDeck')}
+                          aria-label={t('switcher.deleteDeck')}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                       </>
                     )}
@@ -212,14 +217,15 @@ export function DeckSwitcher() {
             {/* Picker header */}
             <div className="flex items-center justify-between px-4 py-2.5">
               <span className="text-xs font-semibold text-white/60">
-                Archetype for{' '}
+                {t('switcher.archetypeFor')}{' '}
                 <span className="text-white/90">{editingDeck ? deckLabel(editingDeck) : '…'}</span>
               </span>
               <button
                 onClick={closePicker}
+                aria-label={t('close', { ns: 'common' })}
                 className="text-white/30 hover:text-white/70 transition-colors"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
 
@@ -232,15 +238,16 @@ export function DeckSwitcher() {
                   type="text"
                   value={archetypeSearch}
                   onChange={(e) => setArchetypeSearch(e.target.value)}
-                  placeholder="Search archetype…"
+                  placeholder={t('switcher.searchPlaceholder')}
                   className="flex-1 bg-transparent text-sm text-white placeholder-white/30 focus:outline-none"
                 />
                 {archetypeSearch && (
                   <button
                     onClick={() => setArchetypeSearch('')}
+                    aria-label={t('switcher.clearSearch')}
                     className="text-white/30 hover:text-white/60"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-3 h-3" aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -249,9 +256,7 @@ export function DeckSwitcher() {
             {/* Archetype list */}
             <div className="max-h-56 overflow-y-auto px-2 pb-2">
               {filteredArchetypes.length === 0 ? (
-                <p className="text-center text-white/30 text-xs py-4">
-                  No match — use custom slug below.
-                </p>
+                <p className="text-center text-white/30 text-xs py-4">{t('switcher.noMatch')}</p>
               ) : (
                 filteredArchetypes.map((a) => {
                   const isCurrent = editingDeck?.archetype === a.slug;
@@ -267,7 +272,9 @@ export function DeckSwitcher() {
                     >
                       <PokemonIcon archetype={a.slug} size="sm" dual reserveSecondary />
                       <span className="flex-1 text-sm truncate">{a.name}</span>
-                      {isCurrent && <Check className="w-3.5 h-3.5 text-brand-400 shrink-0" />}
+                      {isCurrent && (
+                        <Check className="w-3.5 h-3.5 text-brand-400 shrink-0" aria-hidden="true" />
+                      )}
                     </button>
                   );
                 })
@@ -277,7 +284,7 @@ export function DeckSwitcher() {
             {/* Custom slug input */}
             <div className="px-4 pb-3 pt-1 border-t border-white/[0.06]">
               <p className="text-[10px] text-white/30 mb-1.5 uppercase tracking-wider">
-                Custom Limitless slug
+                {t('switcher.customSlugLabel')}
               </p>
               <div className="flex gap-2">
                 <input
@@ -285,7 +292,7 @@ export function DeckSwitcher() {
                   value={customSlug}
                   onChange={(e) => setCustomSlug(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && applyCustomSlug()}
-                  placeholder="e.g. pikachu-ex"
+                  placeholder={t('switcher.customSlugPlaceholder')}
                   className="flex-1 bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400 font-mono"
                 />
                 <button
@@ -293,7 +300,7 @@ export function DeckSwitcher() {
                   disabled={!customSlug.trim()}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-500/15 hover:bg-brand-500/25 text-brand-300 border border-brand-400/25 disabled:opacity-40 transition-colors"
                 >
-                  Apply
+                  {t('switcher.apply')}
                 </button>
               </div>
             </div>

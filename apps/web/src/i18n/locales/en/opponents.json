@@ -1,0 +1,138 @@
+{
+  "addLog": {
+    "title": "Log Match",
+    "myDeck": "My Deck",
+    "noDeckSelected": "— No deck selected —",
+    "opponentDeck": "Opponent Deck",
+    "other": "Other…",
+    "archetypePlaceholder": "Archetype name",
+    "result": "Result",
+    "win": "Win",
+    "loss": "Loss",
+    "tie": "Tie",
+    "eventType": "Event Type",
+    "eventDate": "Event Date",
+    "round": "Round",
+    "moreOptions": "More options (notes, deck version, battle log)",
+    "notes": "Notes (optional)",
+    "notesPlaceholder": "e.g. Lost to Phantom Dive stream",
+    "deckVersion": "Deck version played",
+    "untagged": "— Untagged —",
+    "battleLog": "Battle log (optional)",
+    "battleLogHint": "— for AI analysis",
+    "battleLogPlaceholder": "Paste battle log here…",
+    "saveFailed": "Failed to save match",
+    "saveAndNext": "& next round",
+    "saveAndClose": "Save",
+    "loggedOne": "Match saved",
+    "loggedMany": "{{count}} matches saved"
+  },
+  "eventTypes": {
+    "Online": "Online",
+    "LC": "League Challenge",
+    "LCup": "League Cup",
+    "Regional": "Regional",
+    "Worlds": "Worlds"
+  },
+  "matchDetail": {
+    "versus": "vs. {{archetype}}",
+    "roundLabel": "Round {{round}}",
+    "tabs": {
+      "log": "Battle Log",
+      "stats": "Statistics",
+      "analysis": "AI Analysis",
+      "deckList": "Deck List"
+    },
+    "impact": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "result": {
+      "win": "Win",
+      "loss": "Loss",
+      "tie": "Tie"
+    },
+    "action": {
+      "add": "+add",
+      "remove": "−remove",
+      "increase": "▲ increase",
+      "decrease": "▼ decrease"
+    },
+    "turn": "Turn {{turn}}",
+    "suggestion": "Suggestion:",
+    "analyzedMeta": "Analyzed on {{date}} · Player: {{player}} · Opponent: {{opponent}}",
+    "sections": {
+      "mistakes": "Play Mistakes / Improvements ({{count}})",
+      "keyMoments": "Key Moments ({{count}})",
+      "deckSuggestions": "Deck Suggestions ({{count}})",
+      "cardNotes": "Card Analysis ({{count}})"
+    },
+    "logTab": {
+      "hint": "Paste the battle log from PTCGL / PTCGO. It is stored locally and used for the AI analysis.",
+      "placeholder": "Paste log here…",
+      "save": "Save log"
+    },
+    "stats": {
+      "parseFailed": "The log could not be parsed.",
+      "pasteFirst": "Paste a log in the \"Battle Log\" tab to see statistics."
+    },
+    "snapshot": {
+      "missing": "Snapshot no longer available."
+    },
+    "cardTypes": {
+      "Pokemon": "Pokémon",
+      "Trainer": "Trainer",
+      "Energy": "Energy"
+    },
+    "analysisTab": {
+      "settings": "Analysis Settings",
+      "playerNameLabel": "My player name in the log",
+      "playerNamePlaceholder": "e.g. Premiox",
+      "apiKeyLabel": "Anthropic API Key",
+      "noLog": "No battle log available — paste one in the \"Battle Log\" tab first.",
+      "analyzing": "Analyzing…",
+      "reanalyze": "Re-analyze",
+      "start": "Start analysis",
+      "empty": "No analysis yet. Enter your player name and API key, then start the analysis."
+    }
+  },
+  "statsTab": {
+    "totalTurns": "Total turns",
+    "damageYou": "Damage (you)",
+    "kosYou": "KOs (you)",
+    "winner": "Winner",
+    "opponentValue": "Opponent: {{value}}",
+    "won": "Won!",
+    "lost": "Lost",
+    "prizeRace": "Prize Card Race",
+    "prizesLeft": "{{value}} left",
+    "damagePerTurn": "Attack Damage per Turn",
+    "damageValue": "{{value}} damage",
+    "mostPlayedCards": "Most Played Cards ({{player}})",
+    "played": "played",
+    "noEvents": "The log contains no battle events that can be evaluated."
+  },
+  "logList": {
+    "title": "Match Log",
+    "recordedMatches_one": "{{count}} recorded match",
+    "recordedMatches_other": "{{count}} recorded matches",
+    "empty": "No matches logged yet.",
+    "logFirst": "Log first match",
+    "headers": {
+      "opponent": "Opponent",
+      "myDeck": "My Deck",
+      "event": "Event",
+      "date": "Date",
+      "round": "Rd",
+      "notes": "Notes"
+    },
+    "logAndAnalysis": "Log + analysis available",
+    "logAvailable": "Battle log available",
+    "logMatch": "Log Match"
+  },
+  "analysis": {
+    "apiError": "Anthropic API error {{status}}: {{message}}",
+    "parseError": "The AI response could not be parsed (invalid JSON)."
+  }
+}

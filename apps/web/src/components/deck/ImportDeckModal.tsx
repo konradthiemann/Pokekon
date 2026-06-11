@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Upload, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { parseDeckList, importCards } from '../../lib/deckImport';
 import type { ParsedCard } from '../../lib/deckImport';
 import { useDashboardStore } from '../../store/dashboardStore';
+import type { CardType } from '../../types';
 
 interface Props {
   onClose: () => void;
@@ -26,11 +28,10 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 // Collapsible card group — keeps the preview compact on small screens
-function CardGroup({ label, cards, total }: { label: string; cards: ParsedCard[]; total: number }) {
+function CardGroup({ type, cards, total }: { type: CardType; cards: ParsedCard[]; total: number }) {
+  const { t } = useTranslation('deck');
   const [open, setOpen] = useState(true);
-  const color =
-    TYPE_COLOR[label === 'Pokémon' ? 'Pokemon' : label === 'Trainers' ? 'Trainer' : 'Energy'] ??
-    'text-gray-400';
+  const color = TYPE_COLOR[type] ?? 'text-gray-400';
 
   return (
     <div className="rounded-lg overflow-hidden border border-white/[0.07]">
@@ -39,12 +40,12 @@ function CardGroup({ label, cards, total }: { label: string; cards: ParsedCard[]
         className="w-full flex items-center justify-between px-3 py-2 bg-white/[0.04] hover:bg-white/[0.06] transition-colors"
       >
         <span className={`text-xs font-semibold uppercase tracking-wider ${color}`}>
-          {label} <span className="text-white/40 font-normal">({total})</span>
+          {t(`cardTypes.${type}`)} <span className="text-white/40 font-normal">({total})</span>
         </span>
         {open ? (
-          <ChevronUp className="w-3.5 h-3.5 text-white/30" />
+          <ChevronUp className="w-3.5 h-3.5 text-white/30" aria-hidden="true" />
         ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-white/30" />
+          <ChevronDown className="w-3.5 h-3.5 text-white/30" aria-hidden="true" />
         )}
       </button>
       {open && (
@@ -62,7 +63,7 @@ function CardGroup({ label, cards, total }: { label: string; cards: ParsedCard[]
               <span
                 className={`badge border text-[10px] shrink-0 ${ROLE_COLORS[card.role] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}
               >
-                {card.role}
+                {t(`roles.${card.role}`)}
               </span>
             </div>
           ))}
@@ -73,6 +74,7 @@ function CardGroup({ label, cards, total }: { label: string; cards: ParsedCard[]
 }
 
 export function ImportDeckModal({ onClose }: Props) {
+  const { t } = useTranslation('deck');
   const { activeDeckId } = useDashboardStore();
   const [step, setStep] = useState<Step>('paste');
   const [text, setText] = useState('');
@@ -82,6 +84,14 @@ export function ImportDeckModal({ onClose }: Props) {
   const [replace, setReplace] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   const handleParse = () => {
     const result = parseDeckList(text);
@@ -98,16 +108,16 @@ export function ImportDeckModal({ onClose }: Props) {
       await importCards(cards, replace, activeDeckId ?? undefined);
       setStep('done');
     } catch (e) {
-      setImportError(e instanceof Error ? e.message : 'Import failed');
+      setImportError(e instanceof Error ? e.message : t('importModal.importFailed'));
     } finally {
       setImporting(false);
     }
   };
 
   const groups = [
-    { label: 'Pokémon', type: 'Pokemon' as const },
-    { label: 'Trainers', type: 'Trainer' as const },
-    { label: 'Energy', type: 'Energy' as const },
+    { type: 'Pokemon' as const },
+    { type: 'Trainer' as const },
+    { type: 'Energy' as const },
   ]
     .map((g) => ({ ...g, cards: cards.filter((c) => c.type === g.type) }))
     .filter((g) => g.cards.length > 0)
@@ -118,6 +128,9 @@ export function ImportDeckModal({ onClose }: Props) {
     // Centred dialog on sm+
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/70">
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="import-deck-modal-title"
         className="
         bg-gray-900 border border-gray-700
         rounded-t-2xl sm:rounded-xl
@@ -129,8 +142,10 @@ export function ImportDeckModal({ onClose }: Props) {
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800 shrink-0">
           <div className="flex items-center gap-2">
-            <Upload className="w-4 h-4 text-brand-400" />
-            <h2 className="text-white font-semibold text-sm">Import Deck List</h2>
+            <Upload className="w-4 h-4 text-brand-400" aria-hidden="true" />
+            <h2 id="import-deck-modal-title" className="text-white font-semibold text-sm">
+              {t('importModal.title')}
+            </h2>
             {step === 'preview' && (
               <span
                 className={`text-xs font-semibold ml-1 ${totalCount === 60 ? 'text-emerald-400' : 'text-yellow-400'}`}
@@ -139,8 +154,12 @@ export function ImportDeckModal({ onClose }: Props) {
               </span>
             )}
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 p-1">
-            <X className="w-4 h-4" />
+          <button
+            onClick={onClose}
+            aria-label={t('close', { ns: 'common' })}
+            className="text-gray-500 hover:text-gray-300 p-1"
+          >
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
 
@@ -150,17 +169,16 @@ export function ImportDeckModal({ onClose }: Props) {
           {step === 'paste' && (
             <>
               <p className="text-xs text-gray-400">
-                Paste a deck list with{' '}
-                <span className="text-gray-300">Pokémon / Trainer / Energie</span> sections. Each
-                line: <code className="text-brand-400">count name SET number</code>
+                {t('importModal.pasteHintBefore')}{' '}
+                <span className="text-gray-300">{t('importModal.pasteHintSections')}</span>{' '}
+                {t('importModal.pasteHintAfter')}{' '}
+                <code className="text-brand-400">{t('importModal.lineFormat')}</code>
               </p>
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 rows={14}
-                placeholder={
-                  'Pokémon: 13\n1 Budew ASC 16\n2 Munkidori TWM 95\n...\nTrainer: 14\n1 Judge POR 76\n...\nEnergie: 1\n8 Basic {D} Energy MEE 7'
-                }
+                placeholder={t('importModal.pastePlaceholder')}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-brand-500 font-mono resize-none"
               />
             </>
@@ -178,28 +196,26 @@ export function ImportDeckModal({ onClose }: Props) {
                     onChange={(e) => setReplace(e.target.checked)}
                     className="rounded accent-brand-500"
                   />
-                  <span className="text-xs text-gray-400">Existing deck cards ersetzen</span>
+                  <span className="text-xs text-gray-400">{t('importModal.replaceExisting')}</span>
                 </label>
                 {replace && (
-                  <p className="text-xs text-yellow-500 pl-5">
-                    Alle vorhandenen Karten werden gelöscht.
-                  </p>
+                  <p className="text-xs text-yellow-500 pl-5">{t('importModal.replaceWarning')}</p>
                 )}
                 {activeDeckId == null && (
-                  <p className="text-xs text-red-400 pl-5">Kein Deck ausgewählt.</p>
+                  <p className="text-xs text-red-400 pl-5">{t('importModal.noDeckSelected')}</p>
                 )}
               </div>
 
               {/* Collapsible card groups */}
               {groups.map((g) => (
-                <CardGroup key={g.label} label={g.label} cards={g.cards} total={g.total} />
+                <CardGroup key={g.type} type={g.type} cards={g.cards} total={g.total} />
               ))}
 
               {/* Skipped lines */}
               {skipped.length > 0 && (
                 <div className="p-3 bg-yellow-900/20 border border-yellow-800/40 rounded-lg">
                   <p className="text-xs text-yellow-500 font-semibold mb-1">
-                    {skipped.length} Zeile{skipped.length > 1 ? 'n' : ''} übersprungen:
+                    {t('importModal.skippedLines', { count: skipped.length })}
                   </p>
                   {skipped.map((line, i) => (
                     <p key={i} className="text-xs text-yellow-600/80 font-mono truncate">
@@ -222,8 +238,10 @@ export function ImportDeckModal({ onClose }: Props) {
           {step === 'done' && (
             <div className="flex flex-col items-center justify-center py-10 gap-3">
               <CheckCircle2 className="w-12 h-12 text-emerald-400" />
-              <p className="text-white font-semibold">Deck importiert!</p>
-              <p className="text-xs text-gray-400">{totalCount} Karten wurden hinzugefügt.</p>
+              <p className="text-white font-semibold">{t('importModal.done')}</p>
+              <p className="text-xs text-gray-400">
+                {t('importModal.cardsAdded', { count: totalCount })}
+              </p>
             </div>
           )}
         </div>
@@ -233,14 +251,14 @@ export function ImportDeckModal({ onClose }: Props) {
           {step === 'paste' && (
             <>
               <button onClick={onClose} className="btn-ghost flex-1 justify-center text-sm">
-                Abbrechen
+                {t('cancel', { ns: 'common' })}
               </button>
               <button
                 onClick={handleParse}
                 disabled={!text.trim()}
                 className="btn-primary flex-1 justify-center text-sm disabled:opacity-50"
               >
-                Vorschau
+                {t('importModal.preview')}
               </button>
             </>
           )}
@@ -250,20 +268,22 @@ export function ImportDeckModal({ onClose }: Props) {
                 onClick={() => setStep('paste')}
                 className="btn-ghost flex-1 justify-center text-sm"
               >
-                Zurück
+                {t('back', { ns: 'common' })}
               </button>
               <button
                 onClick={handleImport}
                 disabled={cards.length === 0 || importing || activeDeckId == null}
                 className="btn-primary flex-1 justify-center text-sm disabled:opacity-50"
               >
-                {importing ? 'Importiere…' : `${totalCount} Karten importieren`}
+                {importing
+                  ? t('importModal.importing')
+                  : t('importModal.importCount', { count: totalCount })}
               </button>
             </>
           )}
           {step === 'done' && (
             <button onClick={onClose} className="btn-primary flex-1 justify-center text-sm">
-              Fertig
+              {t('done', { ns: 'common' })}
             </button>
           )}
         </div>

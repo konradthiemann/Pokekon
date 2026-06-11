@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import type { DeckCard } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -114,12 +115,12 @@ export async function fetchArchetypeComparison(
   userDeck: DeckCard[],
   onProgress?: (msg: string) => void,
 ): Promise<ComparisonResult> {
-  onProgress?.('Fetching tournament list…');
+  onProgress?.(i18n.t('recommendations:comparison.progress.fetching'));
 
   const tourRes = await limitlessFetch(
     '/api/tournaments?game=PTCG&completed=true&limit=50&format=standard',
   );
-  if (!tourRes.ok) throw new Error('Could not fetch tournament list');
+  if (!tourRes.ok) throw new Error(i18n.t('recommendations:comparison.errors.fetchFailed'));
   const allTourneys: TourneyEntry[] = await tourRes.json();
 
   // Top 8 largest events (more players → more archetype diversity & decklists)
@@ -138,7 +139,12 @@ export async function fetchArchetypeComparison(
 
   for (const t of eligible) {
     try {
-      onProgress?.(`Scanning "${t.name}" (${t.players} players)…`);
+      onProgress?.(
+        i18n.t('recommendations:comparison.progress.scanning', {
+          name: t.name,
+          players: t.players,
+        }),
+      );
       const res = await limitlessFetch(`/api/tournaments/${t.id}/standings`);
       if (!res.ok) continue;
 
@@ -164,8 +170,7 @@ export async function fetchArchetypeComparison(
 
   if (allLists.length === 0) {
     throw new Error(
-      `No public decklists found for "${archetypeSlug}". ` +
-        `Try the Limitless slug format (e.g. "n-zoroark", "dragapult-ex", "alakazam-dudunsparce").`,
+      i18n.t('recommendations:comparison.errors.noListsFound', { slug: archetypeSlug }),
     );
   }
 
@@ -175,7 +180,12 @@ export async function fetchArchetypeComparison(
   );
   const topListsToUse = topLists.length >= 3 ? topLists : allLists;
 
-  onProgress?.(`Analyzing ${allLists.length} lists (${topListsToUse.length} top-placing)…`);
+  onProgress?.(
+    i18n.t('recommendations:comparison.progress.analyzing', {
+      lists: allLists.length,
+      top: topListsToUse.length,
+    }),
+  );
 
   // Aggregate card stats
   type RawStat = {

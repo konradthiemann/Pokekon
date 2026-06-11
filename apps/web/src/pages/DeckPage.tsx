@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useDashboardStore } from '../store/dashboardStore';
 import { DeckPanel } from '../components/deck/DeckPanel';
 import { LocalMetaPanel } from '../components/deck/LocalMetaPanel';
@@ -11,6 +12,7 @@ import { Clock, Settings2, BarChart2, List, Plus, Copy, AlertTriangle } from 'lu
 // ─── Deck Settings ────────────────────────────────────────────────────────────
 
 function DeckSettingsWidget() {
+  const { t } = useTranslation('deck');
   const { activeDeck, updateCurrentDeck, duplicateDeckAsVariant } = useDashboardStore();
 
   const [archetypeName, setArchetypeName] = useState(activeDeck?.archetypeName ?? '');
@@ -58,39 +60,39 @@ function DeckSettingsWidget() {
   return (
     <SidePanel
       icon={<Settings2 className="w-4 h-4" />}
-      title="Deck Settings"
-      description="Rename this deck or duplicate it as a new variant."
+      title={t('settings.title')}
+      description={t('settings.description')}
     >
       <div className="flex flex-col gap-4 h-full">
         <div className="space-y-2">
           <div>
             <label className="block text-[11px] uppercase tracking-wider text-white/40 mb-1 font-medium">
-              Archetype
+              {t('settings.archetype')}
             </label>
             <input
               type="text"
               value={archetypeName}
               onChange={(e) => setArchetypeName(e.target.value)}
-              placeholder="e.g. N's Zoroark"
+              placeholder={t('settings.archetypePlaceholder')}
               className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400"
             />
           </div>
           <div>
             <label className="block text-[11px] uppercase tracking-wider text-white/40 mb-1 font-medium">
-              Variant label
+              {t('settings.variantLabel')}
             </label>
             <input
               type="text"
               value={variant}
               onChange={(e) => setVariant(e.target.value)}
-              placeholder='e.g. "Control", "Fast Pace"'
+              placeholder={t('settings.variantPlaceholder')}
               className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400"
             />
           </div>
           {showAdvanced ? (
             <div>
               <label className="block text-[11px] uppercase tracking-wider text-white/40 mb-1 font-medium">
-                Limitless slug
+                {t('settings.slugLabel')}
               </label>
               <input
                 type="text"
@@ -99,16 +101,14 @@ function DeckSettingsWidget() {
                 placeholder="n-zoroark"
                 className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400 font-mono"
               />
-              <p className="text-[11px] text-white/25 mt-1">
-                Lowercase, hyphen-separated. Matches against Limitless meta data.
-              </p>
+              <p className="text-[11px] text-white/25 mt-1">{t('settings.slugHint')}</p>
             </div>
           ) : (
             <button
               onClick={() => setShowAdvanced(true)}
               className="text-[11px] text-white/30 hover:text-brand-300 transition-colors"
             >
-              + Advanced (Limitless slug)
+              {t('settings.advancedToggle')}
             </button>
           )}
           <button
@@ -116,7 +116,11 @@ function DeckSettingsWidget() {
             disabled={!archetypeName.trim() || !dirty}
             className="btn-primary w-full justify-center text-xs disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {saved ? 'Saved ✓' : dirty ? 'Save changes' : 'Up to date'}
+            {saved
+              ? t('settings.saved')
+              : dirty
+                ? t('settings.saveChanges')
+                : t('settings.upToDate')}
           </button>
         </div>
 
@@ -126,12 +130,11 @@ function DeckSettingsWidget() {
           <div className="flex items-center gap-2">
             <Copy className="w-3.5 h-3.5 text-white/30" />
             <span className="text-[11px] uppercase tracking-wider text-white/40 font-medium">
-              New variant of this deck
+              {t('settings.newVariantTitle')}
             </span>
           </div>
           <p className="text-[11px] text-white/25 leading-snug">
-            Copies all cards into a new {activeDeck.archetypeName} variant so you can tweak without
-            losing this one.
+            {t('settings.newVariantHint', { archetype: activeDeck.archetypeName })}
           </p>
           <div className="flex gap-2">
             <input
@@ -139,7 +142,7 @@ function DeckSettingsWidget() {
               value={newVariantName}
               onChange={(e) => setNewVariantName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreateVariant()}
-              placeholder='e.g. "Control"'
+              placeholder={t('settings.variantNamePlaceholder')}
               className="flex-1 bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400"
             />
             <button
@@ -147,8 +150,8 @@ function DeckSettingsWidget() {
               disabled={!newVariantName.trim() || copying}
               className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-500/15 hover:bg-brand-500/25 text-brand-300 border border-brand-400/25 transition-colors disabled:opacity-40"
             >
-              <Plus className="w-3.5 h-3.5" />
-              {copying ? '…' : 'Create'}
+              <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+              {copying ? '…' : t('settings.create')}
             </button>
           </div>
         </div>
@@ -159,15 +162,17 @@ function DeckSettingsWidget() {
 
 // ─── Section tabs ─────────────────────────────────────────────────────────────
 
+// Labels are i18n keys in the `deck` namespace, resolved at render time.
 const SECTIONS = [
-  { id: 'deck' as const, label: 'Deck List', Icon: List },
-  { id: 'analytics' as const, label: 'Analytics', Icon: BarChart2 },
-  { id: 'log' as const, label: 'Match Log', Icon: Clock },
+  { id: 'deck' as const, labelKey: 'page.tabs.deckList', Icon: List },
+  { id: 'analytics' as const, labelKey: 'page.tabs.analytics', Icon: BarChart2 },
+  { id: 'log' as const, labelKey: 'page.tabs.matchLog', Icon: Clock },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function DeckPage() {
+  const { t } = useTranslation('deck');
   const { decks, activeDeckId, deckCards, opponentLogs, metaSnapshots, activeDeck } =
     useDashboardStore();
   const [activeSection, setActiveSection] = useState<DeckSection>('deck');
@@ -187,7 +192,7 @@ export function DeckPage() {
         <>
           {/* Section tab bar */}
           <div className="flex rounded-2xl overflow-hidden backdrop-blur-md border border-white/[0.08] bg-white/[0.03]">
-            {SECTIONS.map(({ id, label, Icon }) => (
+            {SECTIONS.map(({ id, labelKey, Icon }) => (
               <button
                 key={id}
                 onClick={() => setActiveSection(id)}
@@ -198,8 +203,8 @@ export function DeckPage() {
                     : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]',
                 ].join(' ')}
               >
-                <Icon className="w-3.5 h-3.5" />
-                {label}
+                <Icon className="w-3.5 h-3.5" aria-hidden="true" />
+                {t(labelKey)}
               </button>
             ))}
           </div>
@@ -210,9 +215,9 @@ export function DeckPage() {
               <>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { label: 'Pokémon', value: pokemon, color: 'text-red-400' },
-                    { label: 'Trainer', value: trainers, color: 'text-blue-400' },
-                    { label: 'Energie', value: energy, color: 'text-orange-400' },
+                    { label: t('cardTypes.Pokemon'), value: pokemon, color: 'text-red-400' },
+                    { label: t('cardTypes.Trainer'), value: trainers, color: 'text-blue-400' },
+                    { label: t('cardTypes.Energy'), value: energy, color: 'text-orange-400' },
                   ].map(({ label, value, color }) => (
                     <div
                       key={label}
@@ -234,8 +239,8 @@ export function DeckPage() {
                   >
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                     {totalCards > 60
-                      ? `Deck hat ${totalCards} Karten — ${totalCards - 60} zu viele (max. 60)`
-                      : `Deck hat nur ${totalCards}/60 Karten`}
+                      ? t('page.tooManyCards', { count: totalCards, excess: totalCards - 60 })
+                      : t('page.tooFewCards', { count: totalCards })}
                   </div>
                 )}
 
@@ -265,7 +270,7 @@ export function DeckPage() {
       ) : /* No deck selected yet — shown only when deck list is empty */
       decks.length === 0 ? null : (
         <div className="card py-12 text-center text-white/30 text-sm">
-          Select a deck above to view its details.
+          {t('page.selectDeckPrompt')}
         </div>
       )}
     </div>

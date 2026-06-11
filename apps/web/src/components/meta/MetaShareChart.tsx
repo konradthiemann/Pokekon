@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart,
   Bar,
@@ -34,12 +35,13 @@ const DEFAULT_VISIBLE = 5;
 const ROW_HEIGHT = 36;
 
 export function MetaShareChart({ snapshots }: Props) {
+  const { t } = useTranslation('meta');
   const [showAll, setShowAll] = useState(false);
 
   if (snapshots.length === 0) {
     return (
       <div className="card h-64 flex items-center justify-center">
-        <p className="text-gray-500 text-sm">No meta data loaded.</p>
+        <p className="text-gray-500 text-sm">{t('metaShareChart.empty')}</p>
       </div>
     );
   }
@@ -54,13 +56,15 @@ export function MetaShareChart({ snapshots }: Props) {
   return (
     <div className="card flex flex-col">
       <div className="flex items-center justify-between mb-3">
-        <span className="card-header mb-0">Meta Share — Current Week</span>
+        <span className="card-header mb-0">{t('metaShareChart.title')}</span>
         {allData.length > DEFAULT_VISIBLE && (
           <button
             onClick={() => setShowAll((v) => !v)}
             className="text-xs text-brand-400 hover:text-brand-300 transition-colors font-medium shrink-0"
           >
-            {showAll ? `Top ${DEFAULT_VISIBLE}` : `All ${allData.length}`}
+            {showAll
+              ? t('metaShareChart.showTop', { count: DEFAULT_VISIBLE })
+              : t('metaShareChart.showAll', { count: allData.length })}
           </button>
         )}
       </div>
@@ -96,7 +100,9 @@ export function MetaShareChart({ snapshots }: Props) {
               contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }}
               labelStyle={{ color: '#f9fafb', fontWeight: 600 }}
               formatter={(value, name) =>
-                name === 'pct' ? [`${value ?? 0}%`, 'Meta Share'] : [`${value ?? 0}%`, 'Win Rate']
+                name === 'pct'
+                  ? [`${value ?? 0}%`, t('metaShareChart.metaShare')]
+                  : [`${value ?? 0}%`, t('metaShareChart.winRate')]
               }
             />
             <Bar dataKey="pct" radius={[0, 4, 4, 0]}>

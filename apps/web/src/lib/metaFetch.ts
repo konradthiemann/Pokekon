@@ -1,5 +1,6 @@
 import type { MetaSnapshot, RecentTournament } from '../types';
 import { upsertMetaSnapshot } from '../db/queries';
+import i18n from '../i18n';
 
 // ─── Limitless API types ──────────────────────────────────────────────────────
 
@@ -91,7 +92,8 @@ export async function fetchRecentTournaments(
   const res = await limitlessFetch(
     '/api/tournaments?game=PTCG&completed=true&limit=100&format=standard',
   );
-  if (!res.ok) throw new Error(`Tournament list fetch failed: ${res.status}`);
+  if (!res.ok)
+    throw new Error(i18n.t('layout:sync.errors.tournamentListFailed', { status: res.status }));
   const all: LimitlessTournament[] = await res.json();
 
   const cutoff = new Date();
@@ -176,12 +178,13 @@ export interface MetaSyncResult {
  * History is never cleared, so callers can query multiple periods for trend analysis.
  */
 export async function syncLiveMeta(onProgress?: (msg: string) => void): Promise<MetaSyncResult> {
-  onProgress?.('Fetching recent tournaments…');
+  onProgress?.(i18n.t('layout:sync.fetchingTournaments'));
 
   const res = await limitlessFetch(
     '/api/tournaments?game=PTCG&completed=true&limit=50&format=standard',
   );
-  if (!res.ok) throw new Error(`Tournament list fetch failed: ${res.status}`);
+  if (!res.ok)
+    throw new Error(i18n.t('layout:sync.errors.tournamentListFailed', { status: res.status }));
   const allTourneys: LimitlessTournament[] = await res.json();
 
   // Only include tournaments from the last 7 days with 30+ players (Standard format, post-G rotation)
@@ -192,9 +195,9 @@ export async function syncLiveMeta(onProgress?: (msg: string) => void): Promise<
     .sort((a, b) => b.players - a.players)
     .slice(0, 6);
 
-  if (eligible.length === 0) throw new Error('No tournaments with 30+ players found.');
+  if (eligible.length === 0) throw new Error(i18n.t('layout:sync.errors.noTournaments'));
 
-  onProgress?.(`Found ${eligible.length} tournaments. Fetching standings…`);
+  onProgress?.(i18n.t('layout:sync.foundTournaments', { count: eligible.length }));
 
   type ArchStat = {
     displayName: string;
@@ -209,7 +212,7 @@ export async function syncLiveMeta(onProgress?: (msg: string) => void): Promise<
 
   for (const t of eligible) {
     try {
-      onProgress?.(`Loading ${t.name} (${t.players} players)…`);
+      onProgress?.(i18n.t('layout:sync.loadingTournament', { name: t.name, players: t.players }));
       const res = await limitlessFetch(`/api/tournaments/${t.id}/standings`);
       if (!res.ok) continue;
 
@@ -240,9 +243,9 @@ export async function syncLiveMeta(onProgress?: (msg: string) => void): Promise<
     }
   }
 
-  if (successCount === 0) throw new Error('Could not load standings for any tournament.');
+  if (successCount === 0) throw new Error(i18n.t('layout:sync.errors.noStandings'));
 
-  onProgress?.('Saving meta data…');
+  onProgress?.(i18n.t('layout:sync.savingMetaData'));
   const period = isoWeekLabel(new Date());
   const sourceNote = `Limitless TCG · ${successCount} tournaments · ${totalPlayers} players`;
 

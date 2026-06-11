@@ -4,6 +4,7 @@
  * To update: replace public/matchup-matrix.csv with a new TrainerHill export.
  */
 import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronRight, RefreshCw } from 'lucide-react';
 import { PokemonIcon } from '../shared/PokemonIcon';
 
@@ -85,6 +86,7 @@ function cellStyle(winRate: number, total: number): string {
 const MIN_GAMES_FILTER_OPTIONS = [1, 10, 20, 50] as const;
 
 export function MatchupMatrix() {
+  const { t } = useTranslation('meta');
   const [minGames, setMinGames] = useState<number>(10);
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [csvText, setCsvText] = useState<string | null>(null);
@@ -150,7 +152,7 @@ export function MatchupMatrix() {
     return (
       <div className="-m-4 py-16 flex items-center justify-center gap-2 text-gray-500 text-sm">
         <RefreshCw className="w-4 h-4 animate-spin" />
-        Lade Matchup-Daten…
+        {t('matchupMatrix.loading')}
       </div>
     );
   }
@@ -158,9 +160,9 @@ export function MatchupMatrix() {
   if (fetchError) {
     return (
       <div className="-m-4 py-12 flex flex-col items-center gap-3 text-sm">
-        <p className="text-gray-400">Matchup-Daten konnten nicht geladen werden.</p>
+        <p className="text-gray-400">{t('matchupMatrix.loadError')}</p>
         <button onClick={loadCsv} className="btn-ghost text-xs">
-          <RefreshCw className="w-3.5 h-3.5" /> Erneut versuchen
+          <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> {t('retry', { ns: 'common' })}
         </button>
       </div>
     );
@@ -171,7 +173,7 @@ export function MatchupMatrix() {
       {/* Filter + Legend */}
       <div className="px-4 py-2 border-b border-gray-800 flex flex-wrap items-center gap-3 text-xs text-gray-500">
         <div className="flex items-center gap-2">
-          <span>Min. games</span>
+          <span>{t('matchupMatrix.minGames')}</span>
           <select
             value={minGames}
             onChange={(e) => setMinGames(Number(e.target.value))}
@@ -185,7 +187,7 @@ export function MatchupMatrix() {
           </select>
         </div>
         <span className="hidden md:inline">·</span>
-        <span>Win rate from row deck's perspective.</span>
+        <span>{t('matchupMatrix.perspectiveNote')}</span>
         <div className="flex items-center gap-1.5 ml-auto">
           <span className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 text-xs">
             ≥70%
@@ -220,13 +222,16 @@ export function MatchupMatrix() {
                   <button
                     onClick={() => setLabelsOpen((v) => !v)}
                     className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-200 transition-colors"
-                    title={labelsOpen ? 'Collapse deck names' : 'Expand deck names'}
+                    title={
+                      labelsOpen ? t('matchupMatrix.collapseNames') : t('matchupMatrix.expandNames')
+                    }
                   >
                     <ChevronRight
                       className="w-3 h-3 transition-transform duration-200"
                       style={{ transform: labelsOpen ? 'rotate(180deg)' : 'none' }}
+                      aria-hidden="true"
                     />
-                    {labelsOpen ? 'Hide' : 'Names'}
+                    {labelsOpen ? t('matchupMatrix.hide') : t('matchupMatrix.names')}
                   </button>
                 </div>
               </th>
@@ -296,9 +301,11 @@ export function MatchupMatrix() {
                       <td
                         key={col}
                         className="px-1 py-1.5 text-center text-gray-700 bg-gray-900/50"
-                        title={`${entry.total} games`}
+                        title={t('matchupMatrix.gamesTooltip', { count: entry.total })}
                       >
-                        <div className="text-[10px]">{entry.total}g</div>
+                        <div className="text-[10px]">
+                          {t('matchupMatrix.gamesShort', { count: entry.total })}
+                        </div>
                       </td>
                     );
                   }
@@ -307,7 +314,14 @@ export function MatchupMatrix() {
                     <td
                       key={col}
                       className={`px-1 py-1.5 text-center ${cellStyle(entry.winRate, entry.total)} ${isDiagonal ? 'opacity-60' : ''}`}
-                      title={`${formatDeckName(row)} vs ${formatDeckName(col)}: ${entry.winRate}% · ${entry.wins}W-${entry.losses}L-${entry.ties}T`}
+                      title={t('matchupMatrix.cellTooltip', {
+                        row: formatDeckName(row),
+                        col: formatDeckName(col),
+                        winRate: entry.winRate,
+                        wins: entry.wins,
+                        losses: entry.losses,
+                        ties: entry.ties,
+                      })}
                     >
                       <div className="font-mono text-xs font-semibold leading-none whitespace-nowrap">
                         {entry.winRate.toFixed(1)}%
@@ -322,15 +336,14 @@ export function MatchupMatrix() {
       </div>
 
       <div className="px-4 py-2 text-xs text-gray-600 border-t border-gray-800 flex items-center gap-3">
-        <span>
-          Source: TrainerHill.com · {csvDate} · Cells show win rate from row deck's perspective
-        </span>
+        <span>{t('matchupMatrix.source', { date: csvDate })}</span>
         <button
           onClick={loadCsv}
           className="ml-auto text-gray-600 hover:text-brand-400 transition-colors"
-          title="Daten neu laden"
+          title={t('matchupMatrix.reload')}
+          aria-label={t('matchupMatrix.reload')}
         >
-          <RefreshCw className="w-3 h-3" />
+          <RefreshCw className="w-3 h-3" aria-hidden="true" />
         </button>
       </div>
     </div>

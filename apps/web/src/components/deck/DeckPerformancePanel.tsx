@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { BarChart2, ChevronUp, ChevronDown, AlertTriangle, Info } from 'lucide-react';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { computeDeckPerformanceStats } from '../../lib/deckPerformanceStats';
@@ -31,7 +33,8 @@ function Stat({
 // ─── Win-rate delta pill ──────────────────────────────────────────────────────
 
 function WRDelta({ wr, baseline, n }: { wr: number; baseline: number; n: number }) {
-  if (n < 3) return <span className="text-[10px] text-gray-600">wenig Daten</span>;
+  const { t } = useTranslation('deck');
+  if (n < 3) return <span className="text-[10px] text-gray-600">{t('performance.lowData')}</span>;
   const delta = wr - baseline;
   const cls = delta > 8 ? 'text-emerald-400' : delta < -8 ? 'text-red-400' : 'text-gray-400';
   const sign = delta > 0 ? '+' : '';
@@ -71,6 +74,7 @@ function SortIcon({ k, sortKey, asc }: { k: SortKey; sortKey: SortKey; asc: bool
 // ─── Card table ───────────────────────────────────────────────────────────────
 
 function CardTable({ cards, overallWR }: { cards: CardPerformance[]; overallWR: number }) {
+  const { t } = useTranslation('deck');
   const [sortKey, setSortKey] = useState<SortKey>('playRate');
   const [asc, setAsc] = useState(false);
 
@@ -89,24 +93,29 @@ function CardTable({ cards, overallWR }: { cards: CardPerformance[]; overallWR: 
       <table className="w-full text-sm min-w-[480px]">
         <thead>
           <tr className="border-b border-gray-800">
-            <th className="text-left py-2 pr-3 text-xs text-gray-400 font-medium">Karte</th>
+            <th className="text-left py-2 pr-3 text-xs text-gray-400 font-medium">
+              {t('performance.table.card')}
+            </th>
             <th
               className="text-right py-2 px-3 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 select-none whitespace-nowrap"
               onClick={() => handleSort('playRate')}
             >
-              Spielrate <SortIcon k="playRate" sortKey={sortKey} asc={asc} />
+              {t('performance.table.playRate')}{' '}
+              <SortIcon k="playRate" sortKey={sortKey} asc={asc} />
             </th>
             <th
               className="text-right py-2 px-3 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 select-none whitespace-nowrap"
               onClick={() => handleSort('avgPlays')}
             >
-              Ø/Spiel <SortIcon k="avgPlays" sortKey={sortKey} asc={asc} />
+              {t('performance.table.avgPerGame')}{' '}
+              <SortIcon k="avgPlays" sortKey={sortKey} asc={asc} />
             </th>
             <th
               className="text-right py-2 pl-3 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 select-none whitespace-nowrap"
               onClick={() => handleSort('winRate')}
             >
-              WR wenn gespielt <SortIcon k="winRate" sortKey={sortKey} asc={asc} />
+              {t('performance.table.wrWhenPlayed')}{' '}
+              <SortIcon k="winRate" sortKey={sortKey} asc={asc} />
             </th>
           </tr>
         </thead>
@@ -164,8 +173,7 @@ function CardTable({ cards, overallWR }: { cards: CardPerformance[]; overallWR: 
         </tbody>
       </table>
       <p className="text-[10px] text-gray-700 mt-2">
-        WR-Delta = Abweichung von deiner Gesamt-WR ({overallWR}%). Grün = besser wenn gespielt, Rot
-        = schlechter. Nur Karten mit ≥2 Spielen gezeigt.
+        {t('performance.table.footnote', { overallWR })}
       </p>
     </div>
   );
@@ -191,6 +199,7 @@ function Insight({ text, severity }: { text: string; severity: 'warn' | 'ok' | '
 
 function buildInsights(
   s: DeckPerformanceStats,
+  t: TFunction,
 ): { text: string; severity: 'warn' | 'ok' | 'info' }[] {
   const out: { text: string; severity: 'warn' | 'ok' | 'info' }[] = [];
 
@@ -199,12 +208,12 @@ function buildInsights(
     if (s.avgTurn1Actions < 1.5) {
       out.push({
         severity: 'warn',
-        text: `Zug-1-Konsistenz: Ø nur ${s.avgTurn1Actions} Aktionen im ersten Zug — mögliches Setup-Problem.`,
+        text: t('performance.insights.turn1Low', { value: s.avgTurn1Actions }),
       });
     } else if (s.avgTurn1Actions >= 3) {
       out.push({
         severity: 'ok',
-        text: `Gute Zug-1-Konsistenz: Ø ${s.avgTurn1Actions} Aktionen im ersten Zug.`,
+        text: t('performance.insights.turn1Good', { value: s.avgTurn1Actions }),
       });
     }
   }
@@ -214,12 +223,12 @@ function buildInsights(
     if (s.lowActivityTurnRate > 35) {
       out.push({
         severity: 'warn',
-        text: `Hohe Brick-Rate: ${s.lowActivityTurnRate}% deiner Züge hatten ≤1 Aktion — Konsistenz verbessern.`,
+        text: t('performance.insights.brickHigh', { value: s.lowActivityTurnRate }),
       });
     } else if (s.lowActivityTurnRate <= 15 && s.totalGamesAnalyzed >= 4) {
       out.push({
         severity: 'ok',
-        text: `Niedrige Brick-Rate: Nur ${s.lowActivityTurnRate}% niedrig-aktive Züge.`,
+        text: t('performance.insights.brickLow', { value: s.lowActivityTurnRate }),
       });
     }
   }
@@ -230,12 +239,15 @@ function buildInsights(
     if (diff >= 3) {
       out.push({
         severity: 'warn',
-        text: `Tempo-Lücke: Siege dauern Ø ${s.avgGameLengthWins} Züge, Niederlagen nur ${s.avgGameLengthLosses} — du wirst häufig überrollt.`,
+        text: t('performance.insights.tempoGap', {
+          wins: s.avgGameLengthWins,
+          losses: s.avgGameLengthLosses,
+        }),
       });
     } else if (diff <= -2) {
       out.push({
         severity: 'ok',
-        text: `Starkes Tempo: Du gewinnst Ø ${Math.abs(diff)} Züge früher als du verlierst.`,
+        text: t('performance.insights.tempoStrong', { diff: Math.abs(diff) }),
       });
     }
   }
@@ -246,12 +258,12 @@ function buildInsights(
     if (avgPrizesYouTookInLosses < 2) {
       out.push({
         severity: 'warn',
-        text: `Ø ${avgPrizesYouTookInLosses} Preiskarten in Niederlagen — du wirst in vielen Spielen früh dominiert.`,
+        text: t('performance.insights.prizesLowInLosses', { value: avgPrizesYouTookInLosses }),
       });
     } else if (avgPrizesYouTookInLosses >= 4) {
       out.push({
         severity: 'info',
-        text: `Knappe Niederlagen: Du nimmst Ø ${avgPrizesYouTookInLosses} Preiskarten — die Spiele sind oft eng.`,
+        text: t('performance.insights.closeLosses', { value: avgPrizesYouTookInLosses }),
       });
     }
   }
@@ -262,6 +274,7 @@ function buildInsights(
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export function DeckPerformancePanel() {
+  const { t } = useTranslation('deck');
   const { opponentLogs } = useDashboardStore();
   const playerName = localStorage.getItem(LS_PLAYER) ?? '';
 
@@ -277,12 +290,9 @@ export function DeckPerformancePanel() {
       <div className="card">
         <div className="flex items-center gap-2 mb-3">
           <BarChart2 className="w-4 h-4 text-brand-400" />
-          <h3 className="card-header mb-0">Kampfverlauf-Statistiken</h3>
+          <h3 className="card-header mb-0">{t('performance.title')}</h3>
         </div>
-        <p className="text-sm text-gray-500">
-          Füge in deinen Matches unter "Kampfprotokoll" Spielprotokolle hinzu — dann erscheinen hier
-          detaillierte Performance-Analysen.
-        </p>
+        <p className="text-sm text-gray-500">{t('performance.emptyHint')}</p>
       </div>
     );
   }
@@ -292,14 +302,14 @@ export function DeckPerformancePanel() {
       <div className="card">
         <div className="flex items-center gap-2 mb-2">
           <BarChart2 className="w-4 h-4 text-brand-400" />
-          <h3 className="card-header mb-0">Kampfverlauf-Statistiken</h3>
+          <h3 className="card-header mb-0">{t('performance.title')}</h3>
         </div>
-        <p className="text-sm text-gray-500">Protokolle konnten nicht ausgewertet werden.</p>
+        <p className="text-sm text-gray-500">{t('performance.parseFailed')}</p>
       </div>
     );
   }
 
-  const insights = buildInsights(stats);
+  const insights = buildInsights(stats, t);
 
   return (
     <div className="card space-y-5">
@@ -307,14 +317,12 @@ export function DeckPerformancePanel() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <BarChart2 className="w-4 h-4 text-brand-400" />
-          <h3 className="card-header mb-0">Kampfverlauf-Statistiken</h3>
+          <h3 className="card-header mb-0">{t('performance.title')}</h3>
         </div>
         <span className="text-xs text-gray-600">
-          {stats.totalGamesAnalyzed} Spiel{stats.totalGamesAnalyzed !== 1 ? 'e' : ''} mit Protokoll
+          {t('performance.gamesWithLog', { count: stats.totalGamesAnalyzed })}
           {!playerName && (
-            <span className="text-yellow-500 ml-2">
-              — Spielernamen in der Detailansicht setzen für genauere Auswertung
-            </span>
+            <span className="text-yellow-500 ml-2">{t('performance.setPlayerHint')}</span>
           )}
         </span>
       </div>
@@ -322,9 +330,12 @@ export function DeckPerformancePanel() {
       {/* Overview stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         <Stat
-          label="Gesamt-WR"
+          label={t('performance.overallWr')}
           value={`${stats.overallWinRate}%`}
-          sub={`${stats.prizeEfficiency.winGamesCount}S / ${stats.prizeEfficiency.lossGamesCount}N`}
+          sub={t('performance.wlSub', {
+            wins: stats.prizeEfficiency.winGamesCount,
+            losses: stats.prizeEfficiency.lossGamesCount,
+          })}
           color={
             stats.overallWinRate >= 55
               ? 'text-emerald-400'
@@ -334,42 +345,49 @@ export function DeckPerformancePanel() {
           }
         />
         <Stat
-          label="Ø Spiellänge"
-          value={`${stats.avgGameLength} Züge`}
+          label={t('performance.avgGameLength')}
+          value={t('performance.turnsValue', { count: stats.avgGameLength })}
           sub={
             stats.avgGameLengthWins > 0 && stats.avgGameLengthLosses > 0
-              ? `S: ${stats.avgGameLengthWins} / N: ${stats.avgGameLengthLosses}`
+              ? t('performance.wlLengths', {
+                  wins: stats.avgGameLengthWins,
+                  losses: stats.avgGameLengthLosses,
+                })
               : undefined
           }
         />
         <Stat
-          label="Ø Zug-1-Aktionen"
+          label={t('performance.avgTurn1')}
           value={stats.avgTurn1Actions}
           color={stats.avgTurn1Actions < 1.5 ? 'text-yellow-400' : 'text-white'}
         />
         <Stat
-          label="Brick-Rate"
+          label={t('performance.brickRate')}
           value={`${stats.lowActivityTurnRate}%`}
-          sub="Züge mit ≤1 Aktion"
+          sub={t('performance.brickSub')}
           color={stats.lowActivityTurnRate > 35 ? 'text-yellow-400' : 'text-white'}
         />
         <Stat
-          label="Preiskarten in Siegen"
+          label={t('performance.prizesInWins')}
           value={
             stats.prizeEfficiency.winGamesCount > 0
-              ? `Gegner: ${stats.prizeEfficiency.avgPrizesOpponentTookInWins}`
+              ? t('performance.opponentValue', {
+                  value: stats.prizeEfficiency.avgPrizesOpponentTookInWins,
+                })
               : '—'
           }
-          sub="Ø Preisk. des Gegners"
+          sub={t('performance.prizesInWinsSub')}
         />
         <Stat
-          label="Preiskarten in Niederl."
+          label={t('performance.prizesInLosses')}
           value={
             stats.prizeEfficiency.lossGamesCount > 0
-              ? `Du: ${stats.prizeEfficiency.avgPrizesYouTookInLosses}`
+              ? t('performance.youValue', {
+                  value: stats.prizeEfficiency.avgPrizesYouTookInLosses,
+                })
               : '—'
           }
-          sub="Ø eigene Preiskarten"
+          sub={t('performance.prizesInLossesSub')}
           color={
             stats.prizeEfficiency.lossGamesCount > 0 &&
             stats.prizeEfficiency.avgPrizesYouTookInLosses < 2
@@ -392,7 +410,7 @@ export function DeckPerformancePanel() {
       {stats.cardPerformance.length > 0 && (
         <section>
           <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-            Karten-Performance
+            {t('performance.cardPerformance')}
           </h4>
           <div className="bg-gray-800/20 rounded-lg border border-gray-700/30 p-3">
             <CardTable cards={stats.cardPerformance} overallWR={stats.overallWinRate} />

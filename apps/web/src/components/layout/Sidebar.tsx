@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   Layers,
@@ -11,15 +12,18 @@ import {
   BarChart2,
 } from 'lucide-react';
 import { useDashboardStore } from '../../store/dashboardStore';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
+// Labels are i18n keys in the `layout` namespace, resolved at render time.
 const NAV_ITEMS = [
-  { id: 'overview', label: 'Overview', Icon: LayoutDashboard },
-  { id: 'meta', label: 'Meta', Icon: BarChart2 },
-  { id: 'deck', label: 'My Deck', Icon: Layers },
-  { id: 'recommendations', label: 'Recommendations', Icon: Lightbulb },
+  { id: 'overview', labelKey: 'nav.overview', Icon: LayoutDashboard },
+  { id: 'meta', labelKey: 'nav.meta', Icon: BarChart2 },
+  { id: 'deck', labelKey: 'nav.myDeck', Icon: Layers },
+  { id: 'recommendations', labelKey: 'nav.recommendations', Icon: Lightbulb },
 ] as const;
 
 export function Sidebar() {
+  const { t } = useTranslation('layout');
   const {
     activeTab,
     setActiveTab,
@@ -56,13 +60,13 @@ export function Sidebar() {
         <Zap className="w-5 h-5 text-brand-400" />
         <span className="font-bold text-white text-sm tracking-wide">TCG Meta</span>
         <span className="ml-auto text-[10px] text-white/30 tracking-widest uppercase">
-          Dashboard
+          {t('sidebar.dashboard')}
         </span>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 p-2 space-y-0.5 mt-2">
-        {NAV_ITEMS.map(({ id, label, Icon }) => {
+        {NAV_ITEMS.map(({ id, labelKey, Icon }) => {
           const active = activeTab === id;
           return (
             <button
@@ -74,8 +78,8 @@ export function Sidebar() {
                   : 'text-white/50 hover:text-white/80 hover:bg-white/[0.06] border border-transparent'
               }`}
             >
-              <Icon className="w-4 h-4" />
-              {label}
+              <Icon className="w-4 h-4" aria-hidden="true" />
+              {t(labelKey)}
             </button>
           );
         })}
@@ -90,11 +94,18 @@ export function Sidebar() {
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium bg-brand-500/15 hover:bg-brand-500/25 text-brand-300 border border-brand-400/25 transition-colors disabled:opacity-50"
         >
           {syncDone ? (
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
           ) : (
-            <Globe className={`w-3.5 h-3.5 ${isSyncing ? 'animate-pulse' : ''}`} />
+            <Globe
+              className={`w-3.5 h-3.5 ${isSyncing ? 'animate-pulse' : ''}`}
+              aria-hidden="true"
+            />
           )}
-          {isSyncing ? 'Syncing…' : syncDone ? 'Synced!' : 'Sync Live Meta'}
+          {isSyncing
+            ? t('sidebar.syncing')
+            : syncDone
+              ? t('sidebar.synced')
+              : t('sidebar.syncLiveMeta')}
         </button>
 
         {isSyncing && syncProgress && (
@@ -110,7 +121,7 @@ export function Sidebar() {
         )}
         {!isSyncing && !syncError && lastSynced && (
           <p className="text-center text-gray-600 text-xs">
-            Synced {lastSynced.toLocaleTimeString()}
+            {t('sidebar.syncedAt', { time: lastSynced.toLocaleTimeString() })}
           </p>
         )}
 
@@ -120,12 +131,19 @@ export function Sidebar() {
           disabled={isLoading}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium bg-white/[0.06] hover:bg-white/[0.10] text-white/60 hover:text-white/80 border border-white/[0.08] transition-colors disabled:opacity-50"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh Data
+          <RefreshCw
+            className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`}
+            aria-hidden="true"
+          />
+          {t('sidebar.refreshData')}
         </button>
         {lastRefreshed && (
           <p className="text-center text-gray-600 text-xs">{lastRefreshed.toLocaleTimeString()}</p>
         )}
+
+        <div className="flex justify-center pt-1">
+          <LanguageSwitcher />
+        </div>
       </div>
     </aside>
   );

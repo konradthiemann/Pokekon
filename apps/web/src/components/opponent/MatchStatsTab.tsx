@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   LineChart,
   Line,
@@ -42,6 +43,7 @@ function SummaryCard({
 }
 
 export function MatchStatsTab({ data }: Props) {
+  const { t } = useTranslation('opponents');
   const {
     player1,
     player2,
@@ -66,17 +68,21 @@ export function MatchStatsTab({ data }: Props) {
     <div className="space-y-5">
       {/* Summary row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <SummaryCard label="Züge gesamt" value={totalTurns} />
+        <SummaryCard label={t('statsTab.totalTurns')} value={totalTurns} />
         <SummaryCard
-          label="Schaden (du)"
+          label={t('statsTab.damageYou')}
           value={dmgP1.toLocaleString()}
-          sub={`Gegner: ${dmgP2.toLocaleString()}`}
+          sub={t('statsTab.opponentValue', { value: dmgP2.toLocaleString() })}
         />
-        <SummaryCard label="KOs (du)" value={kosP1} sub={`Gegner: ${kosP2}`} />
         <SummaryCard
-          label="Sieger"
+          label={t('statsTab.kosYou')}
+          value={kosP1}
+          sub={t('statsTab.opponentValue', { value: kosP2 })}
+        />
+        <SummaryCard
+          label={t('statsTab.winner')}
           value={data.winner ?? '—'}
-          sub={data.winner === player1 ? 'Gewonnen!' : data.winner ? 'Verloren' : ''}
+          sub={data.winner === player1 ? t('statsTab.won') : data.winner ? t('statsTab.lost') : ''}
         />
       </div>
 
@@ -84,7 +90,7 @@ export function MatchStatsTab({ data }: Props) {
       {hasPrizes && (
         <section>
           <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-            Preiskarten-Rennen
+            {t('statsTab.prizeRace')}
           </h4>
           <div className="bg-gray-800/30 rounded-lg border border-gray-700/40 p-3">
             <ResponsiveContainer width="100%" height={180}>
@@ -110,7 +116,10 @@ export function MatchStatsTab({ data }: Props) {
                 <Tooltip
                   contentStyle={C_TIP}
                   labelStyle={C_LAB}
-                  formatter={(val, nm) => [`${val ?? 0} übrig`, String(nm ?? '')]}
+                  formatter={(val, nm) => [
+                    t('statsTab.prizesLeft', { value: val ?? 0 }),
+                    String(nm ?? ''),
+                  ]}
                 />
                 <Legend
                   formatter={(value) => (
@@ -144,7 +153,7 @@ export function MatchStatsTab({ data }: Props) {
       {hasDamage && (
         <section>
           <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-            Angriffs-Schaden pro Zug
+            {t('statsTab.damagePerTurn')}
           </h4>
           <div className="bg-gray-800/30 rounded-lg border border-gray-700/40 p-3">
             <ResponsiveContainer width="100%" height={160}>
@@ -161,7 +170,10 @@ export function MatchStatsTab({ data }: Props) {
                 <Tooltip
                   contentStyle={C_TIP}
                   labelStyle={C_LAB}
-                  formatter={(val, nm) => [`${val ?? 0} Schaden`, String(nm ?? '')]}
+                  formatter={(val, nm) => [
+                    t('statsTab.damageValue', { value: val ?? 0 }),
+                    String(nm ?? ''),
+                  ]}
                 />
                 <Legend
                   formatter={(value) => (
@@ -192,7 +204,7 @@ export function MatchStatsTab({ data }: Props) {
       {hasCards && (
         <section>
           <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-            Meist gespielte Karten ({player1})
+            {t('statsTab.mostPlayedCards', { player: player1 })}
           </h4>
           <div className="bg-gray-800/30 rounded-lg border border-gray-700/40 p-3">
             <ResponsiveContainer width="100%" height={Math.max(140, cardFrequency.length * 24)}>
@@ -220,7 +232,7 @@ export function MatchStatsTab({ data }: Props) {
                 <Tooltip
                   contentStyle={C_TIP}
                   labelStyle={C_LAB}
-                  formatter={(val) => [`${val ?? 0}×`, 'gespielt']}
+                  formatter={(val) => [`${val ?? 0}×`, t('statsTab.played')]}
                 />
                 <Bar dataKey="count" fill={C_P1} radius={[0, 4, 4, 0]} maxBarSize={16} />
               </BarChart>
@@ -230,9 +242,7 @@ export function MatchStatsTab({ data }: Props) {
       )}
 
       {!hasPrizes && !hasDamage && !hasCards && (
-        <p className="text-sm text-gray-600 text-center py-8">
-          Das Protokoll enthält keine auswertbaren Kampfereignisse.
-        </p>
+        <p className="text-sm text-gray-600 text-center py-8">{t('statsTab.noEvents')}</p>
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { OpponentLog as OpponentLogType } from '../../types';
 import { deleteOpponentLog } from '../../db/queries';
 import { useDashboardStore } from '../../store/dashboardStore';
@@ -42,6 +43,7 @@ interface Props {
  * history.
  */
 export function OpponentLog({ logs, deckId }: Props) {
+  const { t } = useTranslation('opponents');
   const { refresh, decks } = useDashboardStore();
   const [showModal, setShowModal] = useState(false);
   const [detailLog, setDetailLog] = useState<OpponentLogType | null>(null);
@@ -61,18 +63,20 @@ export function OpponentLog({ logs, deckId }: Props) {
     <div className="card overflow-hidden p-0 relative">
       <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-800">
         <div>
-          <h3 className="card-header mb-0">Match Log</h3>
-          <p className="text-xs text-gray-500 mt-0.5">{filtered.length} recorded matches</p>
+          <h3 className="card-header mb-0">{t('logList.title')}</h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {t('logList.recordedMatches', { count: filtered.length })}
+          </p>
         </div>
       </div>
 
       <div className="overflow-y-auto max-h-[520px]">
         {filtered.length === 0 ? (
           <div className="py-12 text-center space-y-3">
-            <p className="text-gray-500 text-sm">Noch keine Matches geloggt.</p>
+            <p className="text-gray-500 text-sm">{t('logList.empty')}</p>
             <button onClick={() => setShowModal(true)} className="btn-primary text-xs mx-auto">
-              <Plus className="w-3.5 h-3.5" />
-              Erstes Match loggen
+              <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+              {t('logList.logFirst')}
             </button>
           </div>
         ) : (
@@ -80,24 +84,26 @@ export function OpponentLog({ logs, deckId }: Props) {
             <thead className="sticky top-0 bg-gray-900/95 backdrop-blur">
               <tr className="border-b border-gray-800">
                 <th className="text-left px-4 py-2.5 text-gray-400 font-medium text-xs">
-                  Opponent
+                  {t('logList.headers.opponent')}
                 </th>
                 {deckId == null && (
                   <th className="text-left px-4 py-2.5 text-gray-400 font-medium text-xs">
-                    My Deck
+                    {t('logList.headers.myDeck')}
                   </th>
                 )}
-                <th className="text-left px-4 py-2.5 text-gray-400 font-medium text-xs">Event</th>
+                <th className="text-left px-4 py-2.5 text-gray-400 font-medium text-xs">
+                  {t('logList.headers.event')}
+                </th>
                 {/* Date hidden on small screens — not enough horizontal space */}
                 <th className="text-left px-4 py-2.5 text-gray-400 font-medium text-xs hidden sm:table-cell">
-                  Date
+                  {t('logList.headers.date')}
                 </th>
                 {/* Round hidden on small screens — lower priority information */}
                 <th className="text-left px-4 py-2.5 text-gray-400 font-medium text-xs hidden sm:table-cell">
-                  Rd
+                  {t('logList.headers.round')}
                 </th>
                 <th className="text-left px-4 py-2.5 text-gray-400 font-medium text-xs hidden md:table-cell">
-                  Notes
+                  {t('logList.headers.notes')}
                 </th>
                 <th className="px-4 py-2.5" />
               </tr>
@@ -124,7 +130,9 @@ export function OpponentLog({ logs, deckId }: Props) {
                       <span className="text-gray-200 font-medium text-sm">{log.archetype}</span>
                       {log.battleLog && (
                         <span
-                          title={log.analysis ? 'Log + analysis available' : 'Battle log available'}
+                          title={
+                            log.analysis ? t('logList.logAndAnalysis') : t('logList.logAvailable')
+                          }
                         >
                           {log.analysis ? (
                             <Brain className="w-3 h-3 text-brand-400 shrink-0" />
@@ -157,9 +165,10 @@ export function OpponentLog({ logs, deckId }: Props) {
                   <td className="px-4 py-2.5">
                     <button
                       onClick={(e) => handleDelete(e, log.id)}
+                      aria-label={t('delete', { ns: 'common' })}
                       className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                     </button>
                   </td>
                 </tr>
@@ -176,8 +185,8 @@ export function OpponentLog({ logs, deckId }: Props) {
             onClick={() => setShowModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-brand-500/15 hover:bg-brand-500/25 text-brand-300 border border-brand-400/25 transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" />
-            Match loggen
+            <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+            {t('logList.logMatch')}
           </button>
         </div>
       )}

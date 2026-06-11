@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart2,
   TrendingUp,
@@ -170,6 +171,7 @@ function computeDeckStats(
 // ─── Variant comparison table ─────────────────────────────────────────────────
 
 function VariantComparison({ variants }: { variants: DeckStats[] }) {
+  const { t } = useTranslation('deck');
   // Gather all matchups that appear in at least one variant with ≥2 decisive games
   const allMatchups = [
     ...new Set(
@@ -185,14 +187,16 @@ function VariantComparison({ variants }: { variants: DeckStats[] }) {
     <div className="card overflow-hidden p-0">
       <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
         <GitCompare className="w-4 h-4 text-brand-400" />
-        <h3 className="card-header mb-0">Variant Comparison</h3>
-        <span className="text-xs text-gray-500 ml-1">— same archetype, different builds</span>
+        <h3 className="card-header mb-0">{t('analytics.comparison.title')}</h3>
+        <span className="text-xs text-gray-500 ml-1">{t('analytics.comparison.subtitle')}</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-800 bg-gray-800/30">
-              <th className="px-4 py-2.5 text-left text-gray-400 font-medium">Matchup</th>
+              <th className="px-4 py-2.5 text-left text-gray-400 font-medium">
+                {t('analytics.comparison.matchup')}
+              </th>
               {variants.map((v) => (
                 <th
                   key={v.deck.id}
@@ -201,13 +205,17 @@ function VariantComparison({ variants }: { variants: DeckStats[] }) {
                   {v.deck.variant}
                 </th>
               ))}
-              <th className="px-3 py-2.5 text-center text-gray-400 font-medium">Edge</th>
+              <th className="px-3 py-2.5 text-center text-gray-400 font-medium">
+                {t('analytics.comparison.edge')}
+              </th>
             </tr>
           </thead>
           <tbody>
             {/* Overall row */}
             <tr className="border-b border-gray-800 bg-gray-800/20">
-              <td className="px-4 py-2.5 font-semibold text-gray-200">Overall WR</td>
+              <td className="px-4 py-2.5 font-semibold text-gray-200">
+                {t('analytics.comparison.overallWr')}
+              </td>
               {variants.map((v) => (
                 <td key={v.deck.id} className="px-3 py-2.5 text-center">
                   <span
@@ -215,7 +223,9 @@ function VariantComparison({ variants }: { variants: DeckStats[] }) {
                   >
                     {v.games > 0 ? `${v.winRate}%` : '—'}
                   </span>
-                  <span className="text-gray-600 ml-1">({v.games}g)</span>
+                  <span className="text-gray-600 ml-1">
+                    {t('analytics.comparison.games', { count: v.games })}
+                  </span>
                 </td>
               ))}
               <td className="px-3 py-2.5 text-center">
@@ -229,10 +239,10 @@ function VariantComparison({ variants }: { variants: DeckStats[] }) {
                       Math.min(...variants.map((v) => v.winRate));
                     return diff >= 3 ? (
                       <span className="text-brand-400 font-medium">
-                        {best.deck.variant} +{diff}%
+                        {t('analytics.comparison.lead', { variant: best.deck.variant, diff })}
                       </span>
                     ) : (
-                      <span className="text-gray-500">~equal</span>
+                      <span className="text-gray-500">{t('analytics.comparison.approxEqual')}</span>
                     );
                   })()}
               </td>
@@ -259,14 +269,21 @@ function VariantComparison({ variants }: { variants: DeckStats[] }) {
                           </span>
                         </span>
                       ) : (
-                        <span className="text-gray-700">{c ? `${c.wins + c.losses}g` : '—'}</span>
+                        <span className="text-gray-700">
+                          {c
+                            ? t('analytics.comparison.gamesShort', { count: c.wins + c.losses })
+                            : '—'}
+                        </span>
                       )}
                     </td>
                   ))}
                   <td className="px-3 py-2 text-center">
                     {spread >= 10 ? (
                       <span className="text-brand-400 text-xs font-medium">
-                        {variants[rates.indexOf(maxRate)]?.deck.variant} +{spread}%
+                        {t('analytics.comparison.lead', {
+                          variant: variants[rates.indexOf(maxRate)]?.deck.variant,
+                          diff: spread,
+                        })}
                       </span>
                     ) : (
                       <span className="text-gray-700 text-xs">—</span>
@@ -285,6 +302,7 @@ function VariantComparison({ variants }: { variants: DeckStats[] }) {
 // ─── Single deck stats panel ──────────────────────────────────────────────────
 
 function MatchupList({ stats }: { stats: DeckStats }) {
+  const { t } = useTranslation('deck');
   const sorted = [...stats.matchups].sort((a, b) => {
     // Sort by meta frequency first (meta-relevant matchups first), then by games
     if (b.metaFreq !== a.metaFreq) return b.metaFreq - a.metaFreq;
@@ -293,9 +311,7 @@ function MatchupList({ stats }: { stats: DeckStats }) {
 
   if (sorted.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-600 text-sm">
-        No matches logged for this deck yet.
-      </div>
+      <div className="text-center py-8 text-gray-600 text-sm">{t('analytics.matchups.empty')}</div>
     );
   }
 
@@ -314,7 +330,9 @@ function MatchupList({ stats }: { stats: DeckStats }) {
               <div className="min-w-0">
                 <span className="text-xs text-gray-300 truncate block">{m.archetype}</span>
                 {m.metaFreq > 0 && (
-                  <span className="text-xs text-gray-600">{m.metaFreq.toFixed(1)}% meta</span>
+                  <span className="text-xs text-gray-600">
+                    {t('analytics.matchups.metaShare', { value: m.metaFreq.toFixed(1) })}
+                  </span>
                 )}
               </div>
             </div>
@@ -326,7 +344,9 @@ function MatchupList({ stats }: { stats: DeckStats }) {
             </div>
             <div className="w-16 shrink-0">
               {isLowData ? (
-                <span className="text-xs text-gray-700 italic">low data</span>
+                <span className="text-xs text-gray-700 italic">
+                  {t('analytics.matchups.lowData')}
+                </span>
               ) : (
                 <span
                   className={`text-xs px-1.5 py-0.5 rounded ${
@@ -338,10 +358,10 @@ function MatchupList({ stats }: { stats: DeckStats }) {
                   }`}
                 >
                   {m.tier === 'favorable'
-                    ? 'Favored'
+                    ? t('analytics.matchups.favored')
                     : m.tier === 'unfavorable'
-                      ? 'Unfav.'
-                      : 'Even'}
+                      ? t('analytics.matchups.unfavorable')
+                      : t('analytics.matchups.even')}
                 </span>
               )}
             </div>
@@ -361,6 +381,7 @@ function MetaInsights({
   stats: DeckStats;
   metaSnapshots: MetaSnapshot[];
 }) {
+  const { t } = useTranslation('deck');
   const topMeta = metaSnapshots
     .filter((s) => s.frequencyPct >= 5)
     .sort((a, b) => b.frequencyPct - a.frequencyPct)
@@ -396,10 +417,14 @@ function MetaInsights({
         <div className="flex items-start gap-2 p-2.5 bg-red-900/20 border border-red-900/40 rounded-lg text-xs">
           <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
           <div>
-            <span className="text-red-300 font-medium">Gatekeeper:</span>
+            <span className="text-red-300 font-medium">
+              {t('analytics.insights.gatekeeperLabel')}
+            </span>
             <span className="text-gray-300 ml-1">
-              {gatekeeper.archetype} ({gatekeeper.winRate}% WR) is a top-3 meta deck you're losing
-              to. Improve this matchup first.
+              {t('analytics.insights.gatekeeperText', {
+                archetype: gatekeeper.archetype,
+                rate: gatekeeper.winRate,
+              })}
             </span>
           </div>
         </div>
@@ -409,10 +434,11 @@ function MetaInsights({
         <div className="flex items-start gap-2 p-2.5 bg-yellow-900/20 border border-yellow-900/40 rounded-lg text-xs">
           <Target className="w-3.5 h-3.5 text-yellow-400 shrink-0 mt-0.5" />
           <div>
-            <span className="text-yellow-300 font-medium">Low coverage:</span>
+            <span className="text-yellow-300 font-medium">
+              {t('analytics.insights.lowCoverageLabel')}
+            </span>
             <span className="text-gray-300 ml-1">
-              You have data on {coveragePct}% of top meta decks. Log more matches for reliable meta
-              score.
+              {t('analytics.insights.lowCoverageText', { value: coveragePct })}
             </span>
           </div>
         </div>
@@ -422,9 +448,14 @@ function MetaInsights({
         <div className="flex items-start gap-2 p-2.5 bg-emerald-900/20 border border-emerald-900/40 rounded-lg text-xs">
           <Shield className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
           <span className="text-gray-300">
-            <span className="text-emerald-300 font-medium">Best matchup:</span>{' '}
-            {bestMatchup.archetype} ({bestMatchup.winRate}% in{' '}
-            {bestMatchup.wins + bestMatchup.losses + bestMatchup.ties} games)
+            <span className="text-emerald-300 font-medium">
+              {t('analytics.insights.bestLabel')}
+            </span>{' '}
+            {bestMatchup.archetype}{' '}
+            {t('analytics.insights.rateInGames', {
+              rate: bestMatchup.winRate,
+              count: bestMatchup.wins + bestMatchup.losses + bestMatchup.ties,
+            })}
           </span>
         </div>
       )}
@@ -435,9 +466,14 @@ function MetaInsights({
           <div className="flex items-start gap-2 p-2.5 bg-gray-800/40 border border-gray-700/40 rounded-lg text-xs">
             <TrendingDown className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
             <span className="text-gray-300">
-              <span className="text-gray-200 font-medium">Worst matchup:</span>{' '}
-              {worstMatchup.archetype} ({worstMatchup.winRate}% in{' '}
-              {worstMatchup.wins + worstMatchup.losses + worstMatchup.ties} games)
+              <span className="text-gray-200 font-medium">
+                {t('analytics.insights.worstLabel')}
+              </span>{' '}
+              {worstMatchup.archetype}{' '}
+              {t('analytics.insights.rateInGames', {
+                rate: worstMatchup.winRate,
+                count: worstMatchup.wins + worstMatchup.losses + worstMatchup.ties,
+              })}
             </span>
           </div>
         )}
@@ -448,6 +484,7 @@ function MetaInsights({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId }: Props) {
+  const { t } = useTranslation('deck');
   const freqMap = useMemo(
     () => new Map(metaSnapshots.map((s) => [s.archetype.toLowerCase(), s.frequencyPct])),
     [metaSnapshots],
@@ -494,9 +531,7 @@ export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId
 
   if (decks.length === 0) {
     return (
-      <div className="card py-12 text-center text-gray-600 text-sm">
-        No decks yet. Create your first deck above.
-      </div>
+      <div className="card py-12 text-center text-gray-600 text-sm">{t('analytics.noDecks')}</div>
     );
   }
 
@@ -507,10 +542,11 @@ export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId
         <div className="card p-0 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
             <Layers className="w-4 h-4 text-brand-400" />
-            <h3 className="card-header mb-0">{activeStats.deck.archetypeName} — Overall</h3>
+            <h3 className="card-header mb-0">
+              {t('analytics.overallTitle', { name: activeStats.deck.archetypeName })}
+            </h3>
             <span className="text-xs text-gray-500 ml-1">
-              · {archetypeAggregate.variantCount}{' '}
-              {archetypeAggregate.variantCount === 1 ? 'variant' : 'variants'} combined
+              {t('analytics.variantsCombined', { count: archetypeAggregate.variantCount })}
             </span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-800">
@@ -520,19 +556,19 @@ export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId
               >
                 {archetypeAggregate.games > 0 ? `${archetypeAggregate.winRate}%` : '—'}
               </div>
-              <div className="text-xs text-gray-500 mt-0.5">Overall WR</div>
+              <div className="text-xs text-gray-500 mt-0.5">{t('analytics.overallWr')}</div>
             </div>
             <div className="p-4 text-center">
               <div className="text-2xl font-bold text-gray-200 tabular-nums">
                 {archetypeAggregate.games}
               </div>
-              <div className="text-xs text-gray-500 mt-0.5">Total Games</div>
+              <div className="text-xs text-gray-500 mt-0.5">{t('analytics.totalGames')}</div>
             </div>
             <div className="p-4 text-center">
               <div className="text-2xl font-bold text-gray-200 font-mono">
                 {archetypeAggregate.wins}-{archetypeAggregate.losses}-{archetypeAggregate.ties}
               </div>
-              <div className="text-xs text-gray-500 mt-0.5">W - L - T</div>
+              <div className="text-xs text-gray-500 mt-0.5">{t('analytics.wlt')}</div>
             </div>
             <div className="p-4 text-center">
               <div className="text-sm font-semibold text-brand-300 truncate px-2">
@@ -541,7 +577,7 @@ export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId
                   : '—'}
               </div>
               <div className="text-xs text-gray-500 mt-0.5">
-                Best Variant
+                {t('analytics.bestVariant')}
                 {archetypeAggregate.bestVariant && archetypeAggregate.bestVariant.games > 0
                   ? ` (${archetypeAggregate.bestVariant.winRate}%)`
                   : ''}
@@ -556,9 +592,9 @@ export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId
         <>
           <div className="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider font-semibold pt-2">
             <BarChart2 className="w-3.5 h-3.5 text-brand-400" />
-            Variant:{' '}
+            {t('analytics.variantLabel')}{' '}
             <span className="text-gray-300 normal-case font-medium tracking-normal">
-              {activeStats.deck.variant || 'Default'}
+              {activeStats.deck.variant || t('analytics.defaultVariant')}
             </span>
           </div>
           {/* KPI row */}
@@ -572,9 +608,11 @@ export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId
               >
                 {activeStats.games > 0 ? `${activeStats.winRate}%` : '—'}
               </div>
-              <div className="text-xs text-gray-500 mt-0.5">Win Rate</div>
+              <div className="text-xs text-gray-500 mt-0.5">{t('analytics.winRate')}</div>
               {activeStats.games >= 5 && (
-                <div className="text-xs text-gray-700 mt-0.5">≥{activeStats.ciLower}% (95% CI)</div>
+                <div className="text-xs text-gray-700 mt-0.5">
+                  {t('analytics.ciLower', { value: activeStats.ciLower })}
+                </div>
               )}
             </div>
 
@@ -587,8 +625,8 @@ export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId
               >
                 {activeStats.metaScore > 0 ? `${activeStats.metaScore}%` : '—'}
               </div>
-              <div className="text-xs text-gray-500 mt-0.5">Meta Score</div>
-              <div className="text-xs text-gray-700 mt-0.5">freq-weighted WR</div>
+              <div className="text-xs text-gray-500 mt-0.5">{t('analytics.metaScore')}</div>
+              <div className="text-xs text-gray-700 mt-0.5">{t('analytics.freqWeighted')}</div>
             </div>
 
             <div className="card p-4 text-center">
@@ -600,7 +638,7 @@ export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId
               >
                 {activeStats.recentForm.length > 0 ? `${activeStats.recentWR}%` : '—'}
               </div>
-              <div className="text-xs text-gray-500 mt-0.5">Recent Form</div>
+              <div className="text-xs text-gray-500 mt-0.5">{t('analytics.recentForm')}</div>
               <div className="flex items-center justify-center gap-0.5 mt-1">
                 {activeStats.recentForm.map((r, i) => (
                   <FormDot key={i} r={r} />
@@ -617,8 +655,8 @@ export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId
               >
                 {activeStats.games >= 6 ? `${activeStats.consistency}` : '—'}
               </div>
-              <div className="text-xs text-gray-500 mt-0.5">Consistency</div>
-              <div className="text-xs text-gray-700 mt-0.5">WR stability</div>
+              <div className="text-xs text-gray-500 mt-0.5">{t('analytics.consistency')}</div>
+              <div className="text-xs text-gray-700 mt-0.5">{t('analytics.wrStability')}</div>
             </div>
           </div>
 
@@ -631,8 +669,8 @@ export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId
           <div className="card p-0 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
               <BarChart2 className="w-4 h-4 text-brand-400" />
-              <h3 className="card-header mb-0">Matchup Performance</h3>
-              <span className="text-xs text-gray-600 ml-1">· sorted by meta relevance</span>
+              <h3 className="card-header mb-0">{t('analytics.matchupPerformance')}</h3>
+              <span className="text-xs text-gray-600 ml-1">{t('analytics.sortedByMeta')}</span>
             </div>
             <div className="px-4 py-3">
               <MatchupList stats={activeStats} />

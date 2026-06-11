@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { DeckRecommendation } from '../../types';
 import { AlertTriangle, TrendingUp, Info, Zap } from 'lucide-react';
 
@@ -5,44 +6,39 @@ interface Props {
   recommendations: DeckRecommendation[];
 }
 
+/**
+ * Static icon/color config per priority tier. Labels are i18n keys in the
+ * `recommendations` namespace, resolved at render time.
+ */
 const PRIORITY_CONFIG = {
   high: {
     Icon: AlertTriangle,
     color: 'text-red-400',
     bg: 'bg-red-900/20 border-red-800',
-    label: 'High Priority',
+    labelKey: 'panel.priority.high',
   },
   medium: {
     Icon: TrendingUp,
     color: 'text-yellow-400',
     bg: 'bg-yellow-900/20 border-yellow-800',
-    label: 'Medium Priority',
+    labelKey: 'panel.priority.medium',
   },
   low: {
     Icon: Info,
     color: 'text-blue-400',
     bg: 'bg-blue-900/20 border-blue-800',
-    label: 'Low Priority',
+    labelKey: 'panel.priority.low',
   },
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  add: 'Add',
-  remove: 'Remove',
-  ratio: 'Ratio',
-  tech: 'Tech',
-  version: 'Version',
-};
-
 export function RecommendationsPanel({ recommendations }: Props) {
+  const { t } = useTranslation('recommendations');
+
   if (recommendations.length === 0) {
     return (
       <div className="card flex flex-col items-center justify-center py-16 gap-3">
         <Zap className="w-8 h-8 text-gray-700" />
-        <p className="text-gray-500 text-sm text-center max-w-xs">
-          No recommendations yet. Log at least 2 opponent matches to start receiving data-driven
-          suggestions.
-        </p>
+        <p className="text-gray-500 text-sm text-center max-w-xs">{t('panel.empty')}</p>
       </div>
     );
   }
@@ -59,13 +55,15 @@ export function RecommendationsPanel({ recommendations }: Props) {
                 <div className="flex items-center gap-2 flex-wrap mb-1.5">
                   <span className="text-white font-medium text-sm">{rec.suggestion}</span>
                   <span className={`badge border text-xs ${config.bg} ${config.color}`}>
-                    {config.label}
+                    {t(config.labelKey)}
                   </span>
                   <span className="badge bg-gray-800 text-gray-400 border-gray-700 text-xs">
-                    {CATEGORY_LABELS[rec.category]}
+                    {t(`panel.category.${rec.category}`)}
                   </span>
                   {rec.dataPoints > 0 && (
-                    <span className="text-gray-600 text-xs">{rec.dataPoints} games</span>
+                    <span className="text-gray-600 text-xs">
+                      {t('games', { count: rec.dataPoints })}
+                    </span>
                   )}
                 </div>
                 <p className="text-gray-400 text-sm">{rec.reasoning}</p>

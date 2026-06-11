@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Layers, Search, Check, CheckCircle2 } from 'lucide-react';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { PokemonIcon } from '../shared/PokemonIcon';
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function CreateDeckModal({ onClose, onRequestImport }: Props) {
+  const { t } = useTranslation('deck');
   const { createNewDeck } = useDashboardStore();
 
   const [query, setQuery] = useState('');
@@ -63,6 +65,14 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
     setShowList(true);
   };
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
   const handleSave = async () => {
     if (!archetypeName.trim()) return;
     setSaving(true);
@@ -79,15 +89,27 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70">
-      <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-xl w-full max-w-md shadow-xl flex flex-col max-h-[85vh]">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-deck-modal-title"
+        className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-xl w-full max-w-md shadow-xl flex flex-col max-h-[85vh]"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/[0.07] shrink-0">
-          <h2 className="text-white font-semibold flex items-center gap-2">
-            <Layers className="w-4 h-4 text-brand-400" />
-            New Deck
+          <h2
+            id="create-deck-modal-title"
+            className="text-white font-semibold flex items-center gap-2"
+          >
+            <Layers className="w-4 h-4 text-brand-400" aria-hidden="true" />
+            {t('createModal.title')}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300">
-            <X className="w-4 h-4" />
+          <button
+            onClick={onClose}
+            aria-label={t('close', { ns: 'common' })}
+            className="text-gray-500 hover:text-gray-300"
+          >
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
 
@@ -97,14 +119,16 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
             /* ── Success state ── */
             <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
               <CheckCircle2 className="w-12 h-12 text-emerald-400" />
-              <p className="text-white font-semibold">Deck created!</p>
-              <p className="text-xs text-gray-400">Import a card list now?</p>
+              <p className="text-white font-semibold">{t('createModal.created')}</p>
+              <p className="text-xs text-gray-400">{t('createModal.importPrompt')}</p>
             </div>
           ) : (
             <>
               {/* Archetype combobox */}
               <div>
-                <label className="block text-xs text-gray-400 mb-1.5">Archetype</label>
+                <label className="block text-xs text-gray-400 mb-1.5">
+                  {t('createModal.archetype')}
+                </label>
                 <div className="relative">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
                     {selected ? (
@@ -124,7 +148,7 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
                         handleSelect(filtered[0].slug, filtered[0].name);
                       }
                     }}
-                    placeholder="Search archetype…"
+                    placeholder={t('createModal.searchPlaceholder')}
                     className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400"
                     autoComplete="off"
                   />
@@ -137,7 +161,7 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
                   >
                     {filtered.length === 0 ? (
                       <div className="px-3 py-2 text-xs text-gray-500">
-                        No match — deck will be created with custom archetype name.
+                        {t('createModal.noMatch')}
                       </div>
                     ) : (
                       filtered.map((a) => (
@@ -155,7 +179,9 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
                         >
                           <PokemonIcon archetype={a.slug} size="sm" dual />
                           <span className="flex-1 text-left">{a.name}</span>
-                          {archetype === a.slug && <Check className="w-3.5 h-3.5 shrink-0" />}
+                          {archetype === a.slug && (
+                            <Check className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                          )}
                         </button>
                       ))
                     )}
@@ -166,14 +192,15 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
               {/* Variant / deck name */}
               <div>
                 <label className="block text-xs text-gray-400 mb-1.5">
-                  Deck Name <span className="text-gray-600">(optional)</span>
+                  {t('createModal.deckName')}{' '}
+                  <span className="text-gray-600">({t('optional', { ns: 'common' })})</span>
                 </label>
                 <input
                   type="text"
                   value={variant}
                   onChange={(e) => setVariant(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                  placeholder='e.g. "Fezandipiti Build", "Aggro", "Turbo"'
+                  placeholder={t('createModal.deckNamePlaceholder')}
                   className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400"
                 />
               </div>
@@ -186,7 +213,7 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
           {deckCreated ? (
             <>
               <button onClick={onClose} className="btn-ghost flex-1 justify-center text-sm">
-                Done
+                {t('done', { ns: 'common' })}
               </button>
               {onRequestImport && (
                 <button
@@ -196,21 +223,21 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
                   }}
                   className="btn-primary flex-1 justify-center text-sm"
                 >
-                  Import Cards
+                  {t('createModal.importCards')}
                 </button>
               )}
             </>
           ) : (
             <>
               <button onClick={onClose} className="btn-ghost flex-1 justify-center text-sm">
-                Cancel
+                {t('cancel', { ns: 'common' })}
               </button>
               <button
                 onClick={handleSave}
                 disabled={!archetypeName.trim() || saving}
                 className="btn-primary flex-1 justify-center text-sm disabled:opacity-50"
               >
-                {saving ? 'Creating…' : 'Create Deck'}
+                {saving ? t('createModal.creating') : t('createModal.create')}
               </button>
             </>
           )}

@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   X,
   FileText,
@@ -30,37 +31,34 @@ interface Props {
 // ─── Small helpers ─────────────────────────────────────────────────────────────
 
 function ImpactBadge({ impact }: { impact: 'high' | 'medium' | 'low' }) {
+  const { t } = useTranslation('opponents');
   const cls =
     impact === 'high'
       ? 'bg-red-900/50 text-red-300 border border-red-700/50'
       : impact === 'medium'
         ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-700/50'
         : 'bg-gray-700/50 text-gray-400 border border-gray-600/50';
-  const label = impact === 'high' ? 'Hoch' : impact === 'medium' ? 'Mittel' : 'Niedrig';
+  const label = t(`matchDetail.impact.${impact}`);
   return <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${cls}`}>{label}</span>;
 }
 
 function ActionBadge({ action }: { action: 'add' | 'remove' | 'increase' | 'decrease' }) {
+  const { t } = useTranslation('opponents');
   const map = {
     add: 'bg-green-900/50 text-green-300 border border-green-700/50',
     remove: 'bg-red-900/50 text-red-300 border border-red-700/50',
     increase: 'bg-blue-900/50 text-blue-300 border border-blue-700/50',
     decrease: 'bg-orange-900/50 text-orange-300 border border-orange-700/50',
   };
-  const label = {
-    add: '+hinzufügen',
-    remove: '−entfernen',
-    increase: '▲ erhöhen',
-    decrease: '▼ reduzieren',
-  };
   return (
     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${map[action]}`}>
-      {label[action]}
+      {t(`matchDetail.action.${action}`)}
     </span>
   );
 }
 
 function PlayCard({ item }: { item: BattleAnalysisPlay }) {
+  const { t } = useTranslation('opponents');
   const [open, setOpen] = useState(false);
   return (
     <div className="bg-gray-800/60 rounded-lg border border-gray-700/50 overflow-hidden">
@@ -69,15 +67,17 @@ function PlayCard({ item }: { item: BattleAnalysisPlay }) {
         onClick={() => setOpen((v) => !v)}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-[10px] text-gray-500 shrink-0">Zug {item.turn}</span>
+          <span className="text-[10px] text-gray-500 shrink-0">
+            {t('matchDetail.turn', { turn: item.turn })}
+          </span>
           <span className="text-sm text-gray-200 truncate">{item.observation}</span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <ImpactBadge impact={item.impact} />
           {open ? (
-            <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
+            <ChevronUp className="w-3.5 h-3.5 text-gray-500" aria-hidden="true" />
           ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+            <ChevronDown className="w-3.5 h-3.5 text-gray-500" aria-hidden="true" />
           )}
         </div>
       </button>
@@ -89,7 +89,7 @@ function PlayCard({ item }: { item: BattleAnalysisPlay }) {
           {item.suggestion && (
             <div className="flex gap-1.5">
               <span className="text-[10px] text-brand-400 font-medium shrink-0 mt-0.5">
-                Vorschlag:
+                {t('matchDetail.suggestion')}
               </span>
               <p className="text-xs text-gray-300">{item.suggestion}</p>
             </div>
@@ -103,14 +103,18 @@ function PlayCard({ item }: { item: BattleAnalysisPlay }) {
 // ─── Analysis result renderer ─────────────────────────────────────────────────
 
 function AnalysisView({ analysis }: { analysis: BattleAnalysis }) {
+  const { t, i18n } = useTranslation('opponents');
   return (
     <div className="space-y-5">
       {/* Summary */}
       <div className="bg-gray-800/40 rounded-lg px-4 py-3 border border-gray-700/40">
         <p className="text-sm text-gray-300 leading-relaxed">{analysis.summary}</p>
         <p className="text-[10px] text-gray-600 mt-2">
-          Analysiert am {new Date(analysis.analyzedAt).toLocaleString('de-DE')} · Spieler:{' '}
-          {analysis.playerName} · Gegner: {analysis.opponentName}
+          {t('matchDetail.analyzedMeta', {
+            date: new Date(analysis.analyzedAt).toLocaleString(i18n.language),
+            player: analysis.playerName,
+            opponent: analysis.opponentName,
+          })}
         </p>
       </div>
 
@@ -119,7 +123,7 @@ function AnalysisView({ analysis }: { analysis: BattleAnalysis }) {
         <section>
           <h4 className="flex items-center gap-1.5 text-xs font-semibold text-red-400 uppercase tracking-wide mb-2">
             <AlertTriangle className="w-3.5 h-3.5" />
-            Spielfehler / Verbesserungen ({analysis.playMistakes.length})
+            {t('matchDetail.sections.mistakes', { count: analysis.playMistakes.length })}
           </h4>
           <div className="space-y-1.5">
             {analysis.playMistakes.map((m, i) => (
@@ -134,7 +138,7 @@ function AnalysisView({ analysis }: { analysis: BattleAnalysis }) {
         <section>
           <h4 className="flex items-center gap-1.5 text-xs font-semibold text-brand-400 uppercase tracking-wide mb-2">
             <TrendingUp className="w-3.5 h-3.5" />
-            Schlüsselmomente ({analysis.keyMoments.length})
+            {t('matchDetail.sections.keyMoments', { count: analysis.keyMoments.length })}
           </h4>
           <div className="space-y-1.5">
             {analysis.keyMoments.map((m, i) => (
@@ -149,7 +153,7 @@ function AnalysisView({ analysis }: { analysis: BattleAnalysis }) {
         <section>
           <h4 className="flex items-center gap-1.5 text-xs font-semibold text-green-400 uppercase tracking-wide mb-2">
             <Layers className="w-3.5 h-3.5" />
-            Deck-Empfehlungen ({analysis.deckSuggestions.length})
+            {t('matchDetail.sections.deckSuggestions', { count: analysis.deckSuggestions.length })}
           </h4>
           <div className="space-y-1.5">
             {analysis.deckSuggestions.map((s, i) => (
@@ -176,7 +180,7 @@ function AnalysisView({ analysis }: { analysis: BattleAnalysis }) {
         <section>
           <h4 className="flex items-center gap-1.5 text-xs font-semibold text-yellow-400 uppercase tracking-wide mb-2">
             <FileText className="w-3.5 h-3.5" />
-            Karten-Analyse ({analysis.cardNotes.length})
+            {t('matchDetail.sections.cardNotes', { count: analysis.cardNotes.length })}
           </h4>
           <div className="space-y-1.5">
             {analysis.cardNotes.map((n, i) => (
@@ -209,6 +213,7 @@ function AnalysisView({ analysis }: { analysis: BattleAnalysis }) {
 // ─── Main modal ───────────────────────────────────────────────────────────────
 
 export function MatchDetailModal({ log, onClose }: Props) {
+  const { t } = useTranslation('opponents');
   const { refresh } = useDashboardStore();
 
   const [battleLog, setBattleLog] = useState(log.battleLog ?? '');
@@ -232,6 +237,14 @@ export function MatchDetailModal({ log, onClose }: Props) {
   const [activeTab, setActiveTab] = useState<'log' | 'stats' | 'analysis' | 'snapshot'>('log');
   const [snapshotCards, setSnapshotCards] = useState<DeckCard[] | null>(null);
   const [snapshotError, setSnapshotError] = useState(false);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     if (activeTab !== 'snapshot' || !log.deckSnapshotId) return;
@@ -291,16 +304,27 @@ export function MatchDetailModal({ log, onClose }: Props) {
   const resultBadge =
     log.result === 'W' ? 'badge-win' : log.result === 'L' ? 'badge-loss' : 'badge-tie';
   const resultLabel =
-    log.result === 'W' ? 'Sieg' : log.result === 'L' ? 'Niederlage' : 'Unentschieden';
+    log.result === 'W'
+      ? t('matchDetail.result.win')
+      : log.result === 'L'
+        ? t('matchDetail.result.loss')
+        : t('matchDetail.result.tie');
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="match-detail-modal-title"
+        className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl"
+      >
         {/* Header */}
         <div className="flex items-start justify-between px-5 pt-5 pb-4 border-b border-gray-800 shrink-0">
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h2 className="text-white font-semibold text-base">vs. {log.archetype}</h2>
+              <h2 id="match-detail-modal-title" className="text-white font-semibold text-base">
+                {t('matchDetail.versus', { archetype: log.archetype })}
+              </h2>
               <span className={resultBadge}>{resultLabel}</span>
               <span className={log.eventType === 'LC' ? 'badge-lc' : 'badge-lcup'}>
                 {log.eventType}
@@ -308,12 +332,16 @@ export function MatchDetailModal({ log, onClose }: Props) {
             </div>
             <p className="text-xs text-gray-500 mt-1">
               {log.eventDate}
-              {log.round ? ` · Runde ${log.round}` : ''}
+              {log.round ? ` · ${t('matchDetail.roundLabel', { round: log.round })}` : ''}
               {log.notes ? ` · ${log.notes}` : ''}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 ml-3 shrink-0">
-            <X className="w-4 h-4" />
+          <button
+            onClick={onClose}
+            aria-label={t('close', { ns: 'common' })}
+            className="text-gray-500 hover:text-gray-300 ml-3 shrink-0"
+          >
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
 
@@ -327,8 +355,8 @@ export function MatchDetailModal({ log, onClose }: Props) {
                 : 'text-gray-500 hover:text-gray-300'
             }`}
           >
-            <FileText className="w-3.5 h-3.5" />
-            Kampfprotokoll
+            <FileText className="w-3.5 h-3.5" aria-hidden="true" />
+            {t('matchDetail.tabs.log')}
           </button>
           <button
             onClick={() => setActiveTab('stats')}
@@ -338,8 +366,8 @@ export function MatchDetailModal({ log, onClose }: Props) {
                 : 'text-gray-500 hover:text-gray-300'
             }`}
           >
-            <BarChart2 className="w-3.5 h-3.5" />
-            Statistiken
+            <BarChart2 className="w-3.5 h-3.5" aria-hidden="true" />
+            {t('matchDetail.tabs.stats')}
           </button>
           <button
             onClick={() => setActiveTab('analysis')}
@@ -349,8 +377,8 @@ export function MatchDetailModal({ log, onClose }: Props) {
                 : 'text-gray-500 hover:text-gray-300'
             }`}
           >
-            <Brain className="w-3.5 h-3.5" />
-            KI-Analyse
+            <Brain className="w-3.5 h-3.5" aria-hidden="true" />
+            {t('matchDetail.tabs.analysis')}
             {analysis && (
               <span className="ml-1 w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
             )}
@@ -364,8 +392,8 @@ export function MatchDetailModal({ log, onClose }: Props) {
                   : 'text-gray-500 hover:text-gray-300'
               }`}
             >
-              <Layers className="w-3.5 h-3.5" />
-              Deckliste
+              <Layers className="w-3.5 h-3.5" aria-hidden="true" />
+              {t('matchDetail.tabs.deckList')}
             </button>
           )}
         </div>
@@ -375,17 +403,14 @@ export function MatchDetailModal({ log, onClose }: Props) {
           {/* ── Log tab ── */}
           {activeTab === 'log' && (
             <div className="space-y-3">
-              <p className="text-xs text-gray-500">
-                Füge das Kampfprotokoll aus PTCGL / PTCGO ein. Es wird lokal gespeichert und für die
-                KI-Analyse verwendet.
-              </p>
+              <p className="text-xs text-gray-500">{t('matchDetail.logTab.hint')}</p>
               <textarea
                 value={battleLog}
                 onChange={(e) => {
                   setBattleLog(e.target.value);
                   setLogDirty(true);
                 }}
-                placeholder="Protokoll hier einfügen…"
+                placeholder={t('matchDetail.logTab.placeholder')}
                 rows={8}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-brand-500 resize-none font-mono leading-relaxed"
               />
@@ -395,8 +420,8 @@ export function MatchDetailModal({ log, onClose }: Props) {
                   disabled={!logDirty || savingLog}
                   className="btn-primary text-xs disabled:opacity-40"
                 >
-                  <Save className="w-3.5 h-3.5" />
-                  {savingLog ? 'Speichern…' : 'Protokoll speichern'}
+                  <Save className="w-3.5 h-3.5" aria-hidden="true" />
+                  {savingLog ? t('saving', { ns: 'common' }) : t('matchDetail.logTab.save')}
                 </button>
               </div>
             </div>
@@ -410,8 +435,8 @@ export function MatchDetailModal({ log, onClose }: Props) {
               ) : (
                 <p className="text-sm text-gray-600 text-center py-10">
                   {battleLog.trim()
-                    ? 'Das Protokoll konnte nicht ausgewertet werden.'
-                    : 'Füge im Tab "Kampfprotokoll" ein Protokoll ein, um Statistiken zu sehen.'}
+                    ? t('matchDetail.stats.parseFailed')
+                    : t('matchDetail.stats.pasteFirst')}
                 </p>
               )}
             </div>
@@ -422,11 +447,13 @@ export function MatchDetailModal({ log, onClose }: Props) {
             <div>
               {snapshotError && (
                 <p className="text-sm text-gray-500 text-center py-10">
-                  Snapshot nicht mehr vorhanden.
+                  {t('matchDetail.snapshot.missing')}
                 </p>
               )}
               {!snapshotError && !snapshotCards && (
-                <p className="text-sm text-gray-600 text-center py-10">Lade…</p>
+                <p className="text-sm text-gray-600 text-center py-10">
+                  {t('loading', { ns: 'common' })}
+                </p>
               )}
               {snapshotCards &&
                 (() => {
@@ -452,7 +479,8 @@ export function MatchDetailModal({ log, onClose }: Props) {
                             <h4
                               className={`text-xs font-semibold uppercase tracking-wide mb-2 ${color}`}
                             >
-                              {type} ({cards.reduce((s, c) => s + c.count, 0)})
+                              {t(`matchDetail.cardTypes.${type}`)} (
+                              {cards.reduce((s, c) => s + c.count, 0)})
                             </h4>
                             <div className="space-y-0.5">
                               {cards.map((c) => (
@@ -482,23 +510,25 @@ export function MatchDetailModal({ log, onClose }: Props) {
               {/* Config area */}
               <div className="bg-gray-800/40 rounded-lg border border-gray-700/40 p-4 space-y-3">
                 <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                  Analyse-Einstellungen
+                  {t('matchDetail.analysisTab.settings')}
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">
-                      Mein Spielername im Protokoll
+                      {t('matchDetail.analysisTab.playerNameLabel')}
                     </label>
                     <input
                       type="text"
                       value={playerName}
                       onChange={(e) => setPlayerName(e.target.value)}
-                      placeholder="z.B. Premiox"
+                      placeholder={t('matchDetail.analysisTab.playerNamePlaceholder')}
                       className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Anthropic API-Key</label>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      {t('matchDetail.analysisTab.apiKeyLabel')}
+                    </label>
                     <input
                       type="password"
                       value={apiKey}
@@ -509,9 +539,7 @@ export function MatchDetailModal({ log, onClose }: Props) {
                   </div>
                 </div>
                 {!battleLog.trim() && (
-                  <p className="text-xs text-yellow-500">
-                    Kein Kampfprotokoll vorhanden — erst im Tab "Kampfprotokoll" einfügen.
-                  </p>
+                  <p className="text-xs text-yellow-500">{t('matchDetail.analysisTab.noLog')}</p>
                 )}
                 <button
                   onClick={handleAnalyze}
@@ -520,13 +548,15 @@ export function MatchDetailModal({ log, onClose }: Props) {
                 >
                   {analyzing ? (
                     <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      Analysiere…
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                      {t('matchDetail.analysisTab.analyzing')}
                     </>
                   ) : (
                     <>
-                      <Brain className="w-3.5 h-3.5" />
-                      {analysis ? 'Neu analysieren' : 'Analyse starten'}
+                      <Brain className="w-3.5 h-3.5" aria-hidden="true" />
+                      {analysis
+                        ? t('matchDetail.analysisTab.reanalyze')
+                        : t('matchDetail.analysisTab.start')}
                     </>
                   )}
                 </button>
@@ -541,8 +571,7 @@ export function MatchDetailModal({ log, onClose }: Props) {
               {analysis && <AnalysisView analysis={analysis} />}
               {!analysis && !analyzing && !analysisError && (
                 <p className="text-sm text-gray-600 text-center py-8">
-                  Noch keine Analyse vorhanden. Gib deinen Spielernamen und API-Key ein und starte
-                  die Analyse.
+                  {t('matchDetail.analysisTab.empty')}
                 </p>
               )}
             </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapPin, X, Plus } from 'lucide-react';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { SidePanel } from './SidePanel';
@@ -18,6 +19,7 @@ const QUICK_ADD = [
 ];
 
 export function LocalMetaPanel() {
+  const { t } = useTranslation('deck');
   const { localMeta, setLocalMeta, archetypeStats } = useDashboardStore();
   const [input, setInput] = useState('');
 
@@ -38,8 +40,8 @@ export function LocalMetaPanel() {
   return (
     <SidePanel
       icon={<MapPin className="w-4 h-4" />}
-      title="Local Meta"
-      description="Decks you commonly face at your locals. These get boosted priority in recommendations."
+      title={t('localMeta.title')}
+      description={t('localMeta.description')}
     >
       <div className="flex flex-col gap-3 h-full">
         {/* Current list */}
@@ -54,9 +56,9 @@ export function LocalMetaPanel() {
                 <button
                   onClick={() => remove(arch)}
                   className="text-amber-500 hover:text-amber-200 ml-0.5"
-                  aria-label={`Remove ${arch}`}
+                  aria-label={t('localMeta.remove', { archetype: arch })}
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3 h-3" aria-hidden="true" />
                 </button>
               </span>
             ))}
@@ -70,7 +72,7 @@ export function LocalMetaPanel() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && add(input)}
-            placeholder="Archetype name…"
+            placeholder={t('localMeta.placeholder')}
             list="arch-suggestions"
             className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-amber-600"
           />
@@ -84,8 +86,8 @@ export function LocalMetaPanel() {
             disabled={!input.trim()}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-700/30 hover:bg-amber-700/50 text-amber-300 border border-amber-700/40 transition-colors disabled:opacity-40"
           >
-            <Plus className="w-3.5 h-3.5" />
-            Add
+            <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+            {t('localMeta.add')}
           </button>
         </div>
 
@@ -93,7 +95,7 @@ export function LocalMetaPanel() {
         {localMeta.length < 8 && allOptions.length > 0 && (
           <div className="mt-auto">
             <p className="text-[11px] uppercase tracking-wider text-gray-600 mb-1.5 font-medium">
-              Suggestions
+              {t('localMeta.suggestions')}
             </p>
             <div className="flex flex-wrap gap-1">
               {allOptions.slice(0, 6).map((arch) => (
