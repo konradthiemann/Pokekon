@@ -1,0 +1,274 @@
+import { useState, useMemo, useRef } from 'react';
+import { Plus, Trash2, X, Star, Pencil, Check, Search } from 'lucide-react';
+import { useDashboardStore } from '../../store/dashboardStore';
+import { PokemonIcon } from '../shared/PokemonIcon';
+import { CreateDeckModal } from './CreateDeckModal';
+import { ImportDeckModal } from './ImportDeckModal';
+import { KNOWN_ARCHETYPES } from '../../constants/archetypes';
+
+export type DeckSection = 'deck' | 'analytics' | 'log';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function WrPill({ rate, games }: { rate: number; games: number }) {
+  if (games === 0) return <span className="text-[10px] text-white/25">Keine Spiele</span>;
+  const cls = rate >= 55 ? 'text-emerald-400' : rate >= 45 ? 'text-yellow-400' : 'text-red-400';
+  return <span className={`text-[10px] font-semibold tabular-nums ${cls}`}>{rate}% · {games}g</span>;
+}
+
+function deckLabel(deck: { archetypeName: string; variant: string }): string {
+  const v = deck.variant?.trim();
+  if (!v || v === 'Default' || v === 'Standard') return deck.archetypeName;
+  return v;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function DeckSwitcher() {
+  const { decks, activeDeckId, opponentLogs, setActiveDeck, removeDecks, updateCurrentDeck } = useDashboardStore();
+
+  const [showCreate,           setShowCreate]           = useState(false);
+  const [showImport,           setShowImport]           = useState(false);
+  const [confirmDelete,        setConfirmDelete]        = useState<number | null>(null);
+  const [editingArchetypeFor,  setEditingArchetypeFor]  = useState<number | null>(null);
+  const [archetypeSearch,      setArchetypeSearch]      = useState('');
+  const [customSlug,           setCustomSlug]           = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const deckStats = useMemo(() => new Map(decks.map((d) => {
+    const logs   = opponentLogs.filter((l) => l.deckId === d.id);
+    const wins   = logs.filter((l) => l.result === 'W').length;
+    const losses = logs.filter((l) => l.result === 'L').length;
+    const rate   = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
+    return [d.id!, { games: logs.length, winRate: rate }] as const;
+  })), [decks, opponentLogs]);
+
+  const filteredArchetypes = useMemo(() => {
+    const q = archetypeSearch.toLowerCase().trim();
+    if (!q) return KNOWN_ARCHETYPES;
+    return KNOWN_ARCHETYPES.filter(
+      (a) => a.name.toLowerCase().includes(q) || a.slug.includes(q)
+    );
+  }, [archetypeSearch]);
+
+  const editingDeck = decks.find((d) => d.id === editingArchetypeFor);
+
+  const openArchetypePicker = async (deckId: number) => {
+    if (deckId !== activeDeckId) await setActiveDeck(deckId);
+    setEditingArchetypeFor(deckId);
+    setArchetypeSearch('');
+    setCustomSlug('');
+    setTimeout(() => searchRef.current?.focus(), 60);
+  };
+
+  const closePicker = () => {
+    setEditingArchetypeFor(null);
+    setArchetypeSearch('');
+    setCustomSlug('');
+  };
+
+  const selectArchetype = async (slug: string, name: string) => {
+    await updateCurrentDeck({ archetype: slug, archetypeName: name });
+    closePicker();
+  };
+
+  const applyCustomSlug = async () => {
+    const s = customSlug.trim();
+    if (!s) return;
+    // Derive a display name: capitalise each word, keep 'ex' lowercase
+    const name = s.split('-')
+      .map((w) => (w === 'ex' ? 'ex' : w.charAt(0).toUpperCase() + w.slice(1)))
+      .join(' ');
+    await selectArchetype(s, name);
+  };
+
+  return (
+    <>
+      <div className="card p-0 overflow-hidden">
+
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
+          <span className="text-[11px] font-semibold text-blue-300/70 uppercase tracking-widest">My Decks</span>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-brand-500/15 hover:bg-brand-500/25 text-brand-300 border border-brand-400/25 transition-colors"
+          >
+            <Plus className="w-3 h-3" /> New
+          </button>
+        </div>
+
+        {/* ── Deck rows ── */}
+        {decks.length === 0 ? (
+          <div className="px-4 py-8 text-center text-white/30 text-sm">
+            No decks yet. Create one to get started.
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.04]">
+            {decks.map((deck) => {
+              const isActive  = deck.id === activeDeckId;
+              const stats     = deckStats.get(deck.id!);
+              const deleting  = confirmDelete === deck.id;
+
+              return (
+                <div
+                  key={deck.id}
+                  className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                    isActive
+                      ? 'bg-brand-500/10 border-l-2 border-brand-400'
+                      : 'hover:bg-white/[0.04] border-l-2 border-transparent cursor-pointer'
+                  }`}
+                  onClick={() => !deleting && !isActive && deck.id && setActiveDeck(deck.id)}
+                >
+                  <PokemonIcon archetype={deck.archetype} size="md" dual reserveSecondary />
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-sm font-semibold truncate ${isActive ? 'text-white' : 'text-white/80'}`}>
+                        {deckLabel(deck)}
+                      </span>
+                      {isActive && <Star className="w-3 h-3 fill-current text-yellow-400 shrink-0" />}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {deck.archetypeName !== deckLabel(deck) && (
+                        <span className="text-[11px] text-white/35 truncate">{deck.archetypeName}</span>
+                      )}
+                      {stats && <WrPill rate={stats.winRate} games={stats.games} />}
+                    </div>
+                  </div>
+
+                  {/* Actions — stop click from bubbling to row */}
+                  <div className="flex items-center gap-1 shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
+                    {deleting ? (
+                      <div className="flex items-center gap-1.5 bg-red-500/10 border border-red-500/25 rounded-lg px-2 py-1">
+                        <span className="text-xs text-red-300">Delete?</span>
+                        <button
+                          onClick={() => { deck.id && removeDecks(deck.id); setConfirmDelete(null); }}
+                          className="text-xs text-red-400 hover:text-red-200 font-medium px-1.5 py-0.5 rounded bg-red-500/20"
+                        >Yes</button>
+                        <button onClick={() => setConfirmDelete(null)} className="text-white/30 hover:text-white/70">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => deck.id && openArchetypePicker(deck.id)}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            editingArchetypeFor === deck.id
+                              ? 'text-brand-300 bg-brand-500/15'
+                              : 'text-white/25 hover:text-brand-300 hover:bg-brand-500/10'
+                          }`}
+                          title="Change archetype"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => deck.id && setConfirmDelete(deck.id)}
+                          className="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          title="Delete deck"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Archetype picker (slides in when a deck's pencil is clicked) ── */}
+        {editingArchetypeFor !== null && (
+          <div className="border-t border-white/[0.08] bg-white/[0.02]">
+            {/* Picker header */}
+            <div className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-xs font-semibold text-white/60">
+                Archetype for <span className="text-white/90">{editingDeck ? deckLabel(editingDeck) : '…'}</span>
+              </span>
+              <button onClick={closePicker} className="text-white/30 hover:text-white/70 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="px-4 pb-2">
+              <div className="flex items-center gap-2 bg-white/[0.06] border border-white/[0.10] rounded-xl px-3 py-2">
+                <Search className="w-3.5 h-3.5 text-white/35 shrink-0" />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={archetypeSearch}
+                  onChange={(e) => setArchetypeSearch(e.target.value)}
+                  placeholder="Search archetype…"
+                  className="flex-1 bg-transparent text-sm text-white placeholder-white/30 focus:outline-none"
+                />
+                {archetypeSearch && (
+                  <button onClick={() => setArchetypeSearch('')} className="text-white/30 hover:text-white/60">
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Archetype list */}
+            <div className="max-h-56 overflow-y-auto px-2 pb-2">
+              {filteredArchetypes.length === 0 ? (
+                <p className="text-center text-white/30 text-xs py-4">No match — use custom slug below.</p>
+              ) : (
+                filteredArchetypes.map((a) => {
+                  const isCurrent = editingDeck?.archetype === a.slug;
+                  return (
+                    <button
+                      key={a.slug}
+                      onClick={() => selectArchetype(a.slug, a.name)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors ${
+                        isCurrent
+                          ? 'bg-brand-500/20 text-white'
+                          : 'hover:bg-white/[0.06] text-white/75'
+                      }`}
+                    >
+                      <PokemonIcon archetype={a.slug} size="sm" dual reserveSecondary />
+                      <span className="flex-1 text-sm truncate">{a.name}</span>
+                      {isCurrent && <Check className="w-3.5 h-3.5 text-brand-400 shrink-0" />}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Custom slug input */}
+            <div className="px-4 pb-3 pt-1 border-t border-white/[0.06]">
+              <p className="text-[10px] text-white/30 mb-1.5 uppercase tracking-wider">Custom Limitless slug</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customSlug}
+                  onChange={(e) => setCustomSlug(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && applyCustomSlug()}
+                  placeholder="e.g. pikachu-ex"
+                  className="flex-1 bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400 font-mono"
+                />
+                <button
+                  onClick={applyCustomSlug}
+                  disabled={!customSlug.trim()}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-500/15 hover:bg-brand-500/25 text-brand-300 border border-brand-400/25 disabled:opacity-40 transition-colors"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {showCreate && (
+        <CreateDeckModal
+          onClose={() => setShowCreate(false)}
+          onRequestImport={() => setShowImport(true)}
+        />
+      )}
+      {showImport && <ImportDeckModal onClose={() => setShowImport(false)} />}
+    </>
+  );
+}

@@ -1,0 +1,1 @@
+- [TCG Dashboard architecture overview](project-architecture.md) — Stack, Dexie schema history, Deck data model, component tree, key file locations

@@ -1,0 +1,1 @@
+- [TCG Dashboard recurring code quality patterns](project-recurring-patterns.md) — Anti-patterns found across the codebase: missing useMemo deps, direct Dexie writes in components, N+1 IDB writes, static CSV in component, mixed German/English strings

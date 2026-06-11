@@ -1,0 +1,1 @@
+- [project_docs_coverage.md](./project_docs_coverage.md) — Docs coverage status: /docs/ created 2026-04-23, gaps: per-component .md files, JSDoc audit, directory READMEs
