@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { UserMenu } from '../auth/UserMenu';
 
 // Labels are i18n keys in the `layout` namespace, resolved at render time.
 const NAV_ITEMS = [
@@ -140,6 +141,10 @@ export function Sidebar() {
         {lastRefreshed && (
           <p className="text-center text-gray-600 text-xs">{lastRefreshed.toLocaleTimeString()}</p>
         )}
+
+        <div className="pt-1 border-t border-white/[0.08]">
+          <UserMenu />
+        </div>
 
         <div className="flex justify-center pt-1">
           <LanguageSwitcher />
