@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import i18n from '../i18n';
 import type {
   Deck,
   DeckCard,
@@ -76,7 +77,7 @@ interface DashboardState {
 
   // Actions
   refresh: () => Promise<void>;
-  setActiveTab: (tab: DashboardState['activeTab'] | 'opponents') => void;
+  setActiveTab: (tab: DashboardState['activeTab']) => void;
   syncMeta: () => Promise<MetaSyncResult>;
   loadRecentTournaments: (opts?: {
     days?: number;
@@ -199,7 +200,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
-  setActiveTab: (tab) => set({ activeTab: tab === 'opponents' ? 'deck' : tab }),
+  setActiveTab: (tab) => set({ activeTab: tab }),
 
   setActiveDeck: async (id) => {
     setActiveDeckId(id);
@@ -263,14 +264,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   syncMeta: async () => {
-    set({ isSyncing: true, syncError: null, syncProgress: 'Starting…' });
+    set({ isSyncing: true, syncError: null, syncProgress: i18n.t('layout:sync.starting') });
     try {
       const result = await syncLiveMeta((msg) => set({ syncProgress: msg }));
       set({ isSyncing: false, syncProgress: '', lastSynced: new Date(), syncError: null });
       await get().refresh();
       return result;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
+      const msg = err instanceof Error ? err.message : i18n.t('layout:sync.unknownError');
       set({ isSyncing: false, syncProgress: '', syncError: msg });
       throw err;
     }
@@ -284,7 +285,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     } catch (err) {
       set({
         isFetchingTournaments: false,
-        tournamentsError: err instanceof Error ? err.message : 'Failed',
+        tournamentsError:
+          err instanceof Error ? err.message : i18n.t('layout:tournaments.fetchFailed'),
       });
     }
   },
@@ -313,10 +315,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     const { activeDeck, deckCards } = get();
     const slug = activeDeck?.archetype ?? get().deckArchSlug;
     if (!slug.trim()) {
-      set({ compareError: 'Set your deck archetype slug first (e.g. "n-zoroark").' });
+      set({ compareError: i18n.t('layout:compare.missingSlug') });
       return;
     }
-    set({ isComparing: true, compareError: null, compareProgress: 'Starting…' });
+    set({
+      isComparing: true,
+      compareError: null,
+      compareProgress: i18n.t('layout:compare.starting'),
+    });
     try {
       const result = await fetchArchetypeComparison(slug, deckCards, (msg) =>
         set({ compareProgress: msg }),
@@ -326,7 +332,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       set({
         isComparing: false,
         compareProgress: '',
-        compareError: err instanceof Error ? err.message : 'Comparison failed',
+        compareError: err instanceof Error ? err.message : i18n.t('layout:compare.failed'),
       });
     }
   },

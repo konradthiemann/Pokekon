@@ -1,4 +1,5 @@
 import type { CardRole, CardType } from '../types';
+import i18n from '../i18n';
 import { db } from '../db/database';
 import { clearDeck, upsertDeckCard } from '../db/queries';
 
@@ -194,7 +195,7 @@ export async function importCards(
   // Guard: replacing with no deckId selected would call clearDeck(undefined),
   // which wipes every card in every deck. Fail loudly instead.
   if (replaceExisting && deckId === undefined) {
-    throw new Error('Cannot replace deck: no active deck selected.');
+    throw new Error(i18n.t('deck:import.noActiveDeck'));
   }
   await db.transaction('rw', db.deckCards, async () => {
     if (replaceExisting) await clearDeck(deckId);

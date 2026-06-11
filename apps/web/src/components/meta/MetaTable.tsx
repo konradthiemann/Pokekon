@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronRight } from 'lucide-react';
 import type { ArchetypeStats } from '../../types';
 import { PokemonIcon } from '../shared/PokemonIcon';
@@ -12,11 +13,15 @@ const ICON_BOX = 54;
 const PAGE_SIZE = 10;
 
 function WinRateBadge({ rate, encounters }: { rate: number | null; encounters: number }) {
+  const { t } = useTranslation('meta');
   if (encounters === 0 || rate === null) return <span className="text-gray-600 text-xs">—</span>;
   if (encounters < 5) {
     return (
       <span className="text-gray-500 font-semibold">
-        {rate}% <span className="text-gray-600 font-normal">(n={encounters})</span>
+        {rate}%{' '}
+        <span className="text-gray-600 font-normal">
+          {t('myMatchups.sampleSize', { count: encounters })}
+        </span>
       </span>
     );
   }
@@ -25,13 +30,14 @@ function WinRateBadge({ rate, encounters }: { rate: number | null; encounters: n
 }
 
 export function MetaTable({ stats }: Props) {
+  const { t } = useTranslation('meta');
   const [namesOpen, setNamesOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   if (stats.length === 0) {
     return (
       <div className="card flex items-center justify-center py-12">
-        <p className="text-gray-500 text-sm">No archetype data available.</p>
+        <p className="text-gray-500 text-sm">{t('myMatchups.empty')}</p>
       </div>
     );
   }
@@ -44,7 +50,7 @@ export function MetaTable({ stats }: Props) {
   return (
     <div className="card overflow-hidden p-0">
       <div className="px-4 pt-4 pb-3 border-b border-gray-800">
-        <h3 className="card-header mb-0">My Matchups</h3>
+        <h3 className="card-header mb-0">{t('myMatchups.title')}</h3>
       </div>
 
       <div className="relative">
@@ -68,21 +74,34 @@ export function MetaTable({ stats }: Props) {
                   <button
                     onClick={() => setNamesOpen((v) => !v)}
                     className="flex items-center gap-1 hover:text-gray-200 transition-colors"
-                    title={namesOpen ? 'Hide names' : 'Show names'}
+                    title={namesOpen ? t('myMatchups.hideNames') : t('myMatchups.showNames')}
                   >
                     <ChevronRight
                       className="w-3 h-3 shrink-0 transition-transform duration-200"
                       style={{ transform: namesOpen ? 'rotate(180deg)' : 'none' }}
+                      aria-hidden="true"
                     />
-                    <span>{namesOpen ? 'Hide' : 'Names'}</span>
+                    <span>{namesOpen ? t('myMatchups.hide') : t('myMatchups.names')}</span>
                   </button>
                 </th>
-                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">Meta %</th>
-                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">Enc.</th>
-                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">W</th>
-                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">L</th>
-                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">T</th>
-                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">WR</th>
+                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">
+                  {t('myMatchups.headers.metaPct')}
+                </th>
+                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">
+                  {t('myMatchups.headers.encounters')}
+                </th>
+                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">
+                  {t('myMatchups.headers.wins')}
+                </th>
+                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">
+                  {t('myMatchups.headers.losses')}
+                </th>
+                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">
+                  {t('myMatchups.headers.ties')}
+                </th>
+                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">
+                  {t('myMatchups.headers.winRate')}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -145,8 +164,11 @@ export function MetaTable({ stats }: Props) {
             <ChevronRight
               className="w-3 h-3 transition-transform duration-200"
               style={{ transform: expanded ? 'rotate(270deg)' : 'rotate(90deg)' }}
+              aria-hidden="true"
             />
-            {expanded ? `Show top ${PAGE_SIZE}` : `Show all ${stats.length} decks`}
+            {expanded
+              ? t('myMatchups.showTop', { count: PAGE_SIZE })
+              : t('myMatchups.showAll', { count: stats.length })}
           </button>
           <span className="text-xs text-gray-600">
             {expanded ? stats.length : Math.min(PAGE_SIZE, stats.length)} / {stats.length}

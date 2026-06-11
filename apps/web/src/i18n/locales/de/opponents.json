@@ -1,0 +1,138 @@
+{
+  "addLog": {
+    "title": "Match loggen",
+    "myDeck": "Mein Deck",
+    "noDeckSelected": "— Kein Deck ausgewählt —",
+    "opponentDeck": "Gegnerisches Deck",
+    "other": "Anderes…",
+    "archetypePlaceholder": "Archetype-Name",
+    "result": "Ergebnis",
+    "win": "Sieg",
+    "loss": "Niederlage",
+    "tie": "Unentschieden",
+    "eventType": "Event-Typ",
+    "eventDate": "Datum",
+    "round": "Runde",
+    "moreOptions": "Mehr Optionen (Notizen, Deck-Version, Kampfprotokoll)",
+    "notes": "Notizen (optional)",
+    "notesPlaceholder": "z.B. Gegen Phantom Dive verloren",
+    "deckVersion": "Gespielte Deck-Version",
+    "untagged": "— Ohne Version —",
+    "battleLog": "Kampfprotokoll (optional)",
+    "battleLogHint": "— für KI-Analyse",
+    "battleLogPlaceholder": "Kampfprotokoll hier einfügen…",
+    "saveFailed": "Match konnte nicht gespeichert werden",
+    "saveAndNext": "& nächste Runde",
+    "saveAndClose": "Speichern",
+    "loggedOne": "Match gespeichert",
+    "loggedMany": "{{count}} Matches gespeichert"
+  },
+  "eventTypes": {
+    "Online": "Online",
+    "LC": "League Challenge",
+    "LCup": "League Cup",
+    "Regional": "Regional",
+    "Worlds": "Worlds"
+  },
+  "matchDetail": {
+    "versus": "vs. {{archetype}}",
+    "roundLabel": "Runde {{round}}",
+    "tabs": {
+      "log": "Kampfprotokoll",
+      "stats": "Statistiken",
+      "analysis": "KI-Analyse",
+      "deckList": "Deckliste"
+    },
+    "impact": {
+      "high": "Hoch",
+      "medium": "Mittel",
+      "low": "Niedrig"
+    },
+    "result": {
+      "win": "Sieg",
+      "loss": "Niederlage",
+      "tie": "Unentschieden"
+    },
+    "action": {
+      "add": "+hinzufügen",
+      "remove": "−entfernen",
+      "increase": "▲ erhöhen",
+      "decrease": "▼ reduzieren"
+    },
+    "turn": "Zug {{turn}}",
+    "suggestion": "Vorschlag:",
+    "analyzedMeta": "Analysiert am {{date}} · Spieler: {{player}} · Gegner: {{opponent}}",
+    "sections": {
+      "mistakes": "Spielfehler / Verbesserungen ({{count}})",
+      "keyMoments": "Schlüsselmomente ({{count}})",
+      "deckSuggestions": "Deck-Empfehlungen ({{count}})",
+      "cardNotes": "Karten-Analyse ({{count}})"
+    },
+    "logTab": {
+      "hint": "Füge das Kampfprotokoll aus PTCGL / PTCGO ein. Es wird lokal gespeichert und für die KI-Analyse verwendet.",
+      "placeholder": "Protokoll hier einfügen…",
+      "save": "Protokoll speichern"
+    },
+    "stats": {
+      "parseFailed": "Das Protokoll konnte nicht ausgewertet werden.",
+      "pasteFirst": "Füge im Tab \"Kampfprotokoll\" ein Protokoll ein, um Statistiken zu sehen."
+    },
+    "snapshot": {
+      "missing": "Snapshot nicht mehr vorhanden."
+    },
+    "cardTypes": {
+      "Pokemon": "Pokémon",
+      "Trainer": "Trainer",
+      "Energy": "Energie"
+    },
+    "analysisTab": {
+      "settings": "Analyse-Einstellungen",
+      "playerNameLabel": "Mein Spielername im Protokoll",
+      "playerNamePlaceholder": "z.B. Premiox",
+      "apiKeyLabel": "Anthropic API-Key",
+      "noLog": "Kein Kampfprotokoll vorhanden — erst im Tab \"Kampfprotokoll\" einfügen.",
+      "analyzing": "Analysiere…",
+      "reanalyze": "Neu analysieren",
+      "start": "Analyse starten",
+      "empty": "Noch keine Analyse vorhanden. Gib deinen Spielernamen und API-Key ein und starte die Analyse."
+    }
+  },
+  "statsTab": {
+    "totalTurns": "Züge gesamt",
+    "damageYou": "Schaden (du)",
+    "kosYou": "KOs (du)",
+    "winner": "Sieger",
+    "opponentValue": "Gegner: {{value}}",
+    "won": "Gewonnen!",
+    "lost": "Verloren",
+    "prizeRace": "Preiskarten-Rennen",
+    "prizesLeft": "{{value}} übrig",
+    "damagePerTurn": "Angriffs-Schaden pro Zug",
+    "damageValue": "{{value}} Schaden",
+    "mostPlayedCards": "Meist gespielte Karten ({{player}})",
+    "played": "gespielt",
+    "noEvents": "Das Protokoll enthält keine auswertbaren Kampfereignisse."
+  },
+  "logList": {
+    "title": "Match-Log",
+    "recordedMatches_one": "{{count}} erfasstes Match",
+    "recordedMatches_other": "{{count}} erfasste Matches",
+    "empty": "Noch keine Matches geloggt.",
+    "logFirst": "Erstes Match loggen",
+    "headers": {
+      "opponent": "Gegner",
+      "myDeck": "Mein Deck",
+      "event": "Event",
+      "date": "Datum",
+      "round": "Rd.",
+      "notes": "Notizen"
+    },
+    "logAndAnalysis": "Protokoll + Analyse vorhanden",
+    "logAvailable": "Kampfprotokoll vorhanden",
+    "logMatch": "Match loggen"
+  },
+  "analysis": {
+    "apiError": "Anthropic API-Fehler {{status}}: {{message}}",
+    "parseError": "Die KI-Antwort konnte nicht gelesen werden (ungültiges JSON)."
+  }
+}

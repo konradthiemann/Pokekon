@@ -1,0 +1,42 @@
+{
+  "nav": {
+    "overview": "Overview",
+    "meta": "Meta",
+    "myDeck": "My Deck",
+    "recommendations": "Recommendations",
+    "tips": "Tips"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "syncLiveMeta": "Sync Live Meta",
+    "syncing": "Syncing…",
+    "synced": "Synced!",
+    "syncedAt": "Synced {{time}}",
+    "refreshData": "Refresh Data"
+  },
+  "bottomNav": {
+    "logMatch": "Log Match"
+  },
+  "sync": {
+    "starting": "Starting…",
+    "fetchingTournaments": "Fetching recent tournaments…",
+    "foundTournaments_one": "Found {{count}} tournament. Fetching standings…",
+    "foundTournaments_other": "Found {{count}} tournaments. Fetching standings…",
+    "loadingTournament": "Loading {{name}} ({{players}} players)…",
+    "savingMetaData": "Saving meta data…",
+    "unknownError": "Unknown error",
+    "errors": {
+      "tournamentListFailed": "Tournament list fetch failed: {{status}}",
+      "noTournaments": "No tournaments with 30+ players found.",
+      "noStandings": "Could not load standings for any tournament."
+    }
+  },
+  "compare": {
+    "starting": "Starting…",
+    "missingSlug": "Set your deck archetype slug first (e.g. \"n-zoroark\").",
+    "failed": "Comparison failed"
+  },
+  "tournaments": {
+    "fetchFailed": "Failed"
+  }
+}

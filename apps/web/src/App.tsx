@@ -1,13 +1,20 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { seedIfEmpty } from './db/seed';
 import { useDashboardStore } from './store/dashboardStore';
 import { Sidebar } from './components/layout/Sidebar';
 import { BottomNav } from './components/layout/BottomNav';
-import { OverviewPage } from './pages/OverviewPage';
-import { DeckPage } from './pages/DeckPage';
-import { RecommendationsPage } from './pages/RecommendationsPage';
-import { MetaPage } from './pages/MetaPage';
+import { PageSkeleton } from './components/layout/PageSkeleton';
 import { DeckSpriteBackground } from './components/DeckSpriteBackground';
+
+// Each page is its own chunk: Recharts-heavy pages no longer block first paint.
+const OverviewPage = lazy(() =>
+  import('./pages/OverviewPage').then((m) => ({ default: m.OverviewPage })),
+);
+const DeckPage = lazy(() => import('./pages/DeckPage').then((m) => ({ default: m.DeckPage })));
+const RecommendationsPage = lazy(() =>
+  import('./pages/RecommendationsPage').then((m) => ({ default: m.RecommendationsPage })),
+);
+const MetaPage = lazy(() => import('./pages/MetaPage').then((m) => ({ default: m.MetaPage })));
 
 function App() {
   const { activeTab, refresh, isLoading } = useDashboardStore();
@@ -32,9 +39,9 @@ function App() {
       <main className="relative z-10 flex-1 overflow-y-auto pb-16 md:pb-0">
         <div className="max-w-screen-2xl mx-auto p-3 md:p-4">
           {isLoading ? (
-            <div className="flex items-center justify-center h-64 text-gray-500">Loading...</div>
+            <PageSkeleton />
           ) : (
-            PAGE[activeTab]
+            <Suspense fallback={<PageSkeleton />}>{PAGE[activeTab]}</Suspense>
           )}
         </div>
       </main>

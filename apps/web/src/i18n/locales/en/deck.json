@@ -1,0 +1,233 @@
+{
+  "cardTypes": {
+    "Pokemon": "Pokémon",
+    "Trainer": "Trainer",
+    "Energy": "Energy"
+  },
+  "roles": {
+    "attacker": "Attacker",
+    "tech": "Tech",
+    "supporter": "Supporter",
+    "item": "Item",
+    "stadium": "Stadium",
+    "energy": "Energy"
+  },
+  "roleHints": {
+    "attacker": "Main damage dealer",
+    "tech": "Single-copy answer",
+    "supporter": "Supporter-rule card",
+    "item": "Item card",
+    "stadium": "Stadium card",
+    "energy": "Energy card"
+  },
+  "page": {
+    "tabs": {
+      "deckList": "Deck List",
+      "analytics": "Analytics",
+      "matchLog": "Match Log"
+    },
+    "tooManyCards": "Deck has {{count}} cards — {{excess}} too many (max. 60)",
+    "tooFewCards": "Deck has only {{count}}/60 cards",
+    "selectDeckPrompt": "Select a deck above to view its details."
+  },
+  "settings": {
+    "title": "Deck Settings",
+    "description": "Rename this deck or duplicate it as a new variant.",
+    "archetype": "Archetype",
+    "archetypePlaceholder": "e.g. N's Zoroark",
+    "variantLabel": "Variant label",
+    "variantPlaceholder": "e.g. \"Control\", \"Fast Pace\"",
+    "advancedToggle": "+ Advanced (Limitless slug)",
+    "slugLabel": "Limitless slug",
+    "slugHint": "Lowercase, hyphen-separated. Matches against Limitless meta data.",
+    "saved": "Saved ✓",
+    "saveChanges": "Save changes",
+    "upToDate": "Up to date",
+    "newVariantTitle": "New variant of this deck",
+    "newVariantHint": "Copies all cards into a new {{archetype}} variant so you can tweak without losing this one.",
+    "variantNamePlaceholder": "e.g. \"Control\"",
+    "create": "Create"
+  },
+  "switcher": {
+    "myDecks": "My Decks",
+    "new": "New",
+    "empty": "No decks yet. Create one to get started.",
+    "noGames": "No games",
+    "wrPill": "{{rate}}% · {{count}}g",
+    "deletePrompt": "Delete?",
+    "yes": "Yes",
+    "changeArchetype": "Change archetype",
+    "deleteDeck": "Delete deck",
+    "archetypeFor": "Archetype for",
+    "searchPlaceholder": "Search archetype…",
+    "noMatch": "No match — use custom slug below.",
+    "customSlugLabel": "Custom Limitless slug",
+    "customSlugPlaceholder": "e.g. pikachu-ex",
+    "apply": "Apply",
+    "clearSearch": "Clear search"
+  },
+  "panel": {
+    "title": "Deck List",
+    "subtitleCards": "{{count}}/60 cards · click role to change · use",
+    "subtitleAdjust": "to adjust counts",
+    "importButton": "Import",
+    "importTitle": "Import deck list",
+    "none": "None",
+    "quickAdd": {
+      "Pokemon": "+ Add Pokémon…",
+      "Trainer": "+ Add trainer…",
+      "Energy": "+ Add energy…"
+    },
+    "changeRole": "Change role",
+    "removeCard": "Remove card",
+    "decrease": "Decrease",
+    "increase": "Increase",
+    "maxCopies": "Max 4 copies",
+    "addCard": "Add card"
+  },
+  "addCardModal": {
+    "title": "Add Card",
+    "cardName": "Card Name",
+    "cardNamePlaceholder": "e.g. Charizard ex",
+    "count": "Count",
+    "type": "Type",
+    "role": "Role",
+    "submit": "Add Card"
+  },
+  "createModal": {
+    "title": "New Deck",
+    "created": "Deck created!",
+    "importPrompt": "Import a card list now?",
+    "archetype": "Archetype",
+    "searchPlaceholder": "Search archetype…",
+    "noMatch": "No match — deck will be created with custom archetype name.",
+    "deckName": "Deck Name",
+    "deckNamePlaceholder": "e.g. \"Fezandipiti Build\", \"Aggro\", \"Turbo\"",
+    "importCards": "Import Cards",
+    "creating": "Creating…",
+    "create": "Create Deck"
+  },
+  "importModal": {
+    "title": "Import Deck List",
+    "pasteHintBefore": "Paste a deck list with",
+    "pasteHintSections": "Pokémon / Trainer / Energy",
+    "pasteHintAfter": "sections. Each line:",
+    "lineFormat": "count name SET number",
+    "pastePlaceholder": "Pokémon: 13\n1 Budew ASC 16\n2 Munkidori TWM 95\n...\nTrainer: 14\n1 Judge POR 76\n...\nEnergie: 1\n8 Basic {D} Energy MEE 7",
+    "replaceExisting": "Replace existing deck cards",
+    "replaceWarning": "All existing cards will be deleted.",
+    "noDeckSelected": "No deck selected.",
+    "skippedLines_one": "{{count}} line skipped:",
+    "skippedLines_other": "{{count}} lines skipped:",
+    "importFailed": "Import failed",
+    "done": "Deck imported!",
+    "cardsAdded_one": "{{count}} card was added.",
+    "cardsAdded_other": "{{count}} cards were added.",
+    "preview": "Preview",
+    "importing": "Importing…",
+    "importCount_one": "Import {{count}} card",
+    "importCount_other": "Import {{count}} cards"
+  },
+  "import": {
+    "noActiveDeck": "Cannot replace deck: no active deck selected."
+  },
+  "analytics": {
+    "noDecks": "No decks yet. Create your first deck above.",
+    "overallTitle": "{{name}} — Overall",
+    "variantsCombined_one": "· {{count}} variant combined",
+    "variantsCombined_other": "· {{count}} variants combined",
+    "overallWr": "Overall WR",
+    "totalGames": "Total Games",
+    "wlt": "W - L - T",
+    "bestVariant": "Best Variant",
+    "variantLabel": "Variant:",
+    "defaultVariant": "Default",
+    "winRate": "Win Rate",
+    "ciLower": "≥{{value}}% (95% CI)",
+    "metaScore": "Meta Score",
+    "freqWeighted": "freq-weighted WR",
+    "recentForm": "Recent Form",
+    "consistency": "Consistency",
+    "wrStability": "WR stability",
+    "matchupPerformance": "Matchup Performance",
+    "sortedByMeta": "· sorted by meta relevance",
+    "comparison": {
+      "title": "Variant Comparison",
+      "subtitle": "— same archetype, different builds",
+      "matchup": "Matchup",
+      "edge": "Edge",
+      "overallWr": "Overall WR",
+      "games": "({{count}}g)",
+      "gamesShort": "{{count}}g",
+      "approxEqual": "~equal",
+      "lead": "{{variant}} +{{diff}}%"
+    },
+    "matchups": {
+      "empty": "No matches logged for this deck yet.",
+      "lowData": "low data",
+      "favored": "Favored",
+      "even": "Even",
+      "unfavorable": "Unfav.",
+      "metaShare": "{{value}}% meta"
+    },
+    "insights": {
+      "gatekeeperLabel": "Gatekeeper:",
+      "gatekeeperText": "{{archetype}} ({{rate}}% WR) is a top-3 meta deck you're losing to. Improve this matchup first.",
+      "lowCoverageLabel": "Low coverage:",
+      "lowCoverageText": "You have data on {{value}}% of top meta decks. Log more matches for reliable meta score.",
+      "bestLabel": "Best matchup:",
+      "worstLabel": "Worst matchup:",
+      "rateInGames_one": "({{rate}}% in {{count}} game)",
+      "rateInGames_other": "({{rate}}% in {{count}} games)"
+    }
+  },
+  "performance": {
+    "title": "Battle Log Statistics",
+    "emptyHint": "Add battle logs to your matches under \"Battle log\" — detailed performance analytics will appear here.",
+    "parseFailed": "Logs could not be parsed.",
+    "gamesWithLog_one": "{{count}} game with log",
+    "gamesWithLog_other": "{{count}} games with log",
+    "setPlayerHint": "— set your player name in the detail view for more accurate analysis",
+    "overallWr": "Overall WR",
+    "wlSub": "{{wins}}W / {{losses}}L",
+    "avgGameLength": "Avg. game length",
+    "turnsValue": "{{count}} turns",
+    "wlLengths": "W: {{wins}} / L: {{losses}}",
+    "avgTurn1": "Avg. turn-1 actions",
+    "brickRate": "Brick rate",
+    "brickSub": "Turns with ≤1 action",
+    "prizesInWins": "Prize cards in wins",
+    "opponentValue": "Opp.: {{value}}",
+    "prizesInWinsSub": "Avg. opponent prizes",
+    "prizesInLosses": "Prize cards in losses",
+    "youValue": "You: {{value}}",
+    "prizesInLossesSub": "Avg. own prize cards",
+    "lowData": "low data",
+    "cardPerformance": "Card Performance",
+    "table": {
+      "card": "Card",
+      "playRate": "Play rate",
+      "avgPerGame": "Avg./game",
+      "wrWhenPlayed": "WR when played",
+      "footnote": "WR delta = deviation from your overall WR ({{overallWR}}%). Green = better when played, red = worse. Only cards with ≥2 games shown."
+    },
+    "insights": {
+      "turn1Low": "Turn-1 consistency: avg. only {{value}} actions on the first turn — possible setup problem.",
+      "turn1Good": "Good turn-1 consistency: avg. {{value}} actions on the first turn.",
+      "brickHigh": "High brick rate: {{value}}% of your turns had ≤1 action — improve consistency.",
+      "brickLow": "Low brick rate: only {{value}}% low-activity turns.",
+      "tempoGap": "Tempo gap: wins take avg. {{wins}} turns, losses only {{losses}} — you often get run over.",
+      "tempoStrong": "Strong tempo: you win avg. {{diff}} turns earlier than you lose.",
+      "prizesLowInLosses": "Avg. {{value}} prize cards in losses — you get dominated early in many games.",
+      "closeLosses": "Close losses: you take avg. {{value}} prize cards — games are often close."
+    }
+  },
+  "localMeta": {
+    "title": "Local Meta",
+    "description": "Decks you commonly face at your locals. These get boosted priority in recommendations.",
+    "placeholder": "Archetype name…",
+    "add": "Add",
+    "suggestions": "Suggestions",
+    "remove": "Remove {{archetype}}"
+  }
+}

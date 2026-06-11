@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { X, CheckCircle2 } from 'lucide-react';
 import type { EventType, MatchResult } from '../../types';
 import { addOpponentLog } from '../../db/queries';
 import { useDashboardStore } from '../../store/dashboardStore';
@@ -10,28 +11,31 @@ import { KNOWN_ARCHETYPES } from '../../constants/archetypes';
  * Describes the active state and color tokens for each result tap button.
  *
  * Using a typed tuple keeps the button list declarative — no per-button
- * conditionals needed in the JSX.
+ * conditionals needed in the JSX. Labels are i18n keys in the `opponents`
+ * namespace, resolved at render time.
  */
 const RESULT_BUTTONS = [
   [
     'W',
-    'Win',
+    'addLog.win',
     'bg-emerald-600 hover:bg-emerald-500 border-emerald-500 text-white',
     'bg-emerald-950/40 border-emerald-800 text-emerald-400',
   ],
   [
     'L',
-    'Loss',
+    'addLog.loss',
     'bg-red-600 hover:bg-red-500 border-red-500 text-white',
     'bg-red-950/40 border-red-800 text-red-400',
   ],
   [
     'T',
-    'Tie',
+    'addLog.tie',
     'bg-yellow-600 hover:bg-yellow-500 border-yellow-500 text-white',
     'bg-yellow-950/40 border-yellow-800 text-yellow-400',
   ],
 ] as const;
+
+const EVENT_TYPES: EventType[] = ['Online', 'LC', 'LCup', 'Regional', 'Worlds'];
 
 interface Props {
   onClose: () => void;
@@ -44,14 +48,19 @@ interface Props {
  *
  * The design prioritises the three most-common interactions (pick opponent
  * deck, tap result, save) at the top of the form, then hides secondary
- * fields (round, notes, deck version, battle log) in a `<details>` element
+ * fields (notes, deck version, battle log) in a `<details>` element
  * so the modal feels compact on mobile without removing functionality.
+ *
+ * Tournament flow: "Save & next round" keeps the event context (deck, event
+ * type, date, deck version), bumps the round number, and resets only the
+ * per-game fields — so logging round after round takes three taps each.
  *
  * React Concept: `customArch` is kept as a separate piece of state from
  * `archetype` so that switching away from "Other…" and back restores the
  * typed text, avoiding accidental data loss if the user mis-taps.
  */
 export function AddLogModal({ onClose, preselectedDeckId }: Props) {
+  const { t } = useTranslation('opponents');
   const { decks, deckSnapshots, activeDeckId } = useDashboardStore();
   const today = new Date().toISOString().split('T')[0];
 
@@ -69,6 +78,15 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
   const [battleLog, setBattleLog] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [loggedCount, setLoggedCount] = useState(0);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   /**
    * Resolves the final archetype display name used when saving.
@@ -93,8 +111,11 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
    * The try/catch prevents an unhandled rejection from crashing the UI if the
    * Dexie write fails (e.g. storage quota exceeded). `saving` is always reset
    * in the `finally` block so the button never stays stuck in a disabled state.
+   *
+   * `keepOpen` drives the tournament flow: event context survives, per-game
+   * fields reset, and the round number auto-increments.
    */
-  const handleSave = async () => {
+  const handleSave = async (keepOpen: boolean) => {
     if (!finalArchetype.trim() || result === null) return;
     setSaving(true);
     setSaveError(null);
@@ -110,9 +131,20 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
         battleLog: battleLog.trim() || undefined,
         deckId: selectedDeckId ?? undefined,
       });
-      onClose();
+      if (!keepOpen) {
+        onClose();
+        return;
+      }
+      // Reset per-game fields, keep event context (deck, event, date, version)
+      setArchetype('');
+      setCustomArch('');
+      setResult(null);
+      setNotes('');
+      setBattleLog('');
+      setRound((r) => (r === '' ? '' : r + 1));
+      setLoggedCount((c) => c + 1);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save match');
+      setSaveError(err instanceof Error ? err.message : t('addLog.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -120,18 +152,39 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70">
-      <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-xl p-5 sm:p-6 w-full max-w-md shadow-xl max-h-[92vh] overflow-y-auto">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-log-modal-title"
+        className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-xl p-5 sm:p-6 w-full max-w-md shadow-xl max-h-[92vh] overflow-y-auto"
+      >
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-white font-semibold">Log Match</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300">
-            <X className="w-4 h-4" />
+          <div className="flex items-center gap-2">
+            <h2 id="add-log-modal-title" className="text-white font-semibold">
+              {t('addLog.title')}
+            </h2>
+            {loggedCount > 0 && (
+              <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800 rounded-full px-2 py-0.5">
+                <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
+                {loggedCount === 1
+                  ? t('addLog.loggedOne')
+                  : t('addLog.loggedMany', { count: loggedCount })}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            aria-label={t('close', { ns: 'common' })}
+            className="text-gray-500 hover:text-gray-300"
+          >
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
 
         <div className="space-y-4">
           {/* My Deck — always first */}
           <div>
-            <label className="block text-xs text-gray-400 mb-1">My Deck</label>
+            <label className="block text-xs text-gray-400 mb-1">{t('addLog.myDeck')}</label>
             <select
               value={selectedDeckId ?? ''}
               onChange={(e) => {
@@ -141,7 +194,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
               }}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
             >
-              <option value="">— No deck selected —</option>
+              <option value="">{t('addLog.noDeckSelected')}</option>
               {decks.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.archetypeName}
@@ -153,7 +206,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
 
           {/* Opponent deck — visual tap grid */}
           <div>
-            <label className="block text-xs text-gray-400 mb-2">Opponent Deck</label>
+            <label className="block text-xs text-gray-400 mb-2">{t('addLog.opponentDeck')}</label>
             <div className="grid grid-cols-2 gap-1.5">
               {KNOWN_ARCHETYPES.map((a) => (
                 <button
@@ -186,8 +239,10 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
                     : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
                 }`}
               >
-                <span className="text-lg leading-none">+</span>
-                <span className="text-xs font-medium">Other…</span>
+                <span className="text-lg leading-none" aria-hidden="true">
+                  +
+                </span>
+                <span className="text-xs font-medium">{t('addLog.other')}</span>
               </button>
             </div>
             {/* Custom archetype text input — shown when no known tile is selected */}
@@ -196,7 +251,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
                 type="text"
                 value={customArch}
                 onChange={(e) => setCustomArch(e.target.value)}
-                placeholder="Archetype name"
+                placeholder={t('addLog.archetypePlaceholder')}
                 className="mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500"
               />
             )}
@@ -204,9 +259,9 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
 
           {/* Result — 3-button tap row */}
           <div>
-            <label className="block text-xs text-gray-400 mb-2">Result</label>
+            <label className="block text-xs text-gray-400 mb-2">{t('addLog.result')}</label>
             <div className="grid grid-cols-3 gap-2">
-              {RESULT_BUTTONS.map(([val, label, activeCls, inactiveCls]) => (
+              {RESULT_BUTTONS.map(([val, labelKey, activeCls, inactiveCls]) => (
                 <button
                   key={val}
                   type="button"
@@ -216,7 +271,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
                   }`}
                   aria-pressed={result === val}
                 >
-                  {label}
+                  {t(labelKey)}
                 </button>
               ))}
             </div>
@@ -225,21 +280,21 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
           {/* Event type, date, and round — always visible, 3-column grid */}
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Event Type</label>
+              <label className="block text-xs text-gray-400 mb-1">{t('addLog.eventType')}</label>
               <select
                 value={eventType}
                 onChange={(e) => setEventType(e.target.value as EventType)}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
               >
-                <option value="Online">Online</option>
-                <option value="LC">League Challenge</option>
-                <option value="LCup">League Cup</option>
-                <option value="Regional">Regional</option>
-                <option value="Worlds">Worlds</option>
+                {EVENT_TYPES.map((et) => (
+                  <option key={et} value={et}>
+                    {t(`eventTypes.${et}`)}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Event Date</label>
+              <label className="block text-xs text-gray-400 mb-1">{t('addLog.eventDate')}</label>
               <input
                 type="date"
                 value={eventDate}
@@ -248,7 +303,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Round</label>
+              <label className="block text-xs text-gray-400 mb-1">{t('addLog.round')}</label>
               <input
                 type="number"
                 min={1}
@@ -264,16 +319,16 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
           <details className="group">
             <summary className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer select-none list-none py-1">
               <span className="group-open:rotate-180 transition-transform inline-block">▾</span>
-              More options (notes, deck version, battle log)
+              {t('addLog.moreOptions')}
             </summary>
             <div className="space-y-3 mt-3">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Notes (optional)</label>
+                <label className="block text-xs text-gray-400 mb-1">{t('addLog.notes')}</label>
                 <input
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. Lost to Phantom Dive stream"
+                  placeholder={t('addLog.notesPlaceholder')}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500"
                 />
               </div>
@@ -281,7 +336,9 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
               {/* Deck version — filtered to selected deck */}
               {relevantSnapshots.length > 0 && (
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Deck version played</label>
+                  <label className="block text-xs text-gray-400 mb-1">
+                    {t('addLog.deckVersion')}
+                  </label>
                   <select
                     value={deckSnapshotId}
                     onChange={(e) =>
@@ -289,7 +346,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
                     }
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
                   >
-                    <option value="">— Untagged —</option>
+                    <option value="">{t('addLog.untagged')}</option>
                     {relevantSnapshots.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.label}
@@ -301,13 +358,13 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
 
               <div>
                 <label className="block text-xs text-gray-400 mb-1">
-                  Battle log (optional)
-                  <span className="ml-1 text-gray-600">— for AI analysis</span>
+                  {t('addLog.battleLog')}
+                  <span className="ml-1 text-gray-600">{t('addLog.battleLogHint')}</span>
                 </label>
                 <textarea
                   value={battleLog}
                   onChange={(e) => setBattleLog(e.target.value)}
-                  placeholder="Paste battle log here…"
+                  placeholder={t('addLog.battleLogPlaceholder')}
                   rows={4}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 resize-y font-mono text-xs"
                 />
@@ -324,14 +381,22 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
 
         <div className="flex gap-2 mt-4">
           <button onClick={onClose} className="btn-ghost justify-center text-sm px-4">
-            Cancel
+            {t('cancel', { ns: 'common' })}
           </button>
           <button
-            onClick={handleSave}
+            onClick={() => void handleSave(true)}
+            disabled={!finalArchetype.trim() || result === null || saving}
+            className="btn-ghost flex-1 justify-center py-3 text-sm font-bold border border-brand-400/30 text-brand-300 disabled:opacity-50"
+            title={t('addLog.saveAndNext')}
+          >
+            {t('addLog.saveAndNext')}
+          </button>
+          <button
+            onClick={() => void handleSave(false)}
             disabled={!finalArchetype.trim() || result === null || saving}
             className="btn-primary flex-1 justify-center py-3 text-base font-bold disabled:opacity-50"
           >
-            {saving ? 'Saving…' : 'Log Match'}
+            {saving ? t('saving', { ns: 'common' }) : t('addLog.saveAndClose')}
           </button>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   BarChart,
   Bar,
@@ -21,12 +22,13 @@ interface TooltipItem {
 }
 
 export function WinRateChart({ stats }: Props) {
+  const { t } = useTranslation('meta');
   const withData = stats.filter((s) => s.encounters > 0);
 
   if (withData.length === 0) {
     return (
       <div className="card h-56 flex items-center justify-center">
-        <p className="text-gray-500 text-sm">Log opponent matches to see your win rates.</p>
+        <p className="text-gray-500 text-sm">{t('winRateChart.empty')}</p>
       </div>
     );
   }
@@ -41,7 +43,7 @@ export function WinRateChart({ stats }: Props) {
 
   return (
     <div className="card">
-      <div className="card-header">Win Rate vs Archetype</div>
+      <div className="card-header">{t('winRateChart.title')}</div>
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 40, left: 8, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={false} />
@@ -66,8 +68,11 @@ export function WinRateChart({ stats }: Props) {
             contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }}
             labelStyle={{ color: '#f9fafb', fontWeight: 600 }}
             formatter={(value, _name, props) => [
-              `${value ?? 0}% (${(props as TooltipItem).payload?.encounters ?? 0} games)`,
-              'Win Rate',
+              t('winRateChart.tooltipValue', {
+                value: value ?? 0,
+                count: (props as TooltipItem).payload?.encounters ?? 0,
+              }),
+              t('winRateChart.winRate'),
             ]}
           />
           <Bar dataKey="winRate" radius={[0, 4, 4, 0]}>
@@ -80,9 +85,7 @@ export function WinRateChart({ stats }: Props) {
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      <p className="text-xs text-gray-600 mt-2">
-        Green = favorable (60%+) &nbsp; Orange = even (40–60%) &nbsp; Red = unfavorable (&lt;40%)
-      </p>
+      <p className="text-xs text-gray-600 mt-2">{t('winRateChart.legend')}</p>
     </div>
   );
 }

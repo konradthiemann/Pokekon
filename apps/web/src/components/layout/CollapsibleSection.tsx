@@ -27,6 +27,7 @@ export function CollapsibleSection({
       >
         <ChevronDown
           className={`w-4 h-4 text-gray-500 shrink-0 transition-transform ${open ? '' : '-rotate-90'}`}
+          aria-hidden="true"
         />
         {icon}
         <h3 className="text-sm font-semibold text-white flex-1">{title}</h3>

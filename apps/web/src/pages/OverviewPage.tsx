@@ -1,9 +1,11 @@
+import { useTranslation } from 'react-i18next';
 import { useDashboardStore } from '../store/dashboardStore';
 import { StatCard } from '../components/layout/StatCard';
 import { MetaTable } from '../components/meta/MetaTable';
 import { PokemonIcon } from '../components/shared/PokemonIcon';
 
 export function OverviewPage() {
+  const { t } = useTranslation('overview');
   const { activeDeckId, activeDeck, deckCards, opponentLogs, metaSnapshots, archetypeStats } =
     useDashboardStore();
 
@@ -23,10 +25,10 @@ export function OverviewPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white mb-0.5">Meta Dashboard</h1>
+        <h1 className="text-xl font-bold text-white mb-0.5">{t('title')}</h1>
         {activeDeck ? (
           <p className="text-sm text-gray-500 mt-0.5 flex items-center gap-1.5">
-            Aktives Deck:
+            {t('activeDeck')}
             <PokemonIcon archetype={activeDeck.archetype} size="sm" />
             <span className="text-gray-300 font-medium">{activeDeck.archetypeName}</span>
             {activeDeck.variant && !['Default', 'Standard'].includes(activeDeck.variant) && (
@@ -34,29 +36,38 @@ export function OverviewPage() {
             )}
           </p>
         ) : (
-          <p className="text-sm text-gray-500 mt-0.5">
-            Kein aktives Deck — wähle eines unter "My Decks"
-          </p>
+          <p className="text-sm text-gray-500 mt-0.5">{t('noActiveDeck')}</p>
         )}
       </div>
 
       {/* Stat row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label="Overall Win Rate"
+          label={t('stats.winRate.label')}
           value={totalGames > 0 ? `${winRate}%` : '—'}
-          sub={`${wins}W / ${losses}L / ${ties}T`}
+          sub={t('stats.winRate.record', { wins, losses, ties })}
           color={winRate >= 55 ? 'green' : winRate >= 45 ? 'default' : 'red'}
         />
-        <StatCard label="Games Logged" value={totalGames} sub="across all events" color="blue" />
         <StatCard
-          label="Deck Size"
+          label={t('stats.gamesLogged.label')}
+          value={totalGames}
+          sub={t('stats.gamesLogged.sub')}
+          color="blue"
+        />
+        <StatCard
+          label={t('stats.deckSize.label')}
           value={`${totalCards}/60`}
-          sub={totalCards === 60 ? 'Complete' : totalCards > 60 ? 'Over limit' : 'Incomplete'}
+          sub={
+            totalCards === 60
+              ? t('stats.deckSize.complete')
+              : totalCards > 60
+                ? t('stats.deckSize.overLimit')
+                : t('stats.deckSize.incomplete')
+          }
           color={totalCards === 60 ? 'green' : totalCards > 60 ? 'red' : 'default'}
         />
         <StatCard
-          label="Top Meta Threat"
+          label={t('stats.topThreat.label')}
           value={
             topMeta ? (
               <span className="flex items-center gap-1.5 min-w-0">
@@ -69,7 +80,11 @@ export function OverviewPage() {
               '—'
             )
           }
-          sub={topMeta ? `${topMeta.frequencyPct}% meta share` : 'No data'}
+          sub={
+            topMeta
+              ? t('stats.topThreat.metaShare', { pct: topMeta.frequencyPct })
+              : t('stats.topThreat.noData')
+          }
           color="purple"
         />
       </div>

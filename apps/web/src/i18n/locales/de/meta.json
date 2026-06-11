@@ -1,0 +1,90 @@
+{
+  "page": {
+    "title": "Meta",
+    "subtitle": "Live-Turnierdaten von Limitless TCG",
+    "matchupMatrix": "Matchup-Matrix",
+    "tournamentMeta": "Turnier-Meta",
+    "tournamentMetaCount": "Turnier-Meta ({{count}})"
+  },
+  "metaTable": {
+    "empty": "Noch keine Meta-Daten. Klicke in der Sidebar auf \"Sync Live Meta\".",
+    "showNames": "Namen anzeigen",
+    "hideNames": "Namen ausblenden",
+    "names": "Namen",
+    "hide": "Ausblenden",
+    "headers": {
+      "share": "Anteil",
+      "players": "Spieler",
+      "record": "W-L",
+      "winPct": "Win %"
+    },
+    "showTop": "Top {{count}} anzeigen",
+    "showAll": "Alle {{count}} Decks anzeigen"
+  },
+  "tournaments": {
+    "title": "Aktuelle Turniere",
+    "players_one": "{{count}} Spieler",
+    "players_other": "{{count}} Spieler",
+    "today": "Heute",
+    "yesterday": "Gestern",
+    "daysAgo": "vor {{count}} Tagen",
+    "timesPlayed": "{{count}}x",
+    "pastDays": "Zeitraum (Tage)",
+    "minPlayers": "Min. Spieler",
+    "onlineOnly": "Nur online",
+    "load": "Laden",
+    "emptyHint": "Klicke auf \"Laden\", um aktuelle Turniere von Limitless TCG abzurufen.",
+    "openStandings": "Standings öffnen"
+  },
+  "matchupMatrix": {
+    "loading": "Lade Matchup-Daten…",
+    "loadError": "Matchup-Daten konnten nicht geladen werden.",
+    "minGames": "Min. Spiele",
+    "perspectiveNote": "Winrate aus Sicht des Zeilen-Decks.",
+    "expandNames": "Deck-Namen einblenden",
+    "collapseNames": "Deck-Namen ausblenden",
+    "names": "Namen",
+    "hide": "Ausblenden",
+    "gamesTooltip_one": "{{count}} Spiel",
+    "gamesTooltip_other": "{{count}} Spiele",
+    "gamesShort": "{{count}}g",
+    "cellTooltip": "{{row}} vs {{col}}: {{winRate}}% · {{wins}}W-{{losses}}L-{{ties}}T",
+    "source": "Quelle: TrainerHill.com · {{date}} · Zellen zeigen die Winrate aus Sicht des Zeilen-Decks",
+    "reload": "Daten neu laden"
+  },
+  "metaShareChart": {
+    "empty": "Keine Meta-Daten geladen.",
+    "title": "Meta-Anteil — Aktuelle Woche",
+    "showTop": "Top {{count}}",
+    "showAll": "Alle {{count}}",
+    "metaShare": "Meta-Anteil",
+    "winRate": "Winrate"
+  },
+  "myMatchups": {
+    "title": "Meine Matchups",
+    "empty": "Keine Archetype-Daten vorhanden.",
+    "showNames": "Namen anzeigen",
+    "hideNames": "Namen ausblenden",
+    "names": "Namen",
+    "hide": "Ausblenden",
+    "headers": {
+      "metaPct": "Meta %",
+      "encounters": "Beg.",
+      "wins": "W",
+      "losses": "L",
+      "ties": "T",
+      "winRate": "WR"
+    },
+    "sampleSize": "(n={{count}})",
+    "showTop": "Top {{count}} anzeigen",
+    "showAll": "Alle {{count}} Decks anzeigen"
+  },
+  "winRateChart": {
+    "title": "Winrate vs. Archetype",
+    "empty": "Logge Matches gegen Gegner, um deine Winrates zu sehen.",
+    "winRate": "Winrate",
+    "tooltipValue_one": "{{value}}% ({{count}} Spiel)",
+    "tooltipValue_other": "{{value}}% ({{count}} Spiele)",
+    "legend": "Grün = vorteilhaft (60%+)   Orange = ausgeglichen (40–60%)   Rot = unvorteilhaft (<40%)"
+  }
+}

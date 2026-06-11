@@ -1,0 +1,26 @@
+{
+  "title": "Meta-Dashboard",
+  "activeDeck": "Aktives Deck:",
+  "noActiveDeck": "Kein aktives Deck — wähle eines unter \"Mein Deck\"",
+  "stats": {
+    "winRate": {
+      "label": "Gesamt-Winrate",
+      "record": "{{wins}}W / {{losses}}L / {{ties}}T"
+    },
+    "gamesLogged": {
+      "label": "Geloggte Spiele",
+      "sub": "über alle Events"
+    },
+    "deckSize": {
+      "label": "Deckgröße",
+      "complete": "Vollständig",
+      "overLimit": "Über Limit",
+      "incomplete": "Unvollständig"
+    },
+    "topThreat": {
+      "label": "Top-Meta-Bedrohung",
+      "metaShare": "{{pct}}% Meta-Anteil",
+      "noData": "Keine Daten"
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type {
   ArchetypeStats,
   DeckCard,
@@ -15,84 +16,32 @@ import type {
  * Keys are case-sensitive and must match the `archetype` field stored in `OpponentLog`
  * exactly (e.g. "Dragapult ex", not "dragapult-ex"). Update this object manually
  * whenever the competitive meta shifts and new counter-cards become relevant.
+ *
+ * `reasonKey` references a translation under `recommendations:rules.tech.reasons.*`
+ * so the explanation text follows the active UI language.
  */
 // All suggested cards must be Standard-legal (Regulation H, I, J — post-G rotation April 2026).
 // Iono, Path to the Peak, Lost Vacuum, Collapsed Stadium, Canceling Cologne are all G or older — removed.
-const TECH_SUGGESTIONS: Record<string, { card: string; reason: string }> = {
-  'Dragapult ex': {
-    card: 'Eri',
-    reason:
-      "Hand disruption (H regulation) slows Dragapult's setup; reduces opponent hand mid-game.",
-  },
-  'Dragapult Blaziken': {
-    card: 'Eri',
-    reason: 'Disrupts the Blaziken energy acceleration before it comes online.',
-  },
-  'Dragapult Dusknoir': {
-    card: 'Unfair Stamp',
-    reason: "Resets opponent's hand to a small number before Dusknoir's Ability chain activates.",
-  },
-  "N's Zoroark ex": {
-    card: 'Briar',
-    reason: 'Snipes benched Zorua before it evolves, cutting off the draw engine.',
-  },
-  "N's Zoroark": {
-    card: 'Briar',
-    reason: 'Snipes benched Zorua before it evolves, cutting off the draw engine.',
-  },
-  'Lucario Hariyama': {
-    card: 'Fezandipiti ex',
-    reason: "Disrupts the bench and hand to slow Lucario's aggressive early game.",
-  },
-  'Alakazam Dudunsparce': {
-    card: 'TM: Devolution',
-    reason: 'Devolves Alakazam back to Abra, removing the ability engine.',
-  },
-  'Starmie Froslass': {
-    card: 'Eri',
-    reason: 'Hand disruption breaks the Starmie / Froslass setup loop.',
-  },
-  "Cynthia's Garchomp ex": {
-    card: 'Unfair Stamp',
-    reason: "Reduces hand size before Garchomp's ability chain activates.",
-  },
-  "Rocket's Mewtwo": {
-    card: 'Eri',
-    reason: 'Hand disruption prevents setting up the Mewtwo attack chain.',
-  },
-  'Ogerpon Meganium': {
-    card: 'Fezandipiti ex',
-    reason: 'Disrupts the Meganium bench, preventing energy acceleration for Ogerpon.',
-  },
-  'Raging Bolt Ogerpon': {
-    card: "Hero's Cape",
-    reason: "Reduces damage taken from Raging Bolt's high-damage attacks.",
-  },
-  'Raging Bolt ex': {
-    card: "Hero's Cape",
-    reason: "Reduces damage from Raging Bolt's Ancient attacks.",
-  },
-  'Grimmsnarl Froslass': {
-    card: 'TM: Devolution',
-    reason: 'Devolves Grimmsnarl to interrupt ability-based strategies before they lock in.',
-  },
-  "Rocket's Honchkrow": {
-    card: 'Eri',
-    reason: "Hand disruption to break Honchkrow's setup before it attacks.",
-  },
-  'Okidogi Barbaracle': {
-    card: 'Unfair Stamp',
-    reason: "Hand reset disrupts Barbaracle's lock strategy from the start.",
-  },
-  'Mega Venusaur': {
-    card: 'Briar',
-    reason: 'Bench damage knocks out the support Pokémon enabling Mega Venusaur.',
-  },
-  Greninja: { card: 'Unfair Stamp', reason: 'Hand disruption slows the Greninja setup chain.' },
-  Slowking: {
-    card: 'TM: Devolution',
-    reason: 'Devolves Slowking to interrupt ability-based stall strategies.',
-  },
+const TECH_SUGGESTIONS: Record<string, { card: string; reasonKey: string }> = {
+  'Dragapult ex': { card: 'Eri', reasonKey: 'dragapultEx' },
+  'Dragapult Blaziken': { card: 'Eri', reasonKey: 'dragapultBlaziken' },
+  'Dragapult Dusknoir': { card: 'Unfair Stamp', reasonKey: 'dragapultDusknoir' },
+  "N's Zoroark ex": { card: 'Briar', reasonKey: 'nsZoroark' },
+  "N's Zoroark": { card: 'Briar', reasonKey: 'nsZoroark' },
+  'Lucario Hariyama': { card: 'Fezandipiti ex', reasonKey: 'lucarioHariyama' },
+  'Alakazam Dudunsparce': { card: 'TM: Devolution', reasonKey: 'alakazamDudunsparce' },
+  'Starmie Froslass': { card: 'Eri', reasonKey: 'starmieFroslass' },
+  "Cynthia's Garchomp ex": { card: 'Unfair Stamp', reasonKey: 'cynthiasGarchompEx' },
+  "Rocket's Mewtwo": { card: 'Eri', reasonKey: 'rocketsMewtwo' },
+  'Ogerpon Meganium': { card: 'Fezandipiti ex', reasonKey: 'ogerponMeganium' },
+  'Raging Bolt Ogerpon': { card: "Hero's Cape", reasonKey: 'ragingBoltOgerpon' },
+  'Raging Bolt ex': { card: "Hero's Cape", reasonKey: 'ragingBoltEx' },
+  'Grimmsnarl Froslass': { card: 'TM: Devolution', reasonKey: 'grimmsnarlFroslass' },
+  "Rocket's Honchkrow": { card: 'Eri', reasonKey: 'rocketsHonchkrow' },
+  'Okidogi Barbaracle': { card: 'Unfair Stamp', reasonKey: 'okidogiBarbaracle' },
+  'Mega Venusaur': { card: 'Briar', reasonKey: 'megaVenusaur' },
+  Greninja: { card: 'Unfair Stamp', reasonKey: 'greninja' },
+  Slowking: { card: 'TM: Devolution', reasonKey: 'slowking' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -134,8 +83,9 @@ interface RecommendationInput {
  * present — callers should handle the zero-length case.
  *
  * React concept: the result is memoized via `useMemo`. Recalculation is triggered by any
- * change to the six dependencies: `archetypeStats`, `deckCards`, `opponentLogs`,
- * `deckSnapshots`, `deckStats`, and `localMeta`. Pass stable references where possible
+ * change to the dependencies: `archetypeStats`, `deckCards`, `opponentLogs`,
+ * `deckSnapshots`, `deckStats`, `localMeta`, and `t` (so a language switch regenerates
+ * the suggestion/reasoning strings). Pass stable references where possible
  * (e.g. from the Zustand store) to avoid unnecessary recomputes.
  */
 export function useRecommendations({
@@ -146,9 +96,15 @@ export function useRecommendations({
   localMeta,
   deckStats,
 }: RecommendationInput): DeckRecommendation[] {
+  const { t } = useTranslation('recommendations');
+
   return useMemo(() => {
     const recs: DeckRecommendation[] = [];
     if (archetypeStats.length === 0) return recs;
+
+    /** Localized "{{count}} game(s)" fragment used inside reasoning strings */
+    const games = (count: number) => t('games', { count });
+    const localMetaBadge = ` ${t('localMetaBadge')}`;
 
     // Build a normalized set for fast local-meta lookup
     const localMetaSet = new Set(localMeta.map((a) => a.toLowerCase()));
@@ -180,8 +136,8 @@ export function useRecommendations({
           const wr = winRate(wins, losses);
           const label =
             snapId != null
-              ? (snapMap.get(snapId)?.label ?? `Snapshot #${snapId}`)
-              : 'Before first save';
+              ? (snapMap.get(snapId)?.label ?? t('snapshotFallback', { id: snapId }))
+              : t('rules.version.beforeFirstSave');
           resultsBySnap.push({ snapId, label, wr, games: matchLogs.length });
         }
 
@@ -202,8 +158,25 @@ export function useRecommendations({
           id: `version-${archStat.archetype}`,
           priority: best.wr - worst.wr >= 30 ? 'high' : 'medium',
           category: 'version',
-          suggestion: `vs ${archStat.archetype}: ${trend === 'improving' ? 'Current build is stronger' : 'Revert recent changes?'}`,
-          reasoning: `"${best.label}" → ${best.wr}% WR (${best.games} games). "${worst.label}" → ${worst.wr}% WR (${worst.games} games). ${trend === 'declining' ? 'Your latest changes may have hurt this matchup.' : 'Current changes appear positive.'}`,
+          suggestion: t(
+            trend === 'improving'
+              ? 'rules.version.suggestionImproving'
+              : 'rules.version.suggestionDeclining',
+            { archetype: archStat.archetype },
+          ),
+          reasoning: t(
+            trend === 'declining'
+              ? 'rules.version.reasoningDeclining'
+              : 'rules.version.reasoningImproving',
+            {
+              bestLabel: best.label,
+              bestWr: best.wr,
+              bestGames: games(best.games),
+              worstLabel: worst.label,
+              worstWr: worst.wr,
+              worstGames: games(worst.games),
+            },
+          ),
           dataPoints: archStat.encounters,
         });
       }
@@ -221,8 +194,14 @@ export function useRecommendations({
         // Local meta archetypes are always high priority when win rate is bad
         priority: isLocal || stats.encounters >= 4 ? 'high' : 'medium',
         category: 'tech',
-        suggestion: `Add 1× ${tech.card}${isLocal ? ' 📍 local meta' : ''}`,
-        reasoning: `You're ${stats.wins}W/${stats.losses}L vs ${stats.archetype} (${stats.winRate}% WR in ${stats.encounters} games).${isLocal ? ' This is a key local matchup.' : ''} ${tech.reason}`,
+        suggestion: `${t('rules.tech.suggestion', { card: tech.card })}${isLocal ? localMetaBadge : ''}`,
+        reasoning: `${t('rules.tech.reasoning', {
+          wins: stats.wins,
+          losses: stats.losses,
+          archetype: stats.archetype,
+          winRate: stats.winRate,
+          games: games(stats.encounters),
+        })}${isLocal ? ` ${t('rules.tech.localNote')}` : ''} ${t(`rules.tech.reasons.${tech.reasonKey}`)}`,
         dataPoints: stats.encounters,
       });
     }
@@ -237,8 +216,12 @@ export function useRecommendations({
         id: `matchup-${stats.archetype}`,
         priority: 'high',
         category: 'tech',
-        suggestion: `Research ${stats.archetype} matchup${isLocal ? ' 📍 local meta' : ''}`,
-        reasoning: `0 wins in ${stats.encounters} games vs ${stats.archetype} (${stats.frequencyPct}% meta${isLocal ? ', local priority' : ''}). Highest-priority gap.`,
+        suggestion: `${t('rules.zeroWin.suggestion', { archetype: stats.archetype })}${isLocal ? localMetaBadge : ''}`,
+        reasoning: t(isLocal ? 'rules.zeroWin.reasoningLocal' : 'rules.zeroWin.reasoning', {
+          games: games(stats.encounters),
+          archetype: stats.archetype,
+          metaPct: stats.frequencyPct,
+        }),
         dataPoints: stats.encounters,
       });
     }
@@ -252,8 +235,8 @@ export function useRecommendations({
         id: `local-blindspot-${arch}`,
         priority: 'high',
         category: 'tech',
-        suggestion: `Log matches vs ${arch} 📍 local meta`,
-        reasoning: `${arch} is in your local meta but you have no logged games. Track this matchup to get targeted recommendations.`,
+        suggestion: `${t('rules.localBlindspot.suggestion', { archetype: arch })}${localMetaBadge}`,
+        reasoning: t('rules.localBlindspot.reasoning', { archetype: arch }),
         dataPoints: 0,
       });
     }
@@ -265,9 +248,8 @@ export function useRecommendations({
         id: 'ratio-boss',
         priority: 'medium',
         category: 'add',
-        suggestion: "Add 2× Boss's Orders",
-        reasoning:
-          'Gust effect is a staple. Missing it limits ability to take prizes around tanky benched Pokémon.',
+        suggestion: t('rules.bossMissing.suggestion'),
+        reasoning: t('rules.bossMissing.reasoning'),
         dataPoints: 0,
       });
     } else if (bossCard.count < 2) {
@@ -275,8 +257,8 @@ export function useRecommendations({
         id: 'ratio-boss-count',
         priority: 'medium',
         category: 'ratio',
-        suggestion: `Increase Boss's Orders to 2 copies (currently ${bossCard.count})`,
-        reasoning: 'Single copy is inconsistent. Two copies is the competitive standard.',
+        suggestion: t('rules.bossCount.suggestion', { count: bossCard.count }),
+        reasoning: t('rules.bossCount.reasoning'),
         dataPoints: 0,
       });
     }
@@ -292,8 +274,8 @@ export function useRecommendations({
         id: 'consistency-balls',
         priority: 'medium',
         category: 'add',
-        suggestion: 'Add Pokémon search (Ultra Ball / Nest Ball / Buddy-Buddy Poffin)',
-        reasoning: 'No Pokémon search detected. These are critical for consistent setup.',
+        suggestion: t('rules.ballSearch.suggestion'),
+        reasoning: t('rules.ballSearch.reasoning'),
         dataPoints: 0,
       });
     }
@@ -318,14 +300,25 @@ export function useRecommendations({
 
         if (currentSnap && bestSnap.id !== currentSnap.id && bestSnap.wr - currentSnap.wr >= 15) {
           const bestLabel =
-            deckSnapshots.find((s) => s.id === bestSnap.id)?.label ?? `Snapshot #${bestSnap.id}`;
+            deckSnapshots.find((s) => s.id === bestSnap.id)?.label ??
+            t('snapshotFallback', { id: bestSnap.id });
           const currentLabel = deckSnapshots[0].label;
           recs.push({
             id: 'version-overall-decline',
             priority: 'high',
             category: 'version',
-            suggestion: `Overall WR dropped: ${bestSnap.wr}% → ${currentSnap.wr}% vs best version`,
-            reasoning: `"${bestLabel}" averaged ${bestSnap.wr}% WR (${bestSnap.logs.length} games). Current "${currentLabel}" averaging ${currentSnap.wr}% WR (${currentSnap.logs.length} games). Consider reverting.`,
+            suggestion: t('rules.overallDecline.suggestion', {
+              bestWr: bestSnap.wr,
+              currentWr: currentSnap.wr,
+            }),
+            reasoning: t('rules.overallDecline.reasoning', {
+              bestLabel,
+              bestWr: bestSnap.wr,
+              bestGames: games(bestSnap.logs.length),
+              currentLabel,
+              currentWr: currentSnap.wr,
+              currentGames: games(currentSnap.logs.length),
+            }),
             dataPoints: bestSnap.logs.length + currentSnap.logs.length,
           });
         }
@@ -343,8 +336,14 @@ export function useRecommendations({
         id: `blindspot-${stats.archetype}`,
         priority: 'low',
         category: 'tech',
-        suggestion: `Test vs ${stats.archetype} (${stats.frequencyPct}% meta share)`,
-        reasoning: `No logged games vs ${stats.archetype}. With ${stats.frequencyPct}% meta presence, you'll likely face it.`,
+        suggestion: t('rules.blindspot.suggestion', {
+          archetype: stats.archetype,
+          metaPct: stats.frequencyPct,
+        }),
+        reasoning: t('rules.blindspot.reasoning', {
+          archetype: stats.archetype,
+          metaPct: stats.frequencyPct,
+        }),
         dataPoints: 0,
       });
     }
@@ -355,8 +354,8 @@ export function useRecommendations({
         id: 'data-sparse',
         priority: 'low',
         category: 'tech',
-        suggestion: 'Log more matches for better recommendations',
-        reasoning: `Only ${totalEncounters} games logged. Recommendations improve significantly with 10+ games.`,
+        suggestion: t('rules.dataSparse.suggestion'),
+        reasoning: t('rules.dataSparse.reasoning', { count: totalEncounters }),
         dataPoints: totalEncounters,
       });
     }
@@ -372,8 +371,11 @@ export function useRecommendations({
             id: `low-play-${card.card}`,
             priority: 'medium',
             category: 'remove',
-            suggestion: `Consider removing "${card.card}" (only played in ${card.playRate}% of games)`,
-            reasoning: `Played in ${card.gamesPlayed} out of ${n} logged games. Low play rate suggests inconsistency or low relevance.`,
+            suggestion: t('rules.lowPlayRate.suggestion', {
+              card: card.card,
+              playRate: card.playRate,
+            }),
+            reasoning: t('rules.lowPlayRate.reasoning', { played: card.gamesPlayed, total: n }),
             dataPoints: n,
           });
         }
@@ -389,8 +391,18 @@ export function useRecommendations({
             id: `wr-drag-${card.card}`,
             priority: 'low',
             category: 'remove',
-            suggestion: `"${card.card}" has low WR when played (${card.winRate}% vs. ${deckStats.overallWinRate}% overall)`,
-            reasoning: `In ${decisive} games with this card: ${card.winsWithCard}W/${card.lossesWithCard}L (${card.winRate}% WR). ${Math.abs(delta)}% below your overall WR. May indicate tempo loss caused by this card.`,
+            suggestion: t('rules.winRateDrag.suggestion', {
+              card: card.card,
+              cardWr: card.winRate,
+              overallWr: deckStats.overallWinRate,
+            }),
+            reasoning: t('rules.winRateDrag.reasoning', {
+              games: decisive,
+              wins: card.winsWithCard,
+              losses: card.lossesWithCard,
+              cardWr: card.winRate,
+              delta: Math.abs(delta),
+            }),
             dataPoints: decisive,
           });
         }
@@ -402,8 +414,13 @@ export function useRecommendations({
           id: 'consistency-turn1',
           priority: 'medium',
           category: 'add',
-          suggestion: `Improve turn-1 consistency (avg ${deckStats.avgTurn1Actions} actions)`,
-          reasoning: `Your first turn averages only ${deckStats.avgTurn1Actions} actions across ${n} logged games. Consider more draw supporters or search cards for a more reliable opening.`,
+          suggestion: t('rules.turn1Consistency.suggestion', {
+            actions: deckStats.avgTurn1Actions,
+          }),
+          reasoning: t('rules.turn1Consistency.reasoning', {
+            actions: deckStats.avgTurn1Actions,
+            count: n,
+          }),
           dataPoints: n,
         });
       }
@@ -414,8 +431,8 @@ export function useRecommendations({
           id: 'brick-rate',
           priority: 'medium',
           category: 'add',
-          suggestion: `High brick rate: ${deckStats.lowActivityTurnRate}% low-activity turns`,
-          reasoning: `${deckStats.lowActivityTurnRate}% of your turns had ≤1 action. This suggests frequent hand problems — more consistency cards may help.`,
+          suggestion: t('rules.brickRate.suggestion', { rate: deckStats.lowActivityTurnRate }),
+          reasoning: t('rules.brickRate.reasoning', { rate: deckStats.lowActivityTurnRate }),
           dataPoints: n,
         });
       }
@@ -429,8 +446,12 @@ export function useRecommendations({
           id: 'prize-dominated',
           priority: 'high',
           category: 'tech',
-          suggestion: `Avg only ${deckStats.prizeEfficiency.avgPrizesYouTookInLosses} prizes taken in losses`,
-          reasoning: `In your ${deckStats.prizeEfficiency.lossGamesCount} logged losses you take very few prizes on average. This points to a fundamental early-game weakness. Review your setup Pokémon and tempo attackers.`,
+          suggestion: t('rules.prizeDominated.suggestion', {
+            prizes: deckStats.prizeEfficiency.avgPrizesYouTookInLosses,
+          }),
+          reasoning: t('rules.prizeDominated.reasoning', {
+            count: deckStats.prizeEfficiency.lossGamesCount,
+          }),
           dataPoints: deckStats.prizeEfficiency.lossGamesCount,
         });
       }
@@ -443,8 +464,11 @@ export function useRecommendations({
             id: 'tempo-gap',
             priority: 'medium',
             category: 'tech',
-            suggestion: `Tempo weakness: wins avg ${deckStats.avgGameLengthWins} turns, losses avg ${deckStats.avgGameLengthLosses} turns`,
-            reasoning: `You are losing significantly faster than you win. Often a sign of missing early disruption or too-slow attackers. Review your turns 1–3 game plan.`,
+            suggestion: t('rules.tempoGap.suggestion', {
+              winTurns: deckStats.avgGameLengthWins,
+              lossTurns: deckStats.avgGameLengthLosses,
+            }),
+            reasoning: t('rules.tempoGap.reasoning'),
             dataPoints: n,
           });
         }
@@ -456,5 +480,5 @@ export function useRecommendations({
       const pd = priorityOrder[a.priority] - priorityOrder[b.priority];
       return pd !== 0 ? pd : b.dataPoints - a.dataPoints;
     });
-  }, [archetypeStats, deckCards, opponentLogs, deckSnapshots, deckStats, localMeta]);
+  }, [archetypeStats, deckCards, opponentLogs, deckSnapshots, deckStats, localMeta, t]);
 }

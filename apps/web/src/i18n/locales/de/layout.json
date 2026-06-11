@@ -1,0 +1,42 @@
+{
+  "nav": {
+    "overview": "Übersicht",
+    "meta": "Meta",
+    "myDeck": "Mein Deck",
+    "recommendations": "Empfehlungen",
+    "tips": "Tipps"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "syncLiveMeta": "Live-Meta synchronisieren",
+    "syncing": "Synchronisiere…",
+    "synced": "Synchronisiert!",
+    "syncedAt": "Synchronisiert um {{time}}",
+    "refreshData": "Daten aktualisieren"
+  },
+  "bottomNav": {
+    "logMatch": "Match loggen"
+  },
+  "sync": {
+    "starting": "Starte…",
+    "fetchingTournaments": "Lade aktuelle Turniere…",
+    "foundTournaments_one": "{{count}} Turnier gefunden. Lade Platzierungen…",
+    "foundTournaments_other": "{{count}} Turniere gefunden. Lade Platzierungen…",
+    "loadingTournament": "Lade {{name}} ({{players}} Spieler)…",
+    "savingMetaData": "Speichere Meta-Daten…",
+    "unknownError": "Unbekannter Fehler",
+    "errors": {
+      "tournamentListFailed": "Turnierliste konnte nicht geladen werden: {{status}}",
+      "noTournaments": "Keine Turniere mit 30+ Spielern gefunden.",
+      "noStandings": "Für kein Turnier konnten Platzierungen geladen werden."
+    }
+  },
+  "compare": {
+    "starting": "Starte…",
+    "missingSlug": "Lege zuerst den Archetype-Slug deines Decks fest (z. B. \"n-zoroark\").",
+    "failed": "Vergleich fehlgeschlagen"
+  },
+  "tournaments": {
+    "fetchFailed": "Fehlgeschlagen"
+  }
+}

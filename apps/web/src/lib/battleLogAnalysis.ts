@@ -1,4 +1,5 @@
 import type { BattleAnalysis } from '../types';
+import i18n from '../i18n';
 
 // ─── Log pre-processing helpers ───────────────────────────────────────────────
 
@@ -130,7 +131,9 @@ Fokus auf wenige, gut belegte Punkte. Qualität vor Quantität.`;
 
   if (!response.ok) {
     const errText = await response.text().catch(() => '');
-    throw new Error(`Anthropic API Fehler ${response.status}: ${errText}`);
+    throw new Error(
+      i18n.t('opponents:analysis.apiError', { status: response.status, message: errText }),
+    );
   }
 
   const data = await response.json();
@@ -143,7 +146,12 @@ Fokus auf wenige, gut belegte Punkte. Qualität vor Quantität.`;
     .replace(/```\s*$/i, '')
     .trim();
 
-  const analysis: BattleAnalysis = JSON.parse(jsonStr);
+  let analysis: BattleAnalysis;
+  try {
+    analysis = JSON.parse(jsonStr) as BattleAnalysis;
+  } catch {
+    throw new Error(i18n.t('opponents:analysis.parseError'));
+  }
 
   // ── Evidence validation: discard any item whose quote can't be found ─────────
   analysis.keyMoments = (analysis.keyMoments ?? []).filter((m) =>

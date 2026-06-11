@@ -1,0 +1,90 @@
+{
+  "page": {
+    "title": "Meta",
+    "subtitle": "Live competitive data from Limitless TCG",
+    "matchupMatrix": "Matchup Matrix",
+    "tournamentMeta": "Tournament Meta",
+    "tournamentMetaCount": "Tournament Meta ({{count}})"
+  },
+  "metaTable": {
+    "empty": "No meta data yet. Click \"Sync Live Meta\" in the sidebar.",
+    "showNames": "Show names",
+    "hideNames": "Hide names",
+    "names": "Names",
+    "hide": "Hide",
+    "headers": {
+      "share": "Share",
+      "players": "Players",
+      "record": "W-L",
+      "winPct": "Win %"
+    },
+    "showTop": "Show top {{count}}",
+    "showAll": "Show all {{count}} decks"
+  },
+  "tournaments": {
+    "title": "Recent Tournaments",
+    "players_one": "{{count}} player",
+    "players_other": "{{count}} players",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "daysAgo": "{{count}}d ago",
+    "timesPlayed": "{{count}}x",
+    "pastDays": "Past (days)",
+    "minPlayers": "Min. players",
+    "onlineOnly": "Online only",
+    "load": "Load",
+    "emptyHint": "Click \"Load\" to fetch recent tournaments from Limitless TCG.",
+    "openStandings": "Open standings"
+  },
+  "matchupMatrix": {
+    "loading": "Loading matchup data…",
+    "loadError": "Matchup data could not be loaded.",
+    "minGames": "Min. games",
+    "perspectiveNote": "Win rate from row deck's perspective.",
+    "expandNames": "Expand deck names",
+    "collapseNames": "Collapse deck names",
+    "names": "Names",
+    "hide": "Hide",
+    "gamesTooltip_one": "{{count}} game",
+    "gamesTooltip_other": "{{count}} games",
+    "gamesShort": "{{count}}g",
+    "cellTooltip": "{{row}} vs {{col}}: {{winRate}}% · {{wins}}W-{{losses}}L-{{ties}}T",
+    "source": "Source: TrainerHill.com · {{date}} · Cells show win rate from row deck's perspective",
+    "reload": "Reload data"
+  },
+  "metaShareChart": {
+    "empty": "No meta data loaded.",
+    "title": "Meta Share — Current Week",
+    "showTop": "Top {{count}}",
+    "showAll": "All {{count}}",
+    "metaShare": "Meta Share",
+    "winRate": "Win Rate"
+  },
+  "myMatchups": {
+    "title": "My Matchups",
+    "empty": "No archetype data available.",
+    "showNames": "Show names",
+    "hideNames": "Hide names",
+    "names": "Names",
+    "hide": "Hide",
+    "headers": {
+      "metaPct": "Meta %",
+      "encounters": "Enc.",
+      "wins": "W",
+      "losses": "L",
+      "ties": "T",
+      "winRate": "WR"
+    },
+    "sampleSize": "(n={{count}})",
+    "showTop": "Show top {{count}}",
+    "showAll": "Show all {{count}} decks"
+  },
+  "winRateChart": {
+    "title": "Win Rate vs Archetype",
+    "empty": "Log opponent matches to see your win rates.",
+    "winRate": "Win Rate",
+    "tooltipValue_one": "{{value}}% ({{count}} game)",
+    "tooltipValue_other": "{{value}}% ({{count}} games)",
+    "legend": "Green = favorable (60%+)   Orange = even (40–60%)   Red = unfavorable (<40%)"
+  }
+}

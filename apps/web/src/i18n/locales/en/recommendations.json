@@ -1,0 +1,155 @@
+{
+  "games_one": "{{count}} game",
+  "games_other": "{{count}} games",
+  "localMetaBadge": "📍 local meta",
+  "snapshotFallback": "Snapshot #{{id}}",
+  "page": {
+    "title": "Recommendations",
+    "subtitleForDeck": "For: <deck>{{deckName}}</deck> — based on your matches and the current meta",
+    "subtitleGeneric": "Data-driven deck adjustment suggestions based on your match history and tournament data",
+    "basedOn_one": "Based on <bold>{{count}} logged match</bold> and current meta data.",
+    "basedOn_other": "Based on <bold>{{count}} logged matches</bold> and current meta data.",
+    "logMoreHint": "Log 10+ matches for higher-confidence suggestions.",
+    "localMetaNotice": "Local meta ({{archetypes}}) is prioritized above general meta.",
+    "summary": {
+      "high": "high priority",
+      "medium": "medium priority",
+      "low": "low priority"
+    }
+  },
+  "panel": {
+    "empty": "No recommendations yet. Log at least 2 opponent matches to start receiving data-driven suggestions.",
+    "priority": {
+      "high": "High Priority",
+      "medium": "Medium Priority",
+      "low": "Low Priority"
+    },
+    "category": {
+      "add": "Add",
+      "remove": "Remove",
+      "ratio": "Ratio",
+      "tech": "Tech",
+      "version": "Version"
+    }
+  },
+  "comparison": {
+    "sectionTitle": "List Comparison vs. Tournament Results",
+    "title": "List Comparison",
+    "statsLine": "{{lists}} lists · {{top}} top-placing · {{time}}",
+    "compare": "Compare",
+    "refresh": "Refresh",
+    "comparing": "Comparing…",
+    "notSetUp": "Deck comparison not set up",
+    "setupHint": "Go to <myDeck>My Deck</myDeck> and set your archetype slug (e.g. <slug>n-zoroark</slug>) to compare your list against tournament results.",
+    "compareHint": "Click \"Compare\" to analyze your list against tournament-winning <slug>{{slug}}</slug> lists from Limitless TCG.",
+    "considerAdding": "Consider Adding ({{count}})",
+    "considerRemoving": "Consider Removing ({{count}})",
+    "countAdjustments": "Count Adjustments ({{count}})",
+    "noAdds": "None — your deck covers the high-freq cards.",
+    "noRemoves": "None — everything looks standard.",
+    "noAdjustments": "Counts look good across high-freq cards.",
+    "youVsAvg": "you: {{user}} / avg: {{avg}}",
+    "progress": {
+      "fetching": "Fetching tournament list…",
+      "scanning": "Scanning \"{{name}}\" ({{players}} players)…",
+      "analyzing": "Analyzing {{lists}} lists ({{top}} top-placing)…"
+    },
+    "errors": {
+      "fetchFailed": "Could not fetch tournament list",
+      "noListsFound": "No public decklists found for \"{{slug}}\". Try the Limitless slug format (e.g. \"n-zoroark\", \"dragapult-ex\", \"alakazam-dudunsparce\")."
+    }
+  },
+  "rules": {
+    "version": {
+      "beforeFirstSave": "Before first save",
+      "suggestionImproving": "vs {{archetype}}: Current build is stronger",
+      "suggestionDeclining": "vs {{archetype}}: Revert recent changes?",
+      "reasoningImproving": "\"{{bestLabel}}\" → {{bestWr}}% WR ({{bestGames}}). \"{{worstLabel}}\" → {{worstWr}}% WR ({{worstGames}}). Current changes appear positive.",
+      "reasoningDeclining": "\"{{bestLabel}}\" → {{bestWr}}% WR ({{bestGames}}). \"{{worstLabel}}\" → {{worstWr}}% WR ({{worstGames}}). Your latest changes may have hurt this matchup."
+    },
+    "tech": {
+      "suggestion": "Add 1× {{card}}",
+      "reasoning": "You're {{wins}}W/{{losses}}L vs {{archetype}} ({{winRate}}% WR in {{games}}).",
+      "localNote": "This is a key local matchup.",
+      "reasons": {
+        "dragapultEx": "Hand disruption (H regulation) slows Dragapult's setup; reduces opponent hand mid-game.",
+        "dragapultBlaziken": "Disrupts the Blaziken energy acceleration before it comes online.",
+        "dragapultDusknoir": "Resets opponent's hand to a small number before Dusknoir's Ability chain activates.",
+        "nsZoroark": "Snipes benched Zorua before it evolves, cutting off the draw engine.",
+        "lucarioHariyama": "Disrupts the bench and hand to slow Lucario's aggressive early game.",
+        "alakazamDudunsparce": "Devolves Alakazam back to Abra, removing the ability engine.",
+        "starmieFroslass": "Hand disruption breaks the Starmie / Froslass setup loop.",
+        "cynthiasGarchompEx": "Reduces hand size before Garchomp's ability chain activates.",
+        "rocketsMewtwo": "Hand disruption prevents setting up the Mewtwo attack chain.",
+        "ogerponMeganium": "Disrupts the Meganium bench, preventing energy acceleration for Ogerpon.",
+        "ragingBoltOgerpon": "Reduces damage taken from Raging Bolt's high-damage attacks.",
+        "ragingBoltEx": "Reduces damage from Raging Bolt's Ancient attacks.",
+        "grimmsnarlFroslass": "Devolves Grimmsnarl to interrupt ability-based strategies before they lock in.",
+        "rocketsHonchkrow": "Hand disruption to break Honchkrow's setup before it attacks.",
+        "okidogiBarbaracle": "Hand reset disrupts Barbaracle's lock strategy from the start.",
+        "megaVenusaur": "Bench damage knocks out the support Pokémon enabling Mega Venusaur.",
+        "greninja": "Hand disruption slows the Greninja setup chain.",
+        "slowking": "Devolves Slowking to interrupt ability-based stall strategies."
+      }
+    },
+    "zeroWin": {
+      "suggestion": "Research {{archetype}} matchup",
+      "reasoning": "0 wins in {{games}} vs {{archetype}} ({{metaPct}}% meta). Highest-priority gap.",
+      "reasoningLocal": "0 wins in {{games}} vs {{archetype}} ({{metaPct}}% meta, local priority). Highest-priority gap."
+    },
+    "localBlindspot": {
+      "suggestion": "Log matches vs {{archetype}}",
+      "reasoning": "{{archetype}} is in your local meta but you have no logged games. Track this matchup to get targeted recommendations."
+    },
+    "bossMissing": {
+      "suggestion": "Add 2× Boss's Orders",
+      "reasoning": "Gust effect is a staple. Missing it limits ability to take prizes around tanky benched Pokémon."
+    },
+    "bossCount": {
+      "suggestion": "Increase Boss's Orders to 2 copies (currently {{count}})",
+      "reasoning": "Single copy is inconsistent. Two copies is the competitive standard."
+    },
+    "ballSearch": {
+      "suggestion": "Add Pokémon search (Ultra Ball / Nest Ball / Buddy-Buddy Poffin)",
+      "reasoning": "No Pokémon search detected. These are critical for consistent setup."
+    },
+    "overallDecline": {
+      "suggestion": "Overall WR dropped: {{bestWr}}% → {{currentWr}}% vs best version",
+      "reasoning": "\"{{bestLabel}}\" averaged {{bestWr}}% WR ({{bestGames}}). Current \"{{currentLabel}}\" averaging {{currentWr}}% WR ({{currentGames}}). Consider reverting."
+    },
+    "blindspot": {
+      "suggestion": "Test vs {{archetype}} ({{metaPct}}% meta share)",
+      "reasoning": "No logged games vs {{archetype}}. With {{metaPct}}% meta presence, you'll likely face it."
+    },
+    "dataSparse": {
+      "suggestion": "Log more matches for better recommendations",
+      "reasoning_one": "Only {{count}} game logged. Recommendations improve significantly with 10+ games.",
+      "reasoning_other": "Only {{count}} games logged. Recommendations improve significantly with 10+ games."
+    },
+    "lowPlayRate": {
+      "suggestion": "Consider removing \"{{card}}\" (only played in {{playRate}}% of games)",
+      "reasoning": "Played in {{played}} out of {{total}} logged games. Low play rate suggests inconsistency or low relevance."
+    },
+    "winRateDrag": {
+      "suggestion": "\"{{card}}\" has low WR when played ({{cardWr}}% vs. {{overallWr}}% overall)",
+      "reasoning": "In {{games}} games with this card: {{wins}}W/{{losses}}L ({{cardWr}}% WR). {{delta}}% below your overall WR. May indicate tempo loss caused by this card."
+    },
+    "turn1Consistency": {
+      "suggestion": "Improve turn-1 consistency (avg {{actions}} actions)",
+      "reasoning_one": "Your first turn averages only {{actions}} actions across {{count}} logged game. Consider more draw supporters or search cards for a more reliable opening.",
+      "reasoning_other": "Your first turn averages only {{actions}} actions across {{count}} logged games. Consider more draw supporters or search cards for a more reliable opening."
+    },
+    "brickRate": {
+      "suggestion": "High brick rate: {{rate}}% low-activity turns",
+      "reasoning": "{{rate}}% of your turns had ≤1 action. This suggests frequent hand problems — more consistency cards may help."
+    },
+    "prizeDominated": {
+      "suggestion": "Avg only {{prizes}} prizes taken in losses",
+      "reasoning": "In your {{count}} logged losses you take very few prizes on average. This points to a fundamental early-game weakness. Review your setup Pokémon and tempo attackers."
+    },
+    "tempoGap": {
+      "suggestion": "Tempo weakness: wins avg {{winTurns}} turns, losses avg {{lossTurns}} turns",
+      "reasoning": "You are losing significantly faster than you win. Often a sign of missing early disruption or too-slow attackers. Review your turns 1–3 game plan."
+    }
+  }
+}
