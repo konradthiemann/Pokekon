@@ -1,0 +1,652 @@
+import { useMemo } from 'react';
+import {
+  BarChart2,
+  TrendingUp,
+  TrendingDown,
+  Target,
+  Zap,
+  GitCompare,
+  Shield,
+  AlertTriangle,
+  Layers,
+} from 'lucide-react';
+import type { Deck, OpponentLog, MetaSnapshot, MatchResult } from '../../types';
+import { PokemonIcon } from '../shared/PokemonIcon';
+
+interface Props {
+  decks: Deck[];
+  allLogs: OpponentLog[];
+  metaSnapshots: MetaSnapshot[];
+  activeDeckId: number | null;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function wr(wins: number, losses: number): number {
+  return wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
+}
+
+function stdDev(values: number[]): number {
+  if (values.length < 2) return 0;
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  return Math.sqrt(values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length);
+}
+
+// Simple Wilson confidence interval lower bound (95%)
+function wilsonLower(wins: number, n: number): number {
+  if (n === 0) return 0;
+  const p = wins / n;
+  const z = 1.96;
+  const denom = 1 + (z * z) / n;
+  return Math.round(
+    ((p + (z * z) / (2 * n) - z * Math.sqrt((p * (1 - p) + (z * z) / (4 * n)) / n)) / denom) * 100,
+  );
+}
+
+function FormDot({ r }: { r: MatchResult }) {
+  const cls = r === 'W' ? 'bg-emerald-400' : r === 'L' ? 'bg-red-400' : 'bg-yellow-400';
+  return <span className={`inline-block w-2 h-2 rounded-full ${cls}`} title={r} />;
+}
+
+function WrBar({ value, max = 100 }: { value: number; max?: number }) {
+  const pct = Math.min((value / max) * 100, 100);
+  const color = value >= 60 ? 'bg-emerald-500' : value >= 45 ? 'bg-yellow-500' : 'bg-red-500';
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span
+        className={`text-xs tabular-nums w-8 text-right font-semibold ${value >= 60 ? 'text-emerald-400' : value >= 45 ? 'text-yellow-400' : 'text-red-400'}`}
+      >
+        {value}%
+      </span>
+    </div>
+  );
+}
+
+// ─── Per-deck analytics ───────────────────────────────────────────────────────
+
+interface DeckStats {
+  deck: Deck;
+  games: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  winRate: number;
+  ciLower: number; // 95% Wilson lower bound
+  metaScore: number; // frequency-weighted WR
+  recentForm: MatchResult[];
+  recentWR: number; // last 10 games WR
+  consistency: number; // 100 - stdDev of matchup WRs (capped 0-100)
+  matchups: {
+    archetype: string;
+    wins: number;
+    losses: number;
+    ties: number;
+    winRate: number;
+    metaFreq: number;
+    tier: 'favorable' | 'even' | 'unfavorable';
+  }[];
+}
+
+function computeDeckStats(
+  deck: Deck,
+  logs: OpponentLog[],
+  freqMap: Map<string, number>,
+): DeckStats {
+  const deckLogs = logs.filter((l) => l.deckId === deck.id);
+
+  const statsMap = new Map<string, { wins: number; losses: number; ties: number }>();
+  for (const log of deckLogs) {
+    const cur = statsMap.get(log.archetype) ?? { wins: 0, losses: 0, ties: 0 };
+    if (log.result === 'W') cur.wins++;
+    if (log.result === 'L') cur.losses++;
+    if (log.result === 'T') cur.ties++;
+    statsMap.set(log.archetype, cur);
+  }
+
+  const matchups = [...statsMap.entries()]
+    .map(([archetype, s]) => {
+      const rate = wr(s.wins, s.losses);
+      return {
+        archetype,
+        wins: s.wins,
+        losses: s.losses,
+        ties: s.ties,
+        winRate: rate,
+        metaFreq: freqMap.get(archetype.toLowerCase()) ?? 0,
+        tier:
+          rate >= 58
+            ? ('favorable' as const)
+            : rate >= 42
+              ? ('even' as const)
+              : ('unfavorable' as const),
+      };
+    })
+    .sort((a, b) => b.wins + b.losses - (a.wins + a.losses));
+
+  const wins = deckLogs.filter((l) => l.result === 'W').length;
+  const losses = deckLogs.filter((l) => l.result === 'L').length;
+  const ties = deckLogs.filter((l) => l.result === 'T').length;
+  const decisive = wins + losses;
+  const winRate = wr(wins, losses);
+
+  // Meta-weighted score
+  const metaMatchups = matchups.filter((m) => m.metaFreq > 0 && m.wins + m.losses >= 2);
+  const totalFreq = metaMatchups.reduce((s, m) => s + m.metaFreq, 0);
+  const metaScore =
+    totalFreq > 0
+      ? Math.round(metaMatchups.reduce((s, m) => s + m.metaFreq * m.winRate, 0) / totalFreq)
+      : 0;
+
+  // Recent form (last 10)
+  const recentForm = deckLogs.slice(0, 10).map((l) => l.result as MatchResult);
+  const recentWins = recentForm.filter((r) => r === 'W').length;
+  const recentLosses = recentForm.filter((r) => r === 'L').length;
+  const recentWR = wr(recentWins, recentLosses);
+
+  // Consistency (low std dev = consistent)
+  const matchupWRs = matchups.filter((m) => m.wins + m.losses >= 2).map((m) => m.winRate);
+  const sd = stdDev(matchupWRs);
+  const consistency = Math.max(0, Math.round(100 - sd));
+
+  return {
+    deck,
+    games: deckLogs.length,
+    wins,
+    losses,
+    ties,
+    winRate,
+    ciLower: wilsonLower(wins, decisive),
+    metaScore,
+    recentForm,
+    recentWR,
+    consistency,
+    matchups,
+  };
+}
+
+// ─── Variant comparison table ─────────────────────────────────────────────────
+
+function VariantComparison({ variants }: { variants: DeckStats[] }) {
+  // Gather all matchups that appear in at least one variant with ≥2 decisive games
+  const allMatchups = [
+    ...new Set(
+      variants.flatMap((v) =>
+        v.matchups.filter((m) => m.wins + m.losses >= 2).map((m) => m.archetype),
+      ),
+    ),
+  ];
+
+  if (allMatchups.length === 0) return null;
+
+  return (
+    <div className="card overflow-hidden p-0">
+      <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
+        <GitCompare className="w-4 h-4 text-brand-400" />
+        <h3 className="card-header mb-0">Variant Comparison</h3>
+        <span className="text-xs text-gray-500 ml-1">— same archetype, different builds</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-gray-800 bg-gray-800/30">
+              <th className="px-4 py-2.5 text-left text-gray-400 font-medium">Matchup</th>
+              {variants.map((v) => (
+                <th
+                  key={v.deck.id}
+                  className="px-3 py-2.5 text-center text-gray-400 font-medium min-w-[90px]"
+                >
+                  {v.deck.variant}
+                </th>
+              ))}
+              <th className="px-3 py-2.5 text-center text-gray-400 font-medium">Edge</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* Overall row */}
+            <tr className="border-b border-gray-800 bg-gray-800/20">
+              <td className="px-4 py-2.5 font-semibold text-gray-200">Overall WR</td>
+              {variants.map((v) => (
+                <td key={v.deck.id} className="px-3 py-2.5 text-center">
+                  <span
+                    className={`font-semibold ${v.winRate >= 55 ? 'text-emerald-400' : v.winRate >= 45 ? 'text-gray-200' : 'text-red-400'}`}
+                  >
+                    {v.games > 0 ? `${v.winRate}%` : '—'}
+                  </span>
+                  <span className="text-gray-600 ml-1">({v.games}g)</span>
+                </td>
+              ))}
+              <td className="px-3 py-2.5 text-center">
+                {variants.length >= 2 &&
+                  variants[0].games > 0 &&
+                  variants[1].games > 0 &&
+                  (() => {
+                    const best = variants.reduce((a, b) => (a.winRate > b.winRate ? a : b));
+                    const diff =
+                      Math.max(...variants.map((v) => v.winRate)) -
+                      Math.min(...variants.map((v) => v.winRate));
+                    return diff >= 3 ? (
+                      <span className="text-brand-400 font-medium">
+                        {best.deck.variant} +{diff}%
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">~equal</span>
+                    );
+                  })()}
+              </td>
+            </tr>
+            {allMatchups.map((arch) => {
+              const cells = variants.map((v) => v.matchups.find((m) => m.archetype === arch));
+              const rates = cells.map((c) => (c ? wr(c.wins, c.losses) : -1)).filter((r) => r >= 0);
+              const maxRate = Math.max(...rates);
+              const minRate = Math.min(...rates);
+              const spread = maxRate - minRate;
+
+              return (
+                <tr key={arch} className="border-b border-gray-800/40 hover:bg-gray-800/10">
+                  <td className="px-4 py-2 text-gray-300 truncate max-w-[160px]">{arch}</td>
+                  {cells.map((c, i) => (
+                    <td key={variants[i].deck.id} className="px-3 py-2 text-center">
+                      {c && c.wins + c.losses >= 2 ? (
+                        <span
+                          className={`font-semibold ${c.winRate >= 58 ? 'text-emerald-400' : c.winRate >= 42 ? 'text-gray-300' : 'text-red-400'}`}
+                        >
+                          {c.winRate}%
+                          <span className="text-gray-600 font-normal ml-1 text-xs">
+                            ({c.wins}-{c.losses})
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-gray-700">{c ? `${c.wins + c.losses}g` : '—'}</span>
+                      )}
+                    </td>
+                  ))}
+                  <td className="px-3 py-2 text-center">
+                    {spread >= 10 ? (
+                      <span className="text-brand-400 text-xs font-medium">
+                        {variants[rates.indexOf(maxRate)]?.deck.variant} +{spread}%
+                      </span>
+                    ) : (
+                      <span className="text-gray-700 text-xs">—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Single deck stats panel ──────────────────────────────────────────────────
+
+function MatchupList({ stats }: { stats: DeckStats }) {
+  const sorted = [...stats.matchups].sort((a, b) => {
+    // Sort by meta frequency first (meta-relevant matchups first), then by games
+    if (b.metaFreq !== a.metaFreq) return b.metaFreq - a.metaFreq;
+    return b.wins + b.losses - (a.wins + a.losses);
+  });
+
+  if (sorted.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-600 text-sm">
+        No matches logged for this deck yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      {sorted.map((m) => {
+        const games = m.wins + m.losses + m.ties;
+        const isLowData = games < 3;
+        return (
+          <div
+            key={m.archetype}
+            className={`flex items-center gap-3 px-1 py-1.5 rounded hover:bg-gray-800/30 transition-colors ${isLowData ? 'opacity-60' : ''}`}
+          >
+            <div className="w-36 shrink-0 flex items-center gap-1.5">
+              <PokemonIcon archetype={m.archetype} size="sm" dual />
+              <div className="min-w-0">
+                <span className="text-xs text-gray-300 truncate block">{m.archetype}</span>
+                {m.metaFreq > 0 && (
+                  <span className="text-xs text-gray-600">{m.metaFreq.toFixed(1)}% meta</span>
+                )}
+              </div>
+            </div>
+            <div className="flex-1">
+              <WrBar value={m.winRate} />
+            </div>
+            <div className="text-xs text-gray-500 tabular-nums w-20 text-right shrink-0">
+              {m.wins}W-{m.losses}L-{m.ties}T
+            </div>
+            <div className="w-16 shrink-0">
+              {isLowData ? (
+                <span className="text-xs text-gray-700 italic">low data</span>
+              ) : (
+                <span
+                  className={`text-xs px-1.5 py-0.5 rounded ${
+                    m.tier === 'favorable'
+                      ? 'bg-emerald-900/40 text-emerald-400'
+                      : m.tier === 'unfavorable'
+                        ? 'bg-red-900/40 text-red-400'
+                        : 'bg-gray-800/40 text-gray-400'
+                  }`}
+                >
+                  {m.tier === 'favorable'
+                    ? 'Favored'
+                    : m.tier === 'unfavorable'
+                      ? 'Unfav.'
+                      : 'Even'}
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Meta insights ────────────────────────────────────────────────────────────
+
+function MetaInsights({
+  stats,
+  metaSnapshots,
+}: {
+  stats: DeckStats;
+  metaSnapshots: MetaSnapshot[];
+}) {
+  const topMeta = metaSnapshots
+    .filter((s) => s.frequencyPct >= 5)
+    .sort((a, b) => b.frequencyPct - a.frequencyPct)
+    .slice(0, 10);
+
+  const coverage = topMeta.filter((m) => {
+    const match = stats.matchups.find((mu) =>
+      mu.archetype.toLowerCase().includes(m.archetype.toLowerCase().split('-')[0]),
+    );
+    return match && match.wins + match.losses >= 2;
+  }).length;
+
+  const coveragePct = topMeta.length > 0 ? Math.round((coverage / topMeta.length) * 100) : 0;
+
+  const gatekeeper = stats.matchups.find((m) => {
+    const isTop3 = topMeta
+      .slice(0, 3)
+      .some((t) => m.archetype.toLowerCase().includes(t.archetype.toLowerCase().split('-')[0]));
+    return isTop3 && m.winRate < 45 && m.wins + m.losses >= 3;
+  });
+
+  const bestMatchup = stats.matchups
+    .filter((m) => m.wins + m.losses >= 3)
+    .sort((a, b) => b.winRate - a.winRate)[0];
+
+  const worstMatchup = stats.matchups
+    .filter((m) => m.wins + m.losses >= 3)
+    .sort((a, b) => a.winRate - b.winRate)[0];
+
+  return (
+    <div className="space-y-2">
+      {gatekeeper && (
+        <div className="flex items-start gap-2 p-2.5 bg-red-900/20 border border-red-900/40 rounded-lg text-xs">
+          <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+          <div>
+            <span className="text-red-300 font-medium">Gatekeeper:</span>
+            <span className="text-gray-300 ml-1">
+              {gatekeeper.archetype} ({gatekeeper.winRate}% WR) is a top-3 meta deck you're losing
+              to. Improve this matchup first.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {coveragePct < 50 && topMeta.length > 0 && (
+        <div className="flex items-start gap-2 p-2.5 bg-yellow-900/20 border border-yellow-900/40 rounded-lg text-xs">
+          <Target className="w-3.5 h-3.5 text-yellow-400 shrink-0 mt-0.5" />
+          <div>
+            <span className="text-yellow-300 font-medium">Low coverage:</span>
+            <span className="text-gray-300 ml-1">
+              You have data on {coveragePct}% of top meta decks. Log more matches for reliable meta
+              score.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {bestMatchup && (
+        <div className="flex items-start gap-2 p-2.5 bg-emerald-900/20 border border-emerald-900/40 rounded-lg text-xs">
+          <Shield className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+          <span className="text-gray-300">
+            <span className="text-emerald-300 font-medium">Best matchup:</span>{' '}
+            {bestMatchup.archetype} ({bestMatchup.winRate}% in{' '}
+            {bestMatchup.wins + bestMatchup.losses + bestMatchup.ties} games)
+          </span>
+        </div>
+      )}
+
+      {worstMatchup &&
+        worstMatchup.archetype !== bestMatchup?.archetype &&
+        worstMatchup.winRate < 45 && (
+          <div className="flex items-start gap-2 p-2.5 bg-gray-800/40 border border-gray-700/40 rounded-lg text-xs">
+            <TrendingDown className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+            <span className="text-gray-300">
+              <span className="text-gray-200 font-medium">Worst matchup:</span>{' '}
+              {worstMatchup.archetype} ({worstMatchup.winRate}% in{' '}
+              {worstMatchup.wins + worstMatchup.losses + worstMatchup.ties} games)
+            </span>
+          </div>
+        )}
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId }: Props) {
+  const freqMap = useMemo(
+    () => new Map(metaSnapshots.map((s) => [s.archetype.toLowerCase(), s.frequencyPct])),
+    [metaSnapshots],
+  );
+
+  const allDeckStats = useMemo(
+    () => decks.map((d) => computeDeckStats(d, allLogs, freqMap)),
+    [decks, allLogs, freqMap],
+  );
+
+  // Group by archetype
+  const archetypeGroups = useMemo(() => {
+    const groups = new Map<string, DeckStats[]>();
+    for (const stats of allDeckStats) {
+      const key = stats.deck.archetype;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(stats);
+    }
+    return groups;
+  }, [allDeckStats]);
+
+  const activeStats = allDeckStats.find((s) => s.deck.id === activeDeckId);
+
+  // Archetype-level aggregate (all variants of the active archetype)
+  const archetypeAggregate = useMemo(() => {
+    if (!activeStats) return null;
+    const variants = archetypeGroups.get(activeStats.deck.archetype) ?? [];
+    if (variants.length === 0) return null;
+    const wins = variants.reduce((s, v) => s + v.wins, 0);
+    const losses = variants.reduce((s, v) => s + v.losses, 0);
+    const ties = variants.reduce((s, v) => s + v.ties, 0);
+    const games = variants.reduce((s, v) => s + v.games, 0);
+    const bestVariant = [...variants].sort((a, b) => b.winRate - a.winRate)[0];
+    return {
+      variantCount: variants.length,
+      wins,
+      losses,
+      ties,
+      games,
+      winRate: wr(wins, losses),
+      bestVariant,
+    };
+  }, [activeStats, archetypeGroups]);
+
+  if (decks.length === 0) {
+    return (
+      <div className="card py-12 text-center text-gray-600 text-sm">
+        No decks yet. Create your first deck above.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* ── Archetype-level overview (all variants combined) ── */}
+      {activeStats && archetypeAggregate && archetypeAggregate.variantCount > 0 && (
+        <div className="card p-0 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
+            <Layers className="w-4 h-4 text-brand-400" />
+            <h3 className="card-header mb-0">{activeStats.deck.archetypeName} — Overall</h3>
+            <span className="text-xs text-gray-500 ml-1">
+              · {archetypeAggregate.variantCount}{' '}
+              {archetypeAggregate.variantCount === 1 ? 'variant' : 'variants'} combined
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-800">
+            <div className="p-4 text-center">
+              <div
+                className={`text-2xl font-bold ${archetypeAggregate.winRate >= 55 ? 'text-emerald-400' : archetypeAggregate.winRate >= 45 ? 'text-yellow-400' : archetypeAggregate.games > 0 ? 'text-red-400' : 'text-gray-600'}`}
+              >
+                {archetypeAggregate.games > 0 ? `${archetypeAggregate.winRate}%` : '—'}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">Overall WR</div>
+            </div>
+            <div className="p-4 text-center">
+              <div className="text-2xl font-bold text-gray-200 tabular-nums">
+                {archetypeAggregate.games}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">Total Games</div>
+            </div>
+            <div className="p-4 text-center">
+              <div className="text-2xl font-bold text-gray-200 font-mono">
+                {archetypeAggregate.wins}-{archetypeAggregate.losses}-{archetypeAggregate.ties}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">W - L - T</div>
+            </div>
+            <div className="p-4 text-center">
+              <div className="text-sm font-semibold text-brand-300 truncate px-2">
+                {archetypeAggregate.bestVariant && archetypeAggregate.bestVariant.games > 0
+                  ? archetypeAggregate.bestVariant.deck.variant || '—'
+                  : '—'}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                Best Variant
+                {archetypeAggregate.bestVariant && archetypeAggregate.bestVariant.games > 0
+                  ? ` (${archetypeAggregate.bestVariant.winRate}%)`
+                  : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active variant analytics */}
+      {activeStats && (
+        <>
+          <div className="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider font-semibold pt-2">
+            <BarChart2 className="w-3.5 h-3.5 text-brand-400" />
+            Variant:{' '}
+            <span className="text-gray-300 normal-case font-medium tracking-normal">
+              {activeStats.deck.variant || 'Default'}
+            </span>
+          </div>
+          {/* KPI row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="card p-4 text-center">
+              <div className="flex justify-center mb-1">
+                <BarChart2 className="w-4 h-4 text-brand-400" />
+              </div>
+              <div
+                className={`text-2xl font-bold ${activeStats.winRate >= 55 ? 'text-emerald-400' : activeStats.winRate >= 45 ? 'text-yellow-400' : 'text-red-400'}`}
+              >
+                {activeStats.games > 0 ? `${activeStats.winRate}%` : '—'}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">Win Rate</div>
+              {activeStats.games >= 5 && (
+                <div className="text-xs text-gray-700 mt-0.5">≥{activeStats.ciLower}% (95% CI)</div>
+              )}
+            </div>
+
+            <div className="card p-4 text-center">
+              <div className="flex justify-center mb-1">
+                <Target className="w-4 h-4 text-brand-400" />
+              </div>
+              <div
+                className={`text-2xl font-bold ${activeStats.metaScore >= 55 ? 'text-emerald-400' : activeStats.metaScore >= 45 ? 'text-yellow-400' : activeStats.metaScore > 0 ? 'text-red-400' : 'text-gray-600'}`}
+              >
+                {activeStats.metaScore > 0 ? `${activeStats.metaScore}%` : '—'}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">Meta Score</div>
+              <div className="text-xs text-gray-700 mt-0.5">freq-weighted WR</div>
+            </div>
+
+            <div className="card p-4 text-center">
+              <div className="flex justify-center mb-1">
+                <Zap className="w-4 h-4 text-brand-400" />
+              </div>
+              <div
+                className={`text-2xl font-bold ${activeStats.recentWR >= 55 ? 'text-emerald-400' : activeStats.recentWR >= 45 ? 'text-yellow-400' : activeStats.recentWR > 0 ? 'text-red-400' : 'text-gray-600'}`}
+              >
+                {activeStats.recentForm.length > 0 ? `${activeStats.recentWR}%` : '—'}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">Recent Form</div>
+              <div className="flex items-center justify-center gap-0.5 mt-1">
+                {activeStats.recentForm.map((r, i) => (
+                  <FormDot key={i} r={r} />
+                ))}
+              </div>
+            </div>
+
+            <div className="card p-4 text-center">
+              <div className="flex justify-center mb-1">
+                <TrendingUp className="w-4 h-4 text-brand-400" />
+              </div>
+              <div
+                className={`text-2xl font-bold ${activeStats.consistency >= 70 ? 'text-emerald-400' : activeStats.consistency >= 50 ? 'text-yellow-400' : 'text-red-400'}`}
+              >
+                {activeStats.games >= 6 ? `${activeStats.consistency}` : '—'}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">Consistency</div>
+              <div className="text-xs text-gray-700 mt-0.5">WR stability</div>
+            </div>
+          </div>
+
+          {/* Meta insights */}
+          {activeStats.games >= 3 && (
+            <MetaInsights stats={activeStats} metaSnapshots={metaSnapshots} />
+          )}
+
+          {/* Matchup breakdown */}
+          <div className="card p-0 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
+              <BarChart2 className="w-4 h-4 text-brand-400" />
+              <h3 className="card-header mb-0">Matchup Performance</h3>
+              <span className="text-xs text-gray-600 ml-1">· sorted by meta relevance</span>
+            </div>
+            <div className="px-4 py-3">
+              <MatchupList stats={activeStats} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Variant comparison for archetypes with multiple decks */}
+      {[...archetypeGroups.entries()]
+        .filter(([, variants]) => variants.length >= 2)
+        .map(([archetype, variants]) => (
+          <VariantComparison key={archetype} variants={variants} />
+        ))}
+    </div>
+  );
+}

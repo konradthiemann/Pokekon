@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+package-lock.json
+apps/web/public
+docs
+documents
+todo
+*.md
