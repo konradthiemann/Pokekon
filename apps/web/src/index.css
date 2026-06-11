@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    @apply bg-gray-950 text-gray-100 antialiased;
+    font-family:
+      system-ui,
+      -apple-system,
+      sans-serif;
+    margin: 0;
+  }
+  #root {
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  /* ── Glass card ─────────────────────────────────────────────────────────── */
+  .card {
+    @apply bg-white/[0.06] backdrop-blur-md border border-white/[0.12] rounded-2xl p-4;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  /* Section title inside a card */
+  .card-header {
+    @apply text-[11px] font-semibold text-blue-300/70 uppercase tracking-widest mb-3;
+  }
+
+  /* Large metric number */
+  .stat-value {
+    @apply text-2xl font-bold text-white;
+  }
+
+  /* ── Badges ─────────────────────────────────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  }
+  .badge-win {
+    @apply badge bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 font-bold;
+  }
+  .badge-loss {
+    @apply badge bg-red-500/15 text-red-300 border border-red-500/30 px-2.5 py-1 font-bold;
+  }
+  .badge-tie {
+    @apply badge bg-yellow-500/15 text-yellow-300 border border-yellow-500/30 px-2.5 py-1 font-bold;
+  }
+  .badge-lc {
+    @apply badge bg-blue-500/15 text-blue-300 border border-blue-500/30;
+  }
+  .badge-lcup {
+    @apply badge bg-purple-500/15 text-purple-300 border border-purple-500/30;
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 hover:bg-brand-500 text-white;
+    box-shadow: 0 2px 12px rgba(37, 99, 235, 0.35);
+  }
+  .btn-ghost {
+    @apply btn bg-white/[0.07] hover:bg-white/[0.12] text-gray-300 border border-white/[0.08];
+  }
+}
