@@ -1,366 +1,61 @@
-import type { MetaSnapshot, DeckCard, OpponentLog } from '../types';
+import type { MetaSnapshot } from '../types';
 
 // ─── Meta snapshot seed data ──────────────────────────────────────────────────
-// Based on competitive Pokemon TCG meta circa April 2026 (Surging Sparks / Prismatic Evolutions era)
-// Source: Community tournament aggregation — treat as approximate baseline
+// Post-rotation Standard meta (2026 rotation, see constants/season.ts).
+// Approximate community-aggregate numbers — purely a demo baseline so the
+// meta views are not empty before the first live sync, which then becomes
+// the newest period and takes over every "latest" view.
 
-export const SEED_META_SNAPSHOTS: Omit<MetaSnapshot, 'id'>[] = [
-  {
-    archetype: 'Charizard ex',
-    frequencyPct: 18,
-    winRatePct: 52,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W15',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Dragapult ex',
-    frequencyPct: 15,
-    winRatePct: 55,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W15',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Gardevoir ex',
-    frequencyPct: 12,
-    winRatePct: 51,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W15',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Lugia VSTAR',
-    frequencyPct: 10,
-    winRatePct: 50,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W15',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Roaring Moon ex',
-    frequencyPct: 9,
-    winRatePct: 53,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W15',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Miraidon ex',
-    frequencyPct: 8,
-    winRatePct: 49,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W15',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Raging Bolt ex',
-    frequencyPct: 7,
-    winRatePct: 54,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W15',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Chien-Pao ex',
-    frequencyPct: 6,
-    winRatePct: 48,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W15',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Regidrago VSTAR',
-    frequencyPct: 5,
-    winRatePct: 52,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W15',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Iron Thorns ex',
-    frequencyPct: 4,
-    winRatePct: 47,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W15',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Gholdengo ex',
-    frequencyPct: 3,
-    winRatePct: 50,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W15',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Snorlax Stall',
-    frequencyPct: 2,
-    winRatePct: 45,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W15',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Other',
-    frequencyPct: 1,
-    winRatePct: 48,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W15',
-    sourceNote: 'Community aggregate',
-  },
+/**
+ * Marks seeded demo rows so they can be told apart from live-synced data
+ * (and cleaned up when the demo baseline changes).
+ */
+export const SEED_SOURCE_NOTE = 'Demo baseline (seed)';
 
-  // Previous week for trend comparison
-  {
-    archetype: 'Charizard ex',
-    frequencyPct: 20,
-    winRatePct: 53,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W14',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Dragapult ex',
-    frequencyPct: 13,
-    winRatePct: 54,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W14',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Gardevoir ex',
-    frequencyPct: 14,
-    winRatePct: 52,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W14',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Lugia VSTAR',
-    frequencyPct: 11,
-    winRatePct: 51,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W14',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Roaring Moon ex',
-    frequencyPct: 8,
-    winRatePct: 52,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W14',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Miraidon ex',
-    frequencyPct: 9,
-    winRatePct: 49,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W14',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Raging Bolt ex',
-    frequencyPct: 6,
-    winRatePct: 53,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W14',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Chien-Pao ex',
-    frequencyPct: 7,
-    winRatePct: 47,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W14',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Regidrago VSTAR',
-    frequencyPct: 6,
-    winRatePct: 51,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W14',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Iron Thorns ex',
-    frequencyPct: 3,
-    winRatePct: 46,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W14',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Gholdengo ex',
-    frequencyPct: 2,
-    winRatePct: 49,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W14',
-    sourceNote: 'Community aggregate',
-  },
-  {
-    archetype: 'Snorlax Stall',
-    frequencyPct: 1,
-    winRatePct: 44,
-    wins: 0,
-    losses: 0,
-    playerCount: 0,
-    period: '2026-W14',
-    sourceNote: 'Community aggregate',
-  },
+/**
+ * Source-note marker of the pre-rotation demo seed shipped before 2026-06.
+ * Rows carrying it contain rotated archetypes under a post-rotation period
+ * label, so the period-based season cutoff cannot catch them — they are
+ * deleted explicitly at startup (see db/seed.ts).
+ */
+export const LEGACY_SEED_SOURCE_NOTE = 'Community aggregate';
+
+/** ISO 8601 week label (e.g. "2026-W24") — same algorithm as lib/metaFetch. */
+function isoWeekLabel(date: Date): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${week.toString().padStart(2, '0')}`;
+}
+
+const PERIOD = isoWeekLabel(new Date());
+
+/** name, meta share %, win rate % — all post-rotation archetypes. */
+const BASELINE: [string, number, number][] = [
+  ['Dragapult Dusknoir', 14, 53],
+  ["N's Zoroark", 12, 52],
+  ['Raging Bolt Ogerpon', 10, 51],
+  ['Grimmsnarl Froslass', 9, 54],
+  ["Rocket's Mewtwo", 8, 49],
+  ['Starmie Froslass', 7, 50],
+  ['Ogerpon Meganium', 6, 52],
+  ['Mega Absol Box', 6, 48],
+  ["Cynthia's Garchomp", 5, 47],
+  ['Mega Lucario', 5, 50],
+  ['Flareon Noctowl', 4, 49],
+  ['Tera Box', 4, 46],
 ];
 
-// ─── Example starter deck (Charizard ex) ─────────────────────────────────────
-
-export const SEED_DECK_CARDS: Omit<DeckCard, 'id'>[] = [
-  // Pokemon
-  { cardId: 1, name: 'Charmander', count: 4, type: 'Pokemon', role: 'attacker' },
-  { cardId: 2, name: 'Charmeleon', count: 2, type: 'Pokemon', role: 'attacker' },
-  { cardId: 3, name: 'Charizard ex', count: 3, type: 'Pokemon', role: 'attacker' },
-  { cardId: 4, name: 'Pidgey', count: 2, type: 'Pokemon', role: 'attacker' },
-  { cardId: 5, name: 'Pidgeot ex', count: 2, type: 'Pokemon', role: 'supporter' },
-  { cardId: 6, name: 'Mew ex', count: 1, type: 'Pokemon', role: 'tech' },
-  { cardId: 7, name: 'Rotom V', count: 1, type: 'Pokemon', role: 'tech' },
-  // Trainers — Supporters
-  { cardId: 8, name: 'Arven', count: 4, type: 'Trainer', role: 'supporter' },
-  { cardId: 9, name: "Professor Turo's Scenario", count: 3, type: 'Trainer', role: 'supporter' },
-  { cardId: 10, name: 'Penny', count: 2, type: 'Trainer', role: 'supporter' },
-  { cardId: 11, name: "Boss's Orders", count: 2, type: 'Trainer', role: 'supporter' },
-  // Trainers — Items
-  { cardId: 12, name: 'Rare Candy', count: 4, type: 'Trainer', role: 'item' },
-  { cardId: 13, name: 'Ultra Ball', count: 4, type: 'Trainer', role: 'item' },
-  { cardId: 14, name: 'Nest Ball', count: 4, type: 'Trainer', role: 'item' },
-  { cardId: 15, name: 'Technical Machine: Devolution', count: 1, type: 'Trainer', role: 'item' },
-  { cardId: 16, name: 'Super Rod', count: 1, type: 'Trainer', role: 'item' },
-  { cardId: 17, name: 'Iono', count: 3, type: 'Trainer', role: 'supporter' },
-  // Stadiums
-  { cardId: 18, name: 'Magma Basin', count: 2, type: 'Trainer', role: 'stadium' },
-  // Energy
-  { cardId: 19, name: 'Fire Energy', count: 11, type: 'Energy', role: 'energy' },
-];
-
-// ─── Sample opponent log entries ──────────────────────────────────────────────
-
-export const SEED_OPPONENT_LOGS: Omit<OpponentLog, 'id'>[] = [
-  {
-    archetype: 'Dragapult ex',
-    eventType: 'LCup',
-    eventDate: '2026-04-13',
-    result: 'L',
-    notes: 'Lost to Phantom Dive stream',
-    round: 5,
-  },
-  {
-    archetype: 'Gardevoir ex',
-    eventType: 'LCup',
-    eventDate: '2026-04-13',
-    result: 'W',
-    notes: 'Donked T1',
-    round: 4,
-  },
-  {
-    archetype: 'Charizard ex',
-    eventType: 'LCup',
-    eventDate: '2026-04-13',
-    result: 'W',
-    notes: 'Mirror, won flip',
-    round: 3,
-  },
-  {
-    archetype: 'Miraidon ex',
-    eventType: 'LCup',
-    eventDate: '2026-04-13',
-    result: 'L',
-    notes: 'Paralysis lock',
-    round: 2,
-  },
-  {
-    archetype: 'Roaring Moon ex',
-    eventType: 'LCup',
-    eventDate: '2026-04-13',
-    result: 'W',
-    notes: '',
-    round: 1,
-  },
-  {
-    archetype: 'Dragapult ex',
-    eventType: 'LC',
-    eventDate: '2026-04-06',
-    result: 'W',
-    notes: 'Close game, 1 prize left',
-    round: 4,
-  },
-  {
-    archetype: 'Lugia VSTAR',
-    eventType: 'LC',
-    eventDate: '2026-04-06',
-    result: 'L',
-    notes: 'Jet Punch swarm',
-    round: 3,
-  },
-  {
-    archetype: 'Raging Bolt ex',
-    eventType: 'LC',
-    eventDate: '2026-04-06',
-    result: 'W',
-    notes: '',
-    round: 2,
-  },
-  {
-    archetype: 'Gardevoir ex',
-    eventType: 'LC',
-    eventDate: '2026-04-06',
-    result: 'T',
-    notes: 'Time called R2',
-    round: 1,
-  },
-];
+export const SEED_META_SNAPSHOTS: Omit<MetaSnapshot, 'id'>[] = BASELINE.map(
+  ([archetype, frequencyPct, winRatePct]) => ({
+    archetype,
+    frequencyPct,
+    winRatePct,
+    wins: 0,
+    losses: 0,
+    playerCount: 0,
+    period: PERIOD,
+    sourceNote: SEED_SOURCE_NOTE,
+  }),
+);

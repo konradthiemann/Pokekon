@@ -3,6 +3,7 @@ import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { getDb } from './db/index.js';
 import * as schema from './db/schema.js';
 import { getEnv } from './env.js';
+import { sendPasswordResetEmail } from './email.js';
 
 function createAuth() {
   const env = getEnv();
@@ -10,7 +11,12 @@ function createAuth() {
 
   const options: BetterAuthOptions = {
     database: drizzleAdapter(getDb(), { provider: 'pg', schema }),
-    emailAndPassword: { enabled: true },
+    emailAndPassword: {
+      enabled: true,
+      sendResetPassword: async ({ user, url }) => {
+        await sendPasswordResetEmail({ to: user.email, url });
+      },
+    },
     trustedOrigins: [env.webOrigin],
     ...(env.betterAuthSecret !== undefined ? { secret: env.betterAuthSecret } : {}),
     ...(env.betterAuthUrl !== undefined ? { baseURL: env.betterAuthUrl } : {}),

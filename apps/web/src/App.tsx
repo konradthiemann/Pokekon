@@ -7,6 +7,7 @@ import { BottomNav } from './components/layout/BottomNav';
 import { PageSkeleton } from './components/layout/PageSkeleton';
 import { DeckSpriteBackground } from './components/DeckSpriteBackground';
 import { WelcomeScreen } from './components/auth/WelcomeScreen';
+import { ResetPasswordView } from './components/auth/ResetPasswordView';
 import { MobileAccountSheet } from './components/auth/MobileAccountSheet';
 import { ImportLocalDataModal } from './components/auth/ImportLocalDataModal';
 import { shouldOfferLocalImport } from './lib/localImport';
@@ -76,6 +77,13 @@ function Dashboard() {
  */
 function App() {
   const { data: session, isPending } = authClient.useSession();
+
+  // Password-reset landing page (the email link points here). Checked before
+  // the session gate: the reset flow must work without a session, and the
+  // server's SPA fallback serves index.html for /reset-password.
+  if (window.location.pathname === '/reset-password') {
+    return <ResetPasswordView />;
+  }
 
   if (isPending) {
     return (

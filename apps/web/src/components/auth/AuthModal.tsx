@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { authClient } from '../../lib/authClient';
 
-type AuthMode = 'signIn' | 'signUp';
+type AuthMode = 'signIn' | 'signUp' | 'forgotPassword';
 
 interface Props {
   onClose: () => void;
@@ -66,6 +66,7 @@ export function AuthModal({ onClose }: Props) {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [resetRequested, setResetRequested] = useState(false);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -78,6 +79,21 @@ export function AuthModal({ onClose }: Props) {
   const switchMode = (next: AuthMode) => {
     setMode(next);
     setErrorKey(null);
+    setResetRequested(false);
+  };
+
+  const handleForgotSubmit = async () => {
+    try {
+      // Deliberately ignore the API result: the success message must be
+      // identical whether or not an account exists for this email.
+      await authClient.requestPasswordReset({
+        email,
+        redirectTo: window.location.origin + '/reset-password',
+      });
+      setResetRequested(true);
+    } catch {
+      setErrorKey('errors.network');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -85,6 +101,11 @@ export function AuthModal({ onClose }: Props) {
     if (submitting) return;
     setSubmitting(true);
     setErrorKey(null);
+    if (mode === 'forgotPassword') {
+      await handleForgotSubmit();
+      setSubmitting(false);
+      return;
+    }
     try {
       const { error } =
         mode === 'signIn'
@@ -130,7 +151,11 @@ export function AuthModal({ onClose }: Props) {
       >
         <div className="flex items-center justify-between mb-5">
           <h2 id="auth-modal-title" className="text-white font-semibold">
-            {mode === 'signIn' ? t('modal.signInTitle') : t('modal.signUpTitle')}
+            {mode === 'signIn'
+              ? t('modal.signInTitle')
+              : mode === 'signUp'
+                ? t('modal.signUpTitle')
+                : t('forgot.title')}
           </h2>
           <button
             onClick={onClose}
@@ -141,111 +166,158 @@ export function AuthModal({ onClose }: Props) {
           </button>
         </div>
 
-        {/* Mode toggle */}
-        <div className="grid grid-cols-2 gap-1 p-1 mb-5 bg-gray-800 border border-gray-700 rounded-lg">
-          {(['signIn', 'signUp'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => switchMode(m)}
-              aria-pressed={mode === m}
-              className={`py-1.5 rounded-md text-sm font-medium transition-colors ${
-                mode === m
-                  ? 'bg-brand-600 text-white'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-white/[0.06]'
-              }`}
-            >
-              {m === 'signIn' ? t('modal.tabSignIn') : t('modal.tabSignUp')}
-            </button>
-          ))}
-        </div>
+        {/* Mode toggle (not shown while requesting a password reset) */}
+        {mode !== 'forgotPassword' && (
+          <div className="grid grid-cols-2 gap-1 p-1 mb-5 bg-gray-800 border border-gray-700 rounded-lg">
+            {(['signIn', 'signUp'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => switchMode(m)}
+                aria-pressed={mode === m}
+                className={`py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  mode === m
+                    ? 'bg-brand-600 text-white'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/[0.06]'
+                }`}
+              >
+                {m === 'signIn' ? t('modal.tabSignIn') : t('modal.tabSignUp')}
+              </button>
+            ))}
+          </div>
+        )}
 
-        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
-          {mode === 'signUp' && (
+        {mode === 'forgotPassword' && resetRequested ? (
+          <div className="space-y-4">
+            <div role="status" className="p-3 bg-gray-800 border border-gray-700 rounded-lg">
+              <p className="text-sm text-gray-300">{t('forgot.success')}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => switchMode('signIn')}
+              className="btn-primary w-full justify-center py-2.5 text-sm font-bold"
+            >
+              {t('forgot.backToSignIn')}
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
+            {mode === 'forgotPassword' && (
+              <p className="text-sm text-gray-400">{t('forgot.description')}</p>
+            )}
+            {mode === 'signUp' && (
+              <div>
+                <label htmlFor="auth-name" className="block text-xs text-gray-400 mb-1">
+                  {t('modal.name')}
+                </label>
+                <input
+                  id="auth-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={t('modal.namePlaceholder')}
+                  autoComplete="name"
+                  required
+                  className={inputClass}
+                />
+              </div>
+            )}
+
             <div>
-              <label htmlFor="auth-name" className="block text-xs text-gray-400 mb-1">
-                {t('modal.name')}
+              <label htmlFor="auth-email" className="block text-xs text-gray-400 mb-1">
+                {t('modal.email')}
               </label>
               <input
-                id="auth-name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={t('modal.namePlaceholder')}
-                autoComplete="name"
+                id="auth-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={t('modal.emailPlaceholder')}
+                autoComplete="email"
                 required
                 className={inputClass}
               />
             </div>
-          )}
 
-          <div>
-            <label htmlFor="auth-email" className="block text-xs text-gray-400 mb-1">
-              {t('modal.email')}
-            </label>
-            <input
-              id="auth-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={t('modal.emailPlaceholder')}
-              autoComplete="email"
-              required
-              className={inputClass}
-            />
-          </div>
+            {mode !== 'forgotPassword' && (
+              <div>
+                <label htmlFor="auth-password" className="block text-xs text-gray-400 mb-1">
+                  {t('modal.password')}
+                </label>
+                <input
+                  id="auth-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={t('modal.passwordPlaceholder')}
+                  autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
+                  required
+                  minLength={mode === 'signUp' ? 8 : undefined}
+                  className={inputClass}
+                />
+                {mode === 'signIn' && (
+                  <button
+                    type="button"
+                    onClick={() => switchMode('forgotPassword')}
+                    className="mt-1.5 text-xs text-brand-400 hover:text-brand-300 hover:underline"
+                  >
+                    {t('modal.forgotPassword')}
+                  </button>
+                )}
+              </div>
+            )}
 
-          <div>
-            <label htmlFor="auth-password" className="block text-xs text-gray-400 mb-1">
-              {t('modal.password')}
-            </label>
-            <input
-              id="auth-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={t('modal.passwordPlaceholder')}
-              autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
-              required
-              minLength={mode === 'signUp' ? 8 : undefined}
-              className={inputClass}
-            />
-          </div>
+            {errorKey && (
+              <div role="alert" className="p-3 bg-red-900/20 border border-red-800/40 rounded-lg">
+                <p className="text-xs text-red-400">{t(errorKey)}</p>
+              </div>
+            )}
 
-          {errorKey && (
-            <div role="alert" className="p-3 bg-red-900/20 border border-red-800/40 rounded-lg">
-              <p className="text-xs text-red-400">{t(errorKey)}</p>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn-primary w-full justify-center py-2.5 text-sm font-bold disabled:opacity-50"
+            >
+              {submitting
+                ? t('modal.submitting')
+                : mode === 'signIn'
+                  ? t('modal.submitSignIn')
+                  : mode === 'signUp'
+                    ? t('modal.submitSignUp')
+                    : t('forgot.submit')}
+            </button>
+
+            {mode === 'forgotPassword' && (
+              <button
+                type="button"
+                onClick={() => switchMode('signIn')}
+                className="w-full text-center text-xs text-gray-400 hover:text-gray-200 hover:underline pt-1"
+              >
+                {t('forgot.backToSignIn')}
+              </button>
+            )}
+          </form>
+        )}
+
+        {mode !== 'forgotPassword' && (
+          <>
+            {/* Divider */}
+            <div className="flex items-center gap-3 my-4">
+              <span className="h-px flex-1 bg-gray-700" aria-hidden="true" />
+              <span className="text-xs text-gray-500">{t('modal.or')}</span>
+              <span className="h-px flex-1 bg-gray-700" aria-hidden="true" />
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="btn-primary w-full justify-center py-2.5 text-sm font-bold disabled:opacity-50"
-          >
-            {submitting
-              ? t('modal.submitting')
-              : mode === 'signIn'
-                ? t('modal.submitSignIn')
-                : t('modal.submitSignUp')}
-          </button>
-        </form>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3 my-4">
-          <span className="h-px flex-1 bg-gray-700" aria-hidden="true" />
-          <span className="text-xs text-gray-500">{t('modal.or')}</span>
-          <span className="h-px flex-1 bg-gray-700" aria-hidden="true" />
-        </div>
-
-        <button
-          type="button"
-          onClick={() => void handleGoogle()}
-          className="w-full flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium bg-white hover:bg-gray-100 text-gray-800 border border-gray-300 transition-colors"
-        >
-          <GoogleLogo />
-          {t('modal.google')}
-        </button>
+            <button
+              type="button"
+              onClick={() => void handleGoogle()}
+              className="w-full flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium bg-white hover:bg-gray-100 text-gray-800 border border-gray-300 transition-colors"
+            >
+              <GoogleLogo />
+              {t('modal.google')}
+            </button>
+          </>
+        )}
       </div>
     </div>,
     document.body,
