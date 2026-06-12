@@ -9,6 +9,7 @@
 
 const DEFAULT_PORT = 8080;
 const DEFAULT_WEB_ORIGIN = 'http://localhost:5173';
+const DEFAULT_EMAIL_FROM = 'Pokekon <onboarding@resend.dev>';
 
 export interface Env {
   /** HTTP port the server listens on. Default: 8080. */
@@ -20,6 +21,10 @@ export interface Env {
   /** Google OAuth credentials. Both must be set to enable the Google provider. */
   readonly googleClientId: string | undefined;
   readonly googleClientSecret: string | undefined;
+  /** Resend API key. When unset, emails are logged to stdout instead of sent. */
+  readonly resendApiKey: string | undefined;
+  /** From address for transactional emails. Default: Pokekon <onboarding@resend.dev>. */
+  readonly emailFrom: string;
   /** Postgres connection string. Required at runtime for DB access — throws when missing. */
   readonly databaseUrl: string;
   /** Better Auth signing secret. Required in production — throws when missing there. */
@@ -46,6 +51,8 @@ export function getEnv(): Env {
     betterAuthUrl: nonEmpty(process.env.BETTER_AUTH_URL),
     googleClientId: nonEmpty(process.env.GOOGLE_CLIENT_ID),
     googleClientSecret: nonEmpty(process.env.GOOGLE_CLIENT_SECRET),
+    resendApiKey: nonEmpty(process.env.RESEND_API_KEY),
+    emailFrom: nonEmpty(process.env.EMAIL_FROM) ?? DEFAULT_EMAIL_FROM,
 
     get databaseUrl(): string {
       const url = nonEmpty(process.env.DATABASE_URL);
