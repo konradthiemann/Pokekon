@@ -7,6 +7,7 @@ import { BottomNav } from './components/layout/BottomNav';
 import { PageSkeleton } from './components/layout/PageSkeleton';
 import { DeckSpriteBackground } from './components/DeckSpriteBackground';
 import { WelcomeScreen } from './components/auth/WelcomeScreen';
+import { MobileAccountSheet } from './components/auth/MobileAccountSheet';
 import { ImportLocalDataModal } from './components/auth/ImportLocalDataModal';
 import { shouldOfferLocalImport } from './lib/localImport';
 
@@ -61,6 +62,7 @@ function Dashboard() {
       </main>
 
       <BottomNav />
+      <MobileAccountSheet />
 
       {showLocalImport && <ImportLocalDataModal onClose={() => setShowLocalImport(false)} />}
     </div>
