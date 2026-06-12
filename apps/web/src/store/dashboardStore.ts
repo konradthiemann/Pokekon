@@ -13,6 +13,7 @@ import {
   getDeckCards,
   getOpponentLogs,
   getLatestMetaSnapshots,
+  deletePreRotationMetaSnapshots,
   getArchetypeStats,
   getDeckSnapshots,
   saveDeckSnapshot,
@@ -139,6 +140,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   refresh: async () => {
     set({ isLoading: true });
     try {
+      // Season hygiene: drop meta snapshots recorded before the current
+      // rotation so no view can mix old- and new-format meta data.
+      await deletePreRotationMetaSnapshots();
+
       // Load decks first to determine active deck
       let decks = await getDecks();
 

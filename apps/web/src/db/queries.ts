@@ -1,4 +1,5 @@
 import { db } from './database';
+import { isPostRotationPeriod, ROTATION_PERIOD } from '../constants/season';
 import type {
   Deck,
   DeckCard,
@@ -182,11 +183,24 @@ export async function updateOpponentLog(
 export async function getLatestMetaSnapshots(): Promise<MetaSnapshot[]> {
   const latest = await db.metaSnapshots.orderBy('period').last();
   if (!latest) return [];
+  // Pre-rotation periods are never served — a stale local history must not
+  // surface old-format meta data (see constants/season.ts).
+  if (!isPostRotationPeriod(latest.period)) return [];
   return db.metaSnapshots.where('period').equals(latest.period).toArray();
 }
 
 export async function getAllMetaSnapshots(): Promise<MetaSnapshot[]> {
-  return db.metaSnapshots.orderBy('period').toArray();
+  const all = await db.metaSnapshots.orderBy('period').toArray();
+  return all.filter((s) => isPostRotationPeriod(s.period));
+}
+
+/**
+ * One-time hygiene at app start: removes snapshots recorded before the
+ * current rotation so trend views and "latest period" lookups can never
+ * resurface data from the previous card pool.
+ */
+export async function deletePreRotationMetaSnapshots(): Promise<number> {
+  return db.metaSnapshots.where('period').below(ROTATION_PERIOD).delete();
 }
 
 export async function upsertMetaSnapshot(snap: Omit<MetaSnapshot, 'id'>): Promise<number> {
