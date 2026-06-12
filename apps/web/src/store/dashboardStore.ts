@@ -23,7 +23,6 @@ import {
   deleteDeck as deleteDeckFromDb,
   copyDeckCards,
 } from '../db/queries';
-import { db } from '../db/database';
 import { syncLiveMeta, fetchRecentTournaments } from '../lib/metaFetch';
 import type { MetaSyncResult } from '../lib/metaFetch';
 import { fetchArchetypeComparison } from '../lib/deckComparison';
@@ -130,12 +129,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   tournamentsError: null,
 
   /**
-   * Hydrates all store state from IndexedDB: decks, active deck, cards, snapshots, logs,
-   * meta snapshots, and archetype stats. Called on app mount and after every mutation.
-   *
-   * Deck fallback: if no decks exist (e.g. first launch or failed migration) a default
-   * "My Deck" is created and all untagged cards/logs/snapshots are re-associated with it
-   * inside a single atomic transaction, so legacy data is never silently discarded.
+   * Hydrates all store state: decks, active deck, cards, snapshots and logs from
+   * the REST API; meta snapshots and archetype stats from the local meta cache.
+   * Called once a session exists (see App.tsx) and after every mutation.
+   * Server data cannot be orphaned, so no legacy "default deck" safety net is
+   * needed — zero decks is a valid state for a fresh account.
    */
   refresh: async () => {
     set({ isLoading: true });
@@ -145,28 +143,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       await deletePreRotationMetaSnapshots();
 
       // Load decks first to determine active deck
-      let decks = await getDecks();
-
-      // ── Safety net: if no decks exist but there is card/log data (e.g. legacy data
-      //    that predates multi-deck, or a failed migration), auto-create a default deck
-      //    and re-associate all un-tagged records so nothing is lost. ──────────────────
-      if (decks.length === 0) {
-        const defaultId = await createDeck({
-          archetype: 'my-deck',
-          archetypeName: 'My Deck',
-          variant: 'Default',
-          createdAt: new Date().toISOString(),
-        });
-        // Stamp any records that have no deckId yet — wrapped in a transaction
-        // so all three tables are updated atomically; a failure in one leaves
-        // none of them partially migrated.
-        await db.transaction('rw', db.deckCards, db.deckSnapshots, db.opponentLogs, async () => {
-          await db.deckCards.filter((c) => !c.deckId).modify({ deckId: defaultId });
-          await db.deckSnapshots.filter((s) => !s.deckId).modify({ deckId: defaultId });
-          await db.opponentLogs.filter((l) => !l.deckId).modify({ deckId: defaultId });
-        });
-        decks = await getDecks();
-      }
+      const decks = await getDecks();
 
       let activeDeckId = get().activeDeckId;
 
