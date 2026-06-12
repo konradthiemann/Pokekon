@@ -1,5 +1,6 @@
 import type { MetaSnapshot, RecentTournament } from '../types';
 import { upsertMetaSnapshot } from '../db/queries';
+import { isPostRotation } from '../constants/season';
 import i18n from '../i18n';
 
 // ─── Limitless API types ──────────────────────────────────────────────────────
@@ -101,6 +102,7 @@ export async function fetchRecentTournaments(
 
   const eligible = all.filter((t) => {
     const date = new Date(t.date);
+    if (!isPostRotation(date)) return false;
     if (date < cutoff) return false;
     if (t.players < minPlayers) return false;
     if (onlineOnly && !isLikelyOnline(t)) return false;
@@ -175,7 +177,8 @@ export interface MetaSyncResult {
  * Fetches standings from recent tournaments and persists archetype frequency/win-rate
  * data as `MetaSnapshot` rows for the current ISO week period.
  * Snapshots are upserted — existing periods are updated, new periods are appended.
- * History is never cleared, so callers can query multiple periods for trend analysis.
+ * In-season history is kept for trend analysis; periods before the current
+ * rotation are purged at app start (see deletePreRotationMetaSnapshots).
  */
 export async function syncLiveMeta(onProgress?: (msg: string) => void): Promise<MetaSyncResult> {
   onProgress?.(i18n.t('layout:sync.fetchingTournaments'));
@@ -187,11 +190,12 @@ export async function syncLiveMeta(onProgress?: (msg: string) => void): Promise<
     throw new Error(i18n.t('layout:sync.errors.tournamentListFailed', { status: res.status }));
   const allTourneys: LimitlessTournament[] = await res.json();
 
-  // Only include tournaments from the last 7 days with 30+ players (Standard format, post-G rotation)
+  // Only include tournaments from the last 7 days with 30+ players — and never
+  // anything before the current rotation, even if the API window reaches back.
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const eligible = allTourneys
-    .filter((t) => t.players >= 30 && new Date(t.date) >= sevenDaysAgo)
+    .filter((t) => t.players >= 30 && new Date(t.date) >= sevenDaysAgo && isPostRotation(t.date))
     .sort((a, b) => b.players - a.players)
     .slice(0, 6);
 
