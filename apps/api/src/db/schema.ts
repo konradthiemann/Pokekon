@@ -1,5 +1,15 @@
 import { relations } from 'drizzle-orm';
-import { pgTable, text, timestamp, boolean, index } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  index,
+  serial,
+  integer,
+  jsonb,
+  date,
+} from 'drizzle-orm/pg-core';
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
@@ -89,5 +99,143 @@ export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, {
     fields: [account.userId],
     references: [user.id],
+  }),
+}));
+
+// ─── Domain tables (Pokémon TCG tracker) ─────────────────────────────────────
+// Mirrors the client types in apps/web/src/types/index.ts. The enum-like text
+// columns are constrained at the API layer (zod) and typed here via `{ enum }`.
+
+export const cardTypeValues = ['Pokemon', 'Trainer', 'Energy'] as const;
+export const cardRoleValues = [
+  'attacker',
+  'supporter',
+  'item',
+  'stadium',
+  'energy',
+  'tech',
+] as const;
+export const eventTypeValues = ['LC', 'LCup', 'Regional', 'Worlds', 'Online'] as const;
+export const matchResultValues = ['W', 'L', 'T'] as const;
+
+export type CardType = (typeof cardTypeValues)[number];
+export type CardRole = (typeof cardRoleValues)[number];
+export type EventType = (typeof eventTypeValues)[number];
+export type MatchResult = (typeof matchResultValues)[number];
+
+/** Shape of a single card entry inside a snapshot's jsonb payload. */
+export interface SnapshotCard {
+  name: string;
+  count: number;
+  type: CardType;
+  role: CardRole;
+  /** Optional link to the client-side card catalogue (0 = quick-text entry). */
+  cardId?: number | undefined;
+}
+
+export const decks = pgTable(
+  'decks',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    archetype: text('archetype').notNull(),
+    archetypeName: text('archetype_name').notNull(),
+    variant: text('variant').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('decks_userId_idx').on(table.userId)],
+);
+
+export const deckCards = pgTable(
+  'deck_cards',
+  {
+    id: serial('id').primaryKey(),
+    deckId: integer('deck_id')
+      .notNull()
+      .references(() => decks.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    count: integer('count').notNull(),
+    type: text('type', { enum: cardTypeValues }).notNull(),
+    role: text('role', { enum: cardRoleValues }).notNull(),
+  },
+  (table) => [
+    index('deck_cards_deckId_idx').on(table.deckId),
+    index('deck_cards_userId_idx').on(table.userId),
+  ],
+);
+
+export const deckSnapshots = pgTable(
+  'deck_snapshots',
+  {
+    id: serial('id').primaryKey(),
+    deckId: integer('deck_id')
+      .notNull()
+      .references(() => decks.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    cards: jsonb('cards').$type<SnapshotCard[]>().notNull(),
+    totalCards: integer('total_cards').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('deck_snapshots_deckId_idx').on(table.deckId),
+    index('deck_snapshots_userId_idx').on(table.userId),
+  ],
+);
+
+export const opponentLogs = pgTable(
+  'opponent_logs',
+  {
+    id: serial('id').primaryKey(),
+    deckId: integer('deck_id').references(() => decks.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    archetype: text('archetype').notNull(),
+    eventType: text('event_type', { enum: eventTypeValues }).notNull(),
+    eventDate: date('event_date', { mode: 'string' }).notNull(),
+    result: text('result', { enum: matchResultValues }).notNull(),
+    notes: text('notes').default('').notNull(),
+    round: integer('round'),
+    deckSnapshotId: integer('deck_snapshot_id').references(() => deckSnapshots.id, {
+      onDelete: 'set null',
+    }),
+    battleLog: text('battle_log'),
+    analysis: text('analysis'),
+  },
+  (table) => [
+    index('opponent_logs_userId_idx').on(table.userId),
+    index('opponent_logs_deckId_idx').on(table.deckId),
+    index('opponent_logs_archetype_eventDate_idx').on(table.archetype, table.eventDate),
+  ],
+);
+
+export const decksRelations = relations(decks, ({ one, many }) => ({
+  user: one(user, { fields: [decks.userId], references: [user.id] }),
+  cards: many(deckCards),
+  snapshots: many(deckSnapshots),
+  opponentLogs: many(opponentLogs),
+}));
+
+export const deckCardsRelations = relations(deckCards, ({ one }) => ({
+  deck: one(decks, { fields: [deckCards.deckId], references: [decks.id] }),
+}));
+
+export const deckSnapshotsRelations = relations(deckSnapshots, ({ one }) => ({
+  deck: one(decks, { fields: [deckSnapshots.deckId], references: [decks.id] }),
+}));
+
+export const opponentLogsRelations = relations(opponentLogs, ({ one }) => ({
+  deck: one(decks, { fields: [opponentLogs.deckId], references: [decks.id] }),
+  deckSnapshot: one(deckSnapshots, {
+    fields: [opponentLogs.deckSnapshotId],
+    references: [deckSnapshots.id],
   }),
 }));
