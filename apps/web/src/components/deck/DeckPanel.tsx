@@ -566,9 +566,10 @@ export function DeckPanel({ deckCards }: Props) {
   const energies = deckCards.filter((c) => c.type === 'Energy');
 
   const handleChangeCount = async (id: number, count: number) => {
+    if (activeDeckId == null) return;
     patchDeckCards((cards) => cards.map((c) => (c.id === id ? { ...c, count } : c)));
     try {
-      await updateDeckCard(id, { count });
+      await updateDeckCard(activeDeckId, id, { count });
     } catch (err) {
       console.error('Failed to update card count:', err);
       refresh();
@@ -576,9 +577,10 @@ export function DeckPanel({ deckCards }: Props) {
   };
 
   const handleChangeRole = async (id: number, role: CardRole) => {
+    if (activeDeckId == null) return;
     patchDeckCards((cards) => cards.map((c) => (c.id === id ? { ...c, role } : c)));
     try {
-      await updateDeckCard(id, { role });
+      await updateDeckCard(activeDeckId, id, { role });
     } catch (err) {
       console.error('Failed to update card role:', err);
       refresh();
@@ -586,9 +588,10 @@ export function DeckPanel({ deckCards }: Props) {
   };
 
   const handleDelete = async (id: number) => {
+    if (activeDeckId == null) return;
     patchDeckCards((cards) => cards.filter((c) => c.id !== id));
     try {
-      await deleteDeckCard(id);
+      await deleteDeckCard(activeDeckId, id);
     } catch (err) {
       console.error('Failed to delete card:', err);
       refresh();
@@ -596,6 +599,7 @@ export function DeckPanel({ deckCards }: Props) {
   };
 
   const handleQuickAdd = async (type: CardType, name: string) => {
+    if (activeDeckId == null) return;
     const defaultRole: CardRole =
       type === 'Pokemon' ? 'attacker' : type === 'Trainer' ? 'item' : 'energy';
     const existing = deckCards.find((c) => c.name === name && c.type === type);
@@ -606,7 +610,7 @@ export function DeckPanel({ deckCards }: Props) {
         cards.map((c) => (c.id === existing.id ? { ...c, count: newCount } : c)),
       );
       try {
-        await updateDeckCard(existing.id, { count: newCount });
+        await updateDeckCard(activeDeckId, existing.id, { count: newCount });
       } catch (err) {
         console.error('Failed to increment card:', err);
         refresh();
@@ -623,13 +627,13 @@ export function DeckPanel({ deckCards }: Props) {
       type,
       role: defaultRole,
       cardId: 0,
-      deckId: activeDeckId ?? 0,
+      deckId: activeDeckId,
     };
     patchDeckCards((cards) => [...cards, newCard]);
     try {
       const realId = await upsertDeckCard(
         { name, count: 1, type, role: defaultRole, cardId: 0 },
-        activeDeckId ?? undefined,
+        activeDeckId,
       );
       patchDeckCards((cards) => cards.map((c) => (c.id === tempId ? { ...c, id: realId } : c)));
     } catch (err) {

@@ -1,5 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { parseDeckList } from './deckImport';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { parseDeckList, importCards, type ParsedCard } from './deckImport';
+import * as api from './api';
+
+// importCards talks to the REST API — replace the whole module so tests
+// can assert the PUT payload without any network.
+vi.mock('./api');
+
+const mockedApi = vi.mocked(api);
 
 const PTCG_EXPORT = `Pokémon: 4
 3 Dragapult ex TWM 130
@@ -105,5 +112,56 @@ dies ist keine karte`);
     const result = parseDeckList('');
     expect(result.cards).toHaveLength(0);
     expect(result.totalCount).toBe(0);
+  });
+});
+
+describe('importCards (PUT /api/decks/:id/cards semantics)', () => {
+  const parsed: ParsedCard[] = [
+    {
+      count: 3,
+      name: 'Dragapult ex',
+      set: 'TWM',
+      number: '130',
+      type: 'Pokemon',
+      role: 'attacker',
+    },
+    { count: 4, name: 'Iono', set: 'PAL', number: '185', type: 'Trainer', role: 'supporter' },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedApi.replaceDeckCards.mockResolvedValue([]);
+  });
+
+  it('replaceExisting=true sends exactly the parsed cards as the new full list', async () => {
+    await importCards(parsed, true, 7);
+
+    expect(mockedApi.listDeckCards).not.toHaveBeenCalled();
+    expect(mockedApi.replaceDeckCards).toHaveBeenCalledTimes(1);
+    const [deckId, sent] = mockedApi.replaceDeckCards.mock.calls[0];
+    expect(deckId).toBe(7);
+    expect(sent.map((c) => c.name)).toEqual(['Dragapult ex', 'Iono']);
+  });
+
+  it('replaceExisting=false merges with the current server list, parsed cards winning by name', async () => {
+    mockedApi.listDeckCards.mockResolvedValue([
+      { id: 1, deckId: 7, cardId: 0, name: 'Iono', count: 2, type: 'Trainer', role: 'supporter' },
+      { id: 2, deckId: 7, cardId: 0, name: 'Budew', count: 1, type: 'Pokemon', role: 'tech' },
+    ]);
+
+    await importCards(parsed, false, 7);
+
+    const [deckId, sent] = mockedApi.replaceDeckCards.mock.calls[0];
+    expect(deckId).toBe(7);
+    // Budew kept, Iono overwritten with the parsed count, Dragapult added.
+    expect(sent.find((c) => c.name === 'Budew')?.count).toBe(1);
+    expect(sent.find((c) => c.name === 'Iono')?.count).toBe(4);
+    expect(sent.find((c) => c.name === 'Dragapult ex')?.count).toBe(3);
+    expect(sent).toHaveLength(3);
+  });
+
+  it('throws without a deckId and performs no request', async () => {
+    await expect(importCards(parsed, true, undefined)).rejects.toThrow();
+    expect(mockedApi.replaceDeckCards).not.toHaveBeenCalled();
   });
 });

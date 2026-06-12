@@ -1,7 +1,6 @@
-import type { CardRole, CardType } from '../types';
+import type { CardRole, CardType, DeckCard } from '../types';
 import i18n from '../i18n';
-import { db } from '../db/database';
-import { clearDeck, upsertDeckCard } from '../db/queries';
+import { listDeckCards, replaceDeckCards } from './api';
 
 // ─── Role inference ───────────────────────────────────────────────────────────
 
@@ -187,23 +186,44 @@ export function parseDeckList(text: string): ImportResult {
   return { cards, totalCount: cards.reduce((s, c) => s + c.count, 0), skippedLines };
 }
 
+/**
+ * Imports parsed cards into the deck via the API's atomic PUT semantics:
+ * the full target list is built client-side (replace → just the parsed cards;
+ * merge → current server list with parsed cards upserted by name) and then
+ * replaces the deck's card list in a single request.
+ */
 export async function importCards(
   cards: ParsedCard[],
   replaceExisting: boolean,
   deckId?: number,
 ): Promise<void> {
-  // Guard: replacing with no deckId selected would call clearDeck(undefined),
-  // which wipes every card in every deck. Fail loudly instead.
-  if (replaceExisting && deckId === undefined) {
+  // Cards always belong to a server deck now — without an active deck there
+  // is nothing to import into. Fail loudly instead of guessing.
+  if (deckId === undefined) {
     throw new Error(i18n.t('deck:import.noActiveDeck'));
   }
-  await db.transaction('rw', db.deckCards, async () => {
-    if (replaceExisting) await clearDeck(deckId);
-    for (const c of cards) {
-      await upsertDeckCard(
-        { name: c.name, count: c.count, type: c.type, role: c.role, cardId: 0 },
-        deckId,
-      );
-    }
+
+  const toDeckCard = (c: ParsedCard): Omit<DeckCard, 'id'> => ({
+    deckId,
+    cardId: 0,
+    name: c.name,
+    count: c.count,
+    type: c.type,
+    role: c.role,
   });
+
+  let next: Pick<DeckCard, 'name' | 'count' | 'type' | 'role'>[];
+  if (replaceExisting) {
+    next = cards.map(toDeckCard);
+  } else {
+    const current = await listDeckCards(deckId);
+    const byName = new Map<string, Pick<DeckCard, 'name' | 'count' | 'type' | 'role'>>(
+      current.map((c) => [c.name, c]),
+    );
+    // Parsed cards win over existing entries with the same name (upsert).
+    for (const c of cards) byName.set(c.name, toDeckCard(c));
+    next = [...byName.values()];
+  }
+
+  await replaceDeckCards(deckId, next);
 }
