@@ -305,20 +305,28 @@ function TournamentCard({ t }: { t: RecentTournament }) {
 
       {t.topArchetypes.length > 0 && (
         <div className="space-y-1">
-          {t.topArchetypes.map((arch, i) => (
-            <div key={arch.name} className="flex items-center gap-2">
-              {i === 0 && <Trophy className="w-3 h-3 text-yellow-500 shrink-0" />}
-              {i !== 0 && (
-                <span className="w-3 h-3 text-center text-xs text-gray-600 shrink-0">{i + 1}</span>
-              )}
-              <PokemonIcon archetype={arch.name} size="sm" dual />
-              <span className="flex-1 text-xs text-gray-300 truncate">{arch.name}</span>
-              <span className="text-xs text-gray-500">
-                {tMeta('tournaments.timesPlayed', { count: arch.count })}
-              </span>
-              <WinRateBadge pct={arch.winRate} />
-            </div>
-          ))}
+          {t.topArchetypes.map((arch, i) => {
+            // The trophy marks the actual 1st-place deck (winner), wherever it sits
+            // in the by-count list — not simply the most-played archetype.
+            const isWinner = t.winnerArchetype !== null && arch.name === t.winnerArchetype;
+            return (
+              <div key={arch.name} className="flex items-center gap-2">
+                {isWinner ? (
+                  <Trophy className="w-3 h-3 text-yellow-500 shrink-0" />
+                ) : (
+                  <span className="w-3 h-3 text-center text-xs text-gray-600 shrink-0">
+                    {i + 1}
+                  </span>
+                )}
+                <PokemonIcon archetype={arch.name} size="sm" dual />
+                <span className="flex-1 text-xs text-gray-300 truncate">{arch.name}</span>
+                <span className="text-xs text-gray-500">
+                  {tMeta('tournaments.timesPlayed', { count: arch.count })}
+                </span>
+                <WinRateBadge pct={arch.winRate} />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

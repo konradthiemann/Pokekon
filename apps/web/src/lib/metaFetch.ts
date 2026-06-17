@@ -77,6 +77,65 @@ export function isLikelyOnline(t: LimitlessTournament): boolean {
   );
 }
 
+// ─── Standings summary ─────────────────────────────────────────────────────────
+
+export interface TopArchetype {
+  name: string;
+  count: number;
+  winRate: number;
+}
+
+/**
+ * Summarises a tournament's standings into the top archetypes (by player count)
+ * and the winning archetype (1st place).
+ *
+ * The winner is the deck of the standing with `placing === 1` (falling back to
+ * the first standing, since Limitless returns them in finishing order). If that
+ * winner is **not** among the top-5-by-count, it replaces the 5th entry — so the
+ * trophy deck is always visible. Names use the Limitless display name; "Other"
+ * (unknown deck) is excluded from the list and never treated as a winner.
+ */
+export function summarizeStandings(standings: LimitlessStanding[]): {
+  topArchetypes: TopArchetype[];
+  winnerArchetype: string | null;
+} {
+  const archMap = new Map<
+    string,
+    { displayName: string; wins: number; losses: number; count: number }
+  >();
+  for (const p of standings) {
+    const id = p.deck?.id ?? 'other';
+    const name = p.deck?.name ?? 'Other';
+    const cur = archMap.get(id) ?? { displayName: name, wins: 0, losses: 0, count: 0 };
+    cur.wins += p.record?.wins ?? 0;
+    cur.losses += p.record?.losses ?? 0;
+    cur.count++;
+    archMap.set(id, cur);
+  }
+
+  const ranked: TopArchetype[] = [...archMap.values()]
+    .filter((a) => a.displayName !== 'Other')
+    .sort((a, b) => b.count - a.count)
+    .map((a) => ({
+      name: a.displayName,
+      count: a.count,
+      winRate: a.wins + a.losses > 0 ? Math.round((a.wins / (a.wins + a.losses)) * 100) : 50,
+    }));
+
+  const winnerStanding = standings.find((s) => s.placing === 1) ?? standings[0];
+  const winnerName = winnerStanding?.deck?.name;
+  const winnerArchetype = winnerName && winnerName !== 'Other' ? winnerName : null;
+
+  let topArchetypes = ranked.slice(0, 5);
+  if (winnerArchetype && !topArchetypes.some((a) => a.name === winnerArchetype)) {
+    const winnerEntry = ranked.find((a) => a.name === winnerArchetype);
+    // Replace the 5th slot with the winner, keeping the four most-played decks.
+    if (winnerEntry) topArchetypes = [...topArchetypes.slice(0, 4), winnerEntry];
+  }
+
+  return { topArchetypes, winnerArchetype };
+}
+
 // ─── Recent tournaments ───────────────────────────────────────────────────────
 
 /**
@@ -123,6 +182,7 @@ export async function fetchRecentTournaments(
           date: t.date,
           players: t.players,
           topArchetypes: [],
+          winnerArchetype: null,
         });
         continue;
       }
@@ -130,34 +190,25 @@ export async function fetchRecentTournaments(
       const standings: LimitlessStanding[] = await res.json();
       if (!Array.isArray(standings)) continue;
 
-      // Aggregate archetype win rates
-      const archMap = new Map<
-        string,
-        { displayName: string; wins: number; losses: number; count: number }
-      >();
-      for (const p of standings) {
-        const id = p.deck?.id ?? 'other';
-        const name = p.deck?.name ?? 'Other';
-        const cur = archMap.get(id) ?? { displayName: name, wins: 0, losses: 0, count: 0 };
-        cur.wins += p.record?.wins ?? 0;
-        cur.losses += p.record?.losses ?? 0;
-        cur.count++;
-        archMap.set(id, cur);
-      }
+      const { topArchetypes, winnerArchetype } = summarizeStandings(standings);
 
-      const topArchetypes = [...archMap.values()]
-        .filter((a) => a.displayName !== 'Other')
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5)
-        .map((a) => ({
-          name: a.displayName,
-          count: a.count,
-          winRate: a.wins + a.losses > 0 ? Math.round((a.wins / (a.wins + a.losses)) * 100) : 50,
-        }));
-
-      results.push({ id: t.id, name: t.name, date: t.date, players: t.players, topArchetypes });
+      results.push({
+        id: t.id,
+        name: t.name,
+        date: t.date,
+        players: t.players,
+        topArchetypes,
+        winnerArchetype,
+      });
     } catch {
-      results.push({ id: t.id, name: t.name, date: t.date, players: t.players, topArchetypes: [] });
+      results.push({
+        id: t.id,
+        name: t.name,
+        date: t.date,
+        players: t.players,
+        topArchetypes: [],
+        winnerArchetype: null,
+      });
     }
   }
 
