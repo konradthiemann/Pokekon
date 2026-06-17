@@ -12,8 +12,12 @@ The application source lives at `/Users/konrad.thiemann/tcg/tcg-dashboard/`.
 | [data-types.md](./data-types.md) | All TypeScript interfaces and types explained in plain language |
 | [data-flow.md](./data-flow.md) | How data moves from user action to store to DB to component |
 | [agents.md](./agents.md) | Claude agent ecosystem — who does what, when to trigger each agent |
+| [ai-system.md](./ai-system.md) | **KI-System-Gesamtübersicht** — Schichtenmodell, Guardrails, Orchestrierung, Memory, Diagramme |
+| [backend-evolution-plan.md](./backend-evolution-plan.md) | Roadmap: Backend-Ausbau, Battle-Log-Zugqualität, Doku-Viewer (Starlight) |
 | [features.md](./features.md) | All app features explained: meta sync, battle log, deck comparison, recommendations, snapshots |
 | [getting-started.md](./getting-started.md) | Dev setup, build, deploy |
+
+> ⚠️ **Drift-Hinweis:** Die „Quick orientation" unten beschreibt die App noch als reines local-first SPA ohne Backend. Das ist veraltet — es existiert ein Hono+Postgres-Backend (`apps/api`), das ausgebaut wird. Siehe [backend-evolution-plan.md](./backend-evolution-plan.md) Abschnitt 1. Korrektur erfolgt beim Doku-Viewer-Aufbau.
 
 ## Quick orientation
 
