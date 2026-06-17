@@ -2,26 +2,64 @@
 
 ## Purpose
 
-The Pokemon TCG Meta Dashboard is a **local-first, zero-backend Single Page Application** that helps competitive players track the tournament meta, manage their personal deck, log match results, and receive data-driven recommendations.
+**Pokékon** is a Pokémon-TCG meta dashboard that helps competitive players track
+their own games, analyze the tournament meta, and improve both deck **and** play.
 
-Because all data stays in the browser (IndexedDB), there is no server, no authentication, and no network dependency beyond the optional Limitless TCG API sync.
+The system is a **local-first React SPA backed by a Hono + PostgreSQL service**.
+The web app started fully local-first (all data in the browser via IndexedDB) and
+is now migrating toward the server as the source of truth. Both layers coexist
+today — see [Data Persistence](#data-persistence) — and the direction is set in
+[backend-evolution-plan.md](./backend-evolution-plan.md).
+
+> Earlier revisions of this document described the app as a *"zero-backend SPA."*
+> That is no longer accurate: a Hono + Drizzle + PostgreSQL backend (`apps/api`)
+> with Better Auth runs on Railway and is being expanded from CRUD/auth into the
+> analytics backend. This page reflects the real two-app architecture.
+
+---
+
+## Monorepo Layout
+
+npm-workspace monorepo (`pokekon`):
+
+| Workspace | Stack | Role |
+|-----------|-------|------|
+| `apps/web` | React 19 · Vite · Zustand · Dexie (IndexedDB) · TanStack Query | local-first frontend; still holds most analysis logic |
+| `apps/api` | Hono · Drizzle ORM · PostgreSQL · Better Auth | runs on Railway; migrating from CRUD/auth toward analytics backend |
+| `apps/docs` | Astro · Starlight | this living documentation site (static, GitHub Pages) |
 
 ---
 
 ## Tech Stack
 
-| Layer | Library / Tool | Version |
-|-------|---------------|---------|
-| UI framework | React | 19.2.4 |
-| Language | TypeScript | ~6.0.2 |
-| Build tool | Vite | 8.0.4 |
-| State management | Zustand | 5.0.12 |
-| Database | Dexie (IndexedDB) | 4.4.2 |
-| Server-state caching | TanStack Query | 5.99.0 |
-| Charts | Recharts | 3.8.1 |
-| Icons | Lucide React | 1.8.0 |
-| CSS | Tailwind CSS | 3.4.19 |
-| Linting | ESLint + typescript-eslint | 9.x / 8.x |
+### Frontend (`apps/web`)
+
+| Layer | Library / Tool |
+|-------|----------------|
+| UI framework | React 19 |
+| Build tool | Vite 8 |
+| Language | TypeScript ~6 |
+| State management | Zustand 5 |
+| Local database | Dexie (IndexedDB) 4 |
+| Server-state caching | TanStack Query 5 |
+| Auth client | better-auth |
+| i18n | i18next / react-i18next |
+| Charts | Recharts 3 |
+| Icons | Lucide React |
+| CSS | Tailwind CSS 3 |
+
+### Backend (`apps/api`)
+
+| Layer | Library / Tool |
+|-------|----------------|
+| HTTP framework | Hono 4 (`@hono/node-server`) |
+| ORM | Drizzle ORM |
+| Database | PostgreSQL (`pg`) |
+| Auth | Better Auth + `@better-auth/drizzle-adapter` |
+| Transactional email | Resend (password reset) |
+| Validation | Zod 4 |
+| Migrations | Drizzle Kit (`db:generate` / `db:migrate`) |
+| Hosting | Railway |
 
 ---
 
@@ -29,76 +67,104 @@ Because all data stays in the browser (IndexedDB), there is no server, no authen
 
 ```mermaid
 flowchart TD
-    subgraph Browser
-        subgraph UI["UI Layer (React)"]
-            Pages["Pages\n(OverviewPage, DeckPage,\nRecommendationsPage,\nMetaPage, OpponentsPage)"]
-            Components["Components\n(deck/, meta/, opponent/,\nrecommendations/, layout/)"]
-        end
-
-        subgraph State["State Layer"]
-            Store["dashboardStore\n(Zustand)"]
-            Hook["useRecommendations\n(useMemo hook)"]
-        end
-
-        subgraph Logic["Logic Layer (src/lib/)"]
-            MetaFetch["metaFetch.ts\nLimitless API"]
-            DeckComp["deckComparison.ts\nTournament list diff"]
-            BattleParser["battleLogParser.ts\nGerman protocol parser"]
-            BattleAI["battleLogAnalysis.ts\nClaude API analysis"]
-            DeckImport["deckImport.ts\nCard type inference"]
-            PerfStats["deckPerformanceStats.ts\nCard performance agg."]
-            Prefs["preferences.ts\nlocalStorage wrapper"]
-        end
-
-        subgraph DB["Data Layer (Dexie / IndexedDB)"]
-            Queries["queries.ts\nAll DB operations"]
-            Schema["database.ts\nTCGDatabase class (v3)"]
-        end
+    subgraph Browser["Browser — apps/web (React SPA)"]
+        UI["Pages & Components"]
+        Store["dashboardStore (Zustand)"]
+        Logic["src/lib (analysis logic)<br/>metaFetch · deckComparison<br/>battleLogParser · battleLogAnalysis<br/>deckPerformanceStats · deckImport"]
+        ApiClient["api.ts (typed REST client)"]
+        Dexie["Dexie / IndexedDB<br/>(local-first store)"]
     end
 
-    subgraph External
-        LimitlessAPI["Limitless TCG API\nplay.limitlesstcg.com"]
-        ClaudeAPI["Anthropic Claude API\napi.anthropic.com"]
-        CORSProxy["CORS Proxy\ncorsproxy.io"]
+    subgraph Server["Railway — apps/api (Hono)"]
+        Health["/health (DB-free)"]
+        AuthH["/api/auth/* (Better Auth)"]
+        ApiRoutes["/api/decks · /api/snapshots · /api/logs<br/>(session-guarded)"]
+        Static["Static serving of built SPA<br/>(single-origin)"]
+        Drizzle["Drizzle ORM"]
     end
 
-    Pages --> Components
-    Pages --> Store
-    Components --> Store
-    Store --> Queries
-    Store --> MetaFetch
-    Store --> DeckComp
-    Hook --> PerfStats
-    Hook --> BattleParser
-    MetaFetch --> LimitlessAPI
-    MetaFetch --> CORSProxy
-    DeckComp --> LimitlessAPI
-    DeckComp --> CORSProxy
-    BattleAI --> ClaudeAPI
-    Queries --> Schema
-    Schema --> IndexedDB[(IndexedDB\nTCGMetaDashboard)]
-    Prefs --> LS[(localStorage)]
-    Store --> Prefs
+    subgraph Data["Data"]
+        PG[("PostgreSQL")]
+    end
+
+    subgraph External["External"]
+        LimitlessAPI["Limitless TCG API"]
+        CORSProxy["corsproxy.io (legacy fallback)"]
+        ClaudeAPI["LLM provider API"]
+    end
+
+    UI --> Store
+    Store --> ApiClient
+    Store --> Dexie
+    Store --> Logic
+    ApiClient -->|"fetch, credentials: include"| ApiRoutes
+    ApiClient -->|sign-in / session| AuthH
+    Static -.serves.-> UI
+    ApiRoutes --> Drizzle
+    AuthH --> Drizzle
+    Drizzle --> PG
+    Logic -->|legacy, browser-side| LimitlessAPI
+    Logic --> CORSProxy
+    Logic -->|legacy, moving server-side| ClaudeAPI
 ```
+
+> Dashed arrow: in production the API process also serves the built web app, so
+> the Better Auth session cookie stays first-party (single origin).
 
 ---
 
-## Application Shell
+## Backend (`apps/api`)
 
-`App.tsx` is minimal: it calls `seedIfEmpty()` and `store.refresh()` on mount, then renders `Sidebar` + `BottomNav` (layout) and one of four page components based on `store.activeTab`:
+`createApp()` ([app.ts](../apps/api/src/app.ts)) is a Hono app factory. Creating
+the app needs **no database**: `/health` is fully DB-free and both the Better
+Auth handler and the `pg` pool are initialized lazily on the first matching
+`/api` request.
 
-```
-overview  → OverviewPage
-deck      → DeckPage
-recommendations → RecommendationsPage
-meta      → MetaPage
-```
+Registration order matters:
 
-`OpponentsPage` is a standalone component but is not a separate tab — opponent log functionality is embedded in `DeckPage`'s "Match Log" section.
+1. **CORS** (`hono/cors`) with `credentials: true`, origin = `webOrigin` — must be
+   first (Better Auth requirement). Relevant only for split-origin deployments.
+2. **`GET /health`** — liveness check.
+3. **`/api/auth/*`** — handed to the Better Auth handler before the guarded sub-app
+   so sign-in works without an existing session.
+4. **Guarded `/api` sub-app** — a `sessionMiddleware` runs first, then `db` is
+   injected into the context, then the domain routes mount:
+   `/api/decks`, `/api/snapshots`, `/api/logs`.
+
+**Auth** ([auth.ts](../apps/api/src/auth.ts)): Better Auth with the Drizzle
+adapter (`provider: 'pg'`). Email + password is always on (password reset emails
+via Resend, [email.ts](../apps/api/src/email.ts)); Google OAuth turns on when
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` are present.
+
+**Single-origin deployment** ([static.ts](../apps/api/src/static.ts)): the API
+process serves the built web SPA (`apps/web/dist`, overridable via
+`WEB_DIST_PATH`), so the browser talks to exactly one origin for both the app
+shell and `/api/*` and the session cookie remains first-party.
+
+**Secrets** (`DATABASE_URL`, Better-Auth secret, Resend key, future LLM keys) are
+Railway variables — never in the browser bundle.
 
 ---
 
-## Component Tree
+## Frontend (`apps/web`)
+
+### Application Shell
+
+`App.tsx` renders the layout (`Sidebar` + `BottomNav`) and one page based on
+`store.activeTab` (overview · deck · recommendations · meta). Opponent-log
+functionality is embedded in `DeckPage`'s "Match Log" section rather than a
+separate tab.
+
+### State Management Pattern
+
+A single Zustand store (`useDashboardStore`) owns the data arrays
+(`decks`, `deckCards`, `deckSnapshots`, `opponentLogs`, `metaSnapshots`,
+`archetypeStats`, `recentTournaments`), the active-deck cursor,
+localStorage-backed preferences, async-operation flags, and UI state. The
+`refresh()` action is the single entry point to reload data; mutations end with
+`await get().refresh()` to keep the store consistent.
+
+### Component Tree (frontend)
 
 ```mermaid
 graph TD
@@ -141,43 +207,46 @@ graph TD
 
 ---
 
-## State Management Pattern
-
-There is a single Zustand store (`useDashboardStore`) that owns:
-
-- **Data arrays**: `decks`, `deckCards`, `deckSnapshots`, `opponentLogs`, `metaSnapshots`, `archetypeStats`, `recentTournaments`
-- **Active deck cursor**: `activeDeckId`, `activeDeck` (derived)
-- **User preferences** (localStorage-backed): `localMeta`, `deckArchSlug`
-- **Async operation state**: loading flags, progress strings, error strings for sync / comparison / tournaments
-- **UI state**: `activeTab`, `lastRefreshed`, `lastSynced`
-
-The `refresh()` action is the single entry point to reload all data from IndexedDB. Every mutation action (create/update/delete deck, add log, sync meta, etc.) ends with `await get().refresh()` to keep the store consistent.
-
----
-
 ## Data Persistence
 
-| Data | Storage | Key |
-|------|---------|-----|
-| Decks, cards, logs, snapshots, meta | IndexedDB via Dexie | `TCGMetaDashboard` database |
-| Active deck ID | localStorage | `tcg-active-deck-id-v3` |
-| Local meta archetypes | localStorage | `tcg-local-meta-v1` |
-| Deck archetype slug | localStorage | `tcg-deck-arch-slug-v1` |
-| Player name (for battle log parsing) | localStorage | `tcg-player-name` |
+The migration "IndexedDB → API as the source of truth" is **in progress**, so two
+stores coexist:
+
+| Data | Storage | Notes |
+|------|---------|-------|
+| Decks, cards, logs, snapshots | PostgreSQL via `apps/api` | server-side source of truth (target state) |
+| Decks, cards, logs, snapshots, meta | IndexedDB via Dexie (`TCGMetaDashboard`) | local-first store, still authoritative for parts of the app |
+| Active deck ID | localStorage (`tcg-active-deck-id-v3`) | UI preference |
+| Local meta archetypes | localStorage (`tcg-local-meta-v1`) | UI preference |
+| Deck archetype slug | localStorage (`tcg-deck-arch-slug-v1`) | UI preference |
+| Player name (battle-log parsing) | localStorage (`tcg-player-name`) | parser input |
+
+The typed client [api.ts](../apps/web/src/lib/api.ts) talks to `apps/api` with
+`credentials: 'include'` (Better Auth session cookie); base URL is `VITE_API_URL`
+in split-origin deployments or the empty string for same-origin. It applies a few
+boundary adapters between the client types and the wire format
+(`DeckSnapshot.cards` string ↔ jsonb array, the `DeckCard.cardId` sentinel,
+`null` ↔ `undefined` for optional log columns).
+
+`metaSnapshots` currently exists **only** in IndexedDB; bringing it server-side is
+the first backend step (plan §5.1).
 
 ---
 
 ## External API Integration
 
-Both `metaFetch.ts` and `deckComparison.ts` use an identical two-step fetch strategy:
-
-1. Try the Limitless API directly (`play.limitlesstcg.com/api/...`)
-2. On failure (CORS or HTTP error), fall back to `corsproxy.io`
-
-Neither endpoint requires authentication. The Claude API call in `battleLogAnalysis.ts` requires an API key entered by the user — it is sent directly from the browser (no proxy).
+- **Limitless TCG API** — `metaFetch.ts` and `deckComparison.ts` fetch directly,
+  falling back to `corsproxy.io` on CORS/HTTP failure. This browser-side path is
+  legacy: it moves to a server-side cron job (no CORS proxy needed) per plan §6.2.
+- **LLM analysis** — `battleLogAnalysis.ts` currently calls an LLM provider from
+  the browser with a user-entered key. This is acknowledged tech debt
+  ("Alt-Schuld"): it moves server-side and provider-agnostic, key never in the
+  bundle, per plan §6.3 / CLAUDE.md golden rule 3.
 
 ---
 
 ## Responsive Layout
 
-The app uses a sidebar navigation on medium+ screens and a bottom nav bar on mobile. The main content area is capped at `max-w-screen-2xl` and uses `p-3 md:p-4` padding. The dark color scheme uses `bg-gray-950` as the base with Tailwind utility classes throughout.
+The app uses sidebar navigation on medium+ screens and a bottom nav bar on mobile.
+The main content area is capped at `max-w-screen-2xl` with `p-3 md:p-4` padding,
+on a dark `bg-gray-950` base using Tailwind utilities throughout.

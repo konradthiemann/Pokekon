@@ -1,0 +1,7 @@
+# Astro build + cache
+dist/
+.astro/
+
+# Generated docs content — synced from repo-level docs/ by scripts/sync-docs.mjs.
+# docs/ is the single source of truth; this mirror must never be hand-edited or committed.
+src/content/docs/
