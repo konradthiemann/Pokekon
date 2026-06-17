@@ -4,6 +4,7 @@ import { getAuth } from './auth.js';
 import { getDb, type Db } from './db/index.js';
 import { getEnv } from './env.js';
 import { sessionMiddleware, type ApiEnv, type GetSessionUser } from './middleware/session.js';
+import { createAnalyticsRoutes } from './routes/analytics.js';
 import { createDecksRoutes } from './routes/decks.js';
 import { createLogsRoutes } from './routes/logs.js';
 import { createSnapshotsRoutes } from './routes/snapshots.js';
@@ -49,6 +50,7 @@ export function createApp(deps: AppDeps = {}): Hono {
   api.route('/decks', createDecksRoutes());
   api.route('/snapshots', createSnapshotsRoutes());
   api.route('/logs', createLogsRoutes());
+  api.route('/analytics', createAnalyticsRoutes());
   app.route('/api', api);
 
   return app;

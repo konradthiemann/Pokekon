@@ -3,6 +3,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
+import { eq } from 'drizzle-orm';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
 import type { Db } from './db/index.js';
@@ -18,6 +19,7 @@ const USER_A = 'user-a';
 const USER_B = 'user-b';
 
 let app: ReturnType<typeof createApp>;
+let db: Db;
 
 async function applyMigrations(client: PGlite): Promise<void> {
   const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'drizzle');
@@ -35,7 +37,7 @@ beforeAll(async () => {
   const client = new PGlite();
   await applyMigrations(client);
 
-  const db = drizzle(client, { schema }) as unknown as Db;
+  db = drizzle(client, { schema }) as unknown as Db;
   await db.insert(schema.user).values([
     { id: USER_A, name: 'User A', email: 'a@example.com' },
     { id: USER_B, name: 'User B', email: 'b@example.com' },
@@ -346,5 +348,234 @@ describe('opponent logs', () => {
       body: { result: 'T' },
     });
     expect(patchB.status).toBe(404);
+  });
+});
+
+const SAMPLE_BATTLE_LOG = `Vorbereitung
+Konrad hat den Münzwurf gewonnen.
+Konrad hat für die Starthand 7 Karten gezogen.
+GegnerX hat für die Starthand 7 Karten gezogen.
+
+Zug von Konrad
+Konrad hat Nest Ball gespielt.
+Konrad hat Iono gespielt.
+Konrad hat Psycho-Energie an Dreepy angelegt.
+
+Zug von GegnerX
+GegnerX hat Pokégear 3.0 gespielt.
+Glurak-ex von GegnerX hat Brandwunde für 90 Schadenspunkte eingesetzt.
+
+Zug von Konrad
+Dragapult-ex von Konrad hat Phantombrise für 200 Schadenspunkte eingesetzt.
+Glurak-ex von GegnerX wurde kampfunfähig gemacht!
+Konrad hat 2 Preiskarten aufgenommen.
+
+Konrad hat gewonnen!`;
+
+describe('battle-log parse-on-write pipeline', () => {
+  const baseLog = {
+    archetype: 'charizard',
+    eventType: 'Online',
+    eventDate: '2026-06-10',
+    result: 'W',
+    notes: '',
+  };
+
+  async function parsedRowFor(opponentLogId: number) {
+    const rows = await db
+      .select()
+      .from(schema.matchLogParsed)
+      .where(eq(schema.matchLogParsed.opponentLogId, opponentLogId));
+    return rows[0];
+  }
+
+  it('parses and persists a match_log_parsed row when a log is created with a battle log', async () => {
+    const create = await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: { ...baseLog, battleLog: SAMPLE_BATTLE_LOG, playerName: 'Konrad' },
+    });
+    expect(create.status).toBe(201);
+    const log = (await create.json()) as { id: number };
+
+    const parsed = await parsedRowFor(log.id);
+    expect(parsed).toBeDefined();
+    expect(parsed).toMatchObject({
+      userId: USER_A,
+      totalTurns: 3,
+      wentFirst: true,
+      parserVersion: 2,
+      setupCleanByTurn2: true,
+      deadTurns: 0,
+    });
+    expect(Array.isArray(parsed?.turns)).toBe(true);
+    expect(parsed?.turns).toHaveLength(3);
+  });
+
+  it('does not create a parsed row when no battle log is supplied', async () => {
+    const create = await request('/api/logs', { user: USER_A, method: 'POST', body: baseLog });
+    const log = (await create.json()) as { id: number };
+    expect(await parsedRowFor(log.id)).toBeUndefined();
+  });
+
+  it('clears the parsed row when the battle log is removed, and re-parses when re-added', async () => {
+    const create = await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: { ...baseLog, battleLog: SAMPLE_BATTLE_LOG, playerName: 'Konrad' },
+    });
+    const log = (await create.json()) as { id: number };
+    expect(await parsedRowFor(log.id)).toBeDefined();
+
+    const clear = await request(`/api/logs/${log.id}`, {
+      user: USER_A,
+      method: 'PATCH',
+      body: { battleLog: '' },
+    });
+    expect(clear.status).toBe(200);
+    expect(await parsedRowFor(log.id)).toBeUndefined();
+
+    const readd = await request(`/api/logs/${log.id}`, {
+      user: USER_A,
+      method: 'PATCH',
+      body: { battleLog: SAMPLE_BATTLE_LOG, playerName: 'Konrad' },
+    });
+    expect(readd.status).toBe(200);
+    expect(await parsedRowFor(log.id)).toBeDefined();
+  });
+
+  it('cascade-deletes the parsed row when the log is deleted', async () => {
+    const create = await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: { ...baseLog, battleLog: SAMPLE_BATTLE_LOG, playerName: 'Konrad' },
+    });
+    const log = (await create.json()) as { id: number };
+    expect(await parsedRowFor(log.id)).toBeDefined();
+
+    const del = await request(`/api/logs/${log.id}`, { user: USER_A, method: 'DELETE' });
+    expect(del.status).toBe(204);
+    expect(await parsedRowFor(log.id)).toBeUndefined();
+  });
+});
+
+// A second log where the opponent takes the first turn → player1 (Konrad) went second.
+const SECOND_TURN_LOG = `Vorbereitung
+GegnerX hat den Münzwurf gewonnen.
+Konrad hat für die Starthand 7 Karten gezogen.
+GegnerX hat für die Starthand 7 Karten gezogen.
+
+Zug von GegnerX
+GegnerX hat Iono gespielt.
+GegnerX hat Feuer-Energie an Glumanda angelegt.
+
+Zug von Konrad
+Konrad hat Nest Ball gespielt.
+
+GegnerX hat gewonnen!`;
+
+describe('GET /api/analytics/deck/:id', () => {
+  const today = new Date().toISOString().slice(0, 10);
+
+  type Analytics = {
+    deckId: number;
+    weeks: number;
+    record: { games: number; wins: number; losses: number; winRatePct: number | null };
+    goingFirst: { games: number; wins: number; winRatePct: number | null };
+    goingSecond: { games: number; wins: number; winRatePct: number | null };
+    setup: { parsedGames: number; cleanRatePct: number | null };
+    deadTurns: { parsedGames: number; avgPerGame: number | null };
+    prizeCurveWins: { turn: number; avgPrizesRemaining: number; games: number }[];
+  };
+
+  async function seedDeckWithLogs(): Promise<number> {
+    const deckId = await createDeck(USER_A);
+    const base = { archetype: 'charizard', eventType: 'Online', notes: '' };
+    // In-window: a went-first win, a went-second loss, and an unparsed win.
+    await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: {
+        ...base,
+        deckId,
+        eventDate: today,
+        result: 'W',
+        battleLog: SAMPLE_BATTLE_LOG,
+        playerName: 'Konrad',
+      },
+    });
+    await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: {
+        ...base,
+        deckId,
+        eventDate: today,
+        result: 'L',
+        battleLog: SECOND_TURN_LOG,
+        playerName: 'Konrad',
+      },
+    });
+    await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: { ...base, deckId, eventDate: today, result: 'W' },
+    });
+    // Out of the 4-week window: must be excluded.
+    await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: {
+        ...base,
+        deckId,
+        eventDate: '2020-01-01',
+        result: 'L',
+        battleLog: SAMPLE_BATTLE_LOG,
+        playerName: 'Konrad',
+      },
+    });
+    return deckId;
+  }
+
+  it('aggregates record and going-first/second win rates within the window', async () => {
+    const deckId = await seedDeckWithLogs();
+
+    const res = await request(`/api/analytics/deck/${deckId}?weeks=4`, { user: USER_A });
+    expect(res.status).toBe(200);
+    const a = (await res.json()) as Analytics;
+
+    // 3 in-window logs (the 2020 one is excluded).
+    expect(a.record.games).toBe(3);
+    expect(a.record.wins).toBe(2);
+    expect(a.record.losses).toBe(1);
+    expect(a.record.winRatePct).toBe(66.7);
+
+    // Turn-quality metrics only cover the 2 parsed in-window games.
+    expect(a.goingFirst).toMatchObject({ games: 1, wins: 1, winRatePct: 100 });
+    expect(a.goingSecond).toMatchObject({ games: 1, wins: 0, winRatePct: 0 });
+    expect(a.setup.parsedGames).toBe(2);
+    expect(a.deadTurns.parsedGames).toBe(2);
+    // The won, parsed game contributes a prize curve.
+    expect(a.prizeCurveWins.length).toBeGreaterThan(0);
+  });
+
+  it('excludes older games when the window is narrowed', async () => {
+    const deckId = await seedDeckWithLogs();
+    const res = await request(`/api/analytics/deck/${deckId}?weeks=1`, { user: USER_A });
+    const a = (await res.json()) as Analytics;
+    expect(a.weeks).toBe(1);
+    expect(a.record.games).toBe(3); // all in-window logs are "today"
+  });
+
+  it('rejects a weeks value outside 1–4 with 400', async () => {
+    const deckId = await createDeck(USER_A);
+    const res = await request(`/api/analytics/deck/${deckId}?weeks=9`, { user: USER_A });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 for another user's deck", async () => {
+    const deckId = await createDeck(USER_A);
+    const res = await request(`/api/analytics/deck/${deckId}`, { user: USER_B });
+    expect(res.status).toBe(404);
   });
 });

@@ -5,11 +5,14 @@ import {
   timestamp,
   boolean,
   index,
+  uniqueIndex,
   serial,
   integer,
+  real,
   jsonb,
   date,
 } from 'drizzle-orm/pg-core';
+import type { ParsedTurn, PrizePoint } from '@pokekon/shared';
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
@@ -214,7 +217,62 @@ export const opponentLogs = pgTable(
     index('opponent_logs_userId_idx').on(table.userId),
     index('opponent_logs_deckId_idx').on(table.deckId),
     index('opponent_logs_archetype_eventDate_idx').on(table.archetype, table.eventDate),
+    // Plain event_date index for the 1/2/3/4-week time-window analytics queries (plan §5.4).
+    index('opponent_logs_eventDate_idx').on(table.eventDate),
   ],
+);
+
+// ─── Meta snapshots (global tournament-meta reference data) ──────────────────
+// Not user-scoped: the server-side meta sync (plan §6.2) produces one shared
+// view of the meta for all users. Mirrors the IndexedDB metaSnapshots shape.
+
+export const metaSnapshots = pgTable(
+  'meta_snapshots',
+  {
+    id: serial('id').primaryKey(),
+    archetype: text('archetype').notNull(),
+    frequencyPct: real('frequency_pct').notNull(),
+    winRatePct: integer('win_rate_pct'), // nullable: no decided games yet
+    wins: integer('wins').notNull(),
+    losses: integer('losses').notNull(),
+    playerCount: integer('player_count').notNull(),
+    period: text('period').notNull(), // ISO week, e.g. "2026-W15"
+    sourceNote: text('source_note').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('meta_period_archetype_uq').on(table.period, table.archetype),
+    index('meta_archetype_idx').on(table.archetype),
+  ],
+);
+
+// ─── Parsed battle logs (one row per opponent_log with a battle log) ─────────
+// The expensive parse runs once on write (plan §4); read queries hit finished
+// aggregates. `turns`/`prizeProgression` hold the @pokekon/shared parser output;
+// `parserVersion` allows selective re-parsing after parser improvements (§5.2).
+
+export const matchLogParsed = pgTable(
+  'match_log_parsed',
+  {
+    id: serial('id').primaryKey(),
+    opponentLogId: integer('opponent_log_id')
+      .notNull()
+      .references(() => opponentLogs.id, { onDelete: 'cascade' })
+      .unique(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    totalTurns: integer('total_turns').notNull(),
+    wentFirst: boolean('went_first'), // nullable: unknown from log
+    turns: jsonb('turns').$type<ParsedTurn[]>().notNull(),
+    prizeProgression: jsonb('prize_progression').$type<PrizePoint[]>().notNull(),
+    parserVersion: integer('parser_version').notNull(),
+    // Materialised turn-quality fields for fast reads (plan §3.7.5).
+    setupCleanByTurn2: boolean('setup_clean_by_turn2').notNull(),
+    deadTurns: integer('dead_turns').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('match_log_parsed_userId_idx').on(table.userId)],
 );
 
 export const decksRelations = relations(decks, ({ one, many }) => ({
@@ -237,5 +295,16 @@ export const opponentLogsRelations = relations(opponentLogs, ({ one }) => ({
   deckSnapshot: one(deckSnapshots, {
     fields: [opponentLogs.deckSnapshotId],
     references: [deckSnapshots.id],
+  }),
+  parsed: one(matchLogParsed, {
+    fields: [opponentLogs.id],
+    references: [matchLogParsed.opponentLogId],
+  }),
+}));
+
+export const matchLogParsedRelations = relations(matchLogParsed, ({ one }) => ({
+  opponentLog: one(opponentLogs, {
+    fields: [matchLogParsed.opponentLogId],
+    references: [opponentLogs.id],
   }),
 }));

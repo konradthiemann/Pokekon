@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { opponentLogs } from '../db/schema.js';
 import type { ApiEnv } from '../middleware/session.js';
 import { logBodySchema, logPatchSchema, logsQuerySchema } from '../validation.js';
+import { syncParsedLog } from '../lib/matchLogPipeline.js';
 import { parseId, readJson, userOwnsDeck, userOwnsSnapshot } from './shared.js';
 
 /**
@@ -66,6 +67,22 @@ export function createLogsRoutes(): Hono<ApiEnv> {
         analysis: body.analysis ?? null,
       })
       .returning();
+
+    // Parse-on-write: persist the structured battle log. Best-effort — a parser
+    // failure must never block saving the log itself.
+    if (log !== undefined) {
+      try {
+        await syncParsedLog(db, {
+          opponentLogId: log.id,
+          userId,
+          battleLog: log.battleLog,
+          playerName: body.playerName,
+        });
+      } catch (err) {
+        console.warn(`syncParsedLog failed for log ${log.id}:`, err);
+      }
+    }
+
     return c.json(log, 201);
   });
 
@@ -109,6 +126,21 @@ export function createLogsRoutes(): Hono<ApiEnv> {
       .where(and(eq(opponentLogs.id, id), eq(opponentLogs.userId, userId)))
       .returning();
     if (log === undefined) return c.json({ error: 'Not found' }, 404);
+
+    // Re-parse only when the battle log itself was part of the update.
+    if (body.battleLog !== undefined) {
+      try {
+        await syncParsedLog(db, {
+          opponentLogId: log.id,
+          userId,
+          battleLog: log.battleLog,
+          playerName: body.playerName,
+        });
+      } catch (err) {
+        console.warn(`syncParsedLog failed for log ${log.id}:`, err);
+      }
+    }
+
     return c.json(log);
   });
 

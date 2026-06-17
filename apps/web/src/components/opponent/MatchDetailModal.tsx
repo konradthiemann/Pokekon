@@ -16,7 +16,7 @@ import {
 import type { OpponentLog, BattleAnalysis, BattleAnalysisPlay, DeckCard } from '../../types';
 import { updateOpponentLog, getDeckSnapshotById, parseDeckSnapshot } from '../../db/queries';
 import { analyzeBattleLog } from '../../lib/battleLogAnalysis';
-import { parseBattleLog } from '../../lib/battleLogParser';
+import { parseBattleLog } from '@pokekon/shared';
 import { MatchStatsTab } from './MatchStatsTab';
 import { useDashboardStore } from '../../store/dashboardStore';
 

@@ -57,6 +57,9 @@ const logFields = {
   deckSnapshotId: z.number().int().positive().nullish(),
   battleLog: z.string().nullish(),
   analysis: z.string().nullish(),
+  // Not persisted on opponent_logs — used only to pin "me" when the battle log
+  // is parsed server-side (the local player's exact in-game name).
+  playerName: z.string().max(100).nullish(),
 };
 
 export const logBodySchema = z.object({ ...logFields, notes: z.string().default('') });
@@ -70,4 +73,11 @@ export const logsQuerySchema = z.object({
   deckId: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
+});
+
+// ─── Analytics ──────────────────────────────────────────────────────────────
+
+/** Time window for deck analytics — 1/2/3/4 weeks (plan §5.4), default 4. */
+export const analyticsQuerySchema = z.object({
+  weeks: z.coerce.number().int().min(1).max(4).default(4),
 });

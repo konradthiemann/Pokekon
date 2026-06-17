@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseBattleLog } from './battleLogParser';
+import { parseBattleLog, PARSER_VERSION } from './battleLogParser.js';
 
 const SAMPLE_LOG = `Vorbereitung
 Konrad hat den Münzwurf gewonnen.
@@ -101,5 +101,65 @@ describe('parseBattleLog', () => {
     expect(parsed.totalTurns).toBe(0);
     expect(parsed.turns).toEqual([]);
     expect(parsed.winner).toBeNull();
+  });
+
+  // ── Board-state reconstruction (v2) ──────────────────────────────────────
+
+  it('stamps the parser version on the result', () => {
+    const parsed = parseBattleLog(SAMPLE_LOG, 'Konrad');
+    expect(parsed.parserVersion).toBe(PARSER_VERSION);
+  });
+
+  it('detects the first player and whether player1 went first', () => {
+    const parsed = parseBattleLog(SAMPLE_LOG, 'Konrad');
+    expect(parsed.firstPlayer).toBe('Konrad');
+    expect(parsed.wentFirst).toBe(true);
+  });
+
+  it('reports wentFirst=null when there are no turns', () => {
+    const parsed = parseBattleLog('Konrad hat den Münzwurf gewonnen.', 'Konrad');
+    expect(parsed.firstPlayer).toBeNull();
+    expect(parsed.wentFirst).toBeNull();
+  });
+
+  it('flags only Supporter cards as supporters played', () => {
+    const parsed = parseBattleLog(SAMPLE_LOG, 'Konrad');
+    // Turn 1: Konrad played Nest Ball (item) + Iono (supporter) → only Iono counts.
+    expect(parsed.turns[0].supportersPlayed).toEqual(['Iono']);
+  });
+
+  it('approximates hand size from the opening hand minus plays and energy', () => {
+    const parsed = parseBattleLog(SAMPLE_LOG, 'Konrad');
+    // Konrad opens 7, turn 1 plays 2 cards + attaches 1 energy → 4.
+    expect(parsed.turns[0].handSize).toBe(4);
+  });
+
+  it('infers the active Pokémon from attack lines', () => {
+    const parsed = parseBattleLog(SAMPLE_LOG, 'Konrad');
+    // Turn 3 (index 2): "Dragapult-ex von Konrad hat Phantombrise ... eingesetzt".
+    expect(parsed.turns[2].activePokemon).toBe('Dragapult-ex');
+    // Turn 1 has no attack and no placement markers → unknown active.
+    expect(parsed.turns[0].activePokemon).toBeNull();
+  });
+
+  it('leaves the bench empty when the log has no bench-placement markers', () => {
+    const parsed = parseBattleLog(SAMPLE_LOG, 'Konrad');
+    expect(parsed.turns[0].bench).toEqual([]);
+  });
+
+  it('tracks cumulative energy in play for the turn player', () => {
+    const parsed = parseBattleLog(SAMPLE_LOG, 'Konrad');
+    expect(parsed.turns[0].energyInPlay).toBe(1); // Konrad attached 1 energy by turn 1
+  });
+
+  it('marks a clean setup when energy and a draw supporter land by turn 2', () => {
+    const parsed = parseBattleLog(SAMPLE_LOG, 'Konrad');
+    expect(parsed.setupCleanByTurn2).toBe(true);
+  });
+
+  it('counts no dead turns when every player1 turn acts or attacks', () => {
+    const parsed = parseBattleLog(SAMPLE_LOG, 'Konrad');
+    // Turn 5 only attacks (actionsCount 0) but deals damage → not a dead turn.
+    expect(parsed.deadTurns).toBe(0);
   });
 });
