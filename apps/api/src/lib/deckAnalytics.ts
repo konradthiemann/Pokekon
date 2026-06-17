@@ -1,4 +1,4 @@
-import type { PrizePoint } from '@pokekon/shared';
+import type { DeckAnalytics, PrizePoint, WinRateBlock } from '@pokekon/shared';
 import type { MatchResult } from '../db/schema.js';
 
 /** One match row feeding the analytics aggregation (opponent_log ⨝ match_log_parsed). */
@@ -9,38 +9,6 @@ export interface AnalyticsRow {
   setupCleanByTurn2: boolean | null;
   deadTurns: number | null;
   prizeProgression: PrizePoint[] | null;
-}
-
-export interface WinRateBlock {
-  games: number;
-  wins: number;
-  losses: number;
-  ties: number;
-  /** wins / (wins + losses) as a percentage, or null when no game was decided. */
-  winRatePct: number | null;
-}
-
-export interface DeckAnalytics {
-  deckId: number;
-  weeks: number;
-  /** Record over all logs in the window (parsed or not). */
-  record: WinRateBlock;
-  /** Win rate among parsed games where the player went first / second. */
-  goingFirst: WinRateBlock;
-  goingSecond: WinRateBlock;
-  setup: {
-    parsedGames: number;
-    cleanByTurn2: number;
-    /** Share of parsed games with a clean setup by turn 2, as a percentage. */
-    cleanRatePct: number | null;
-  };
-  deadTurns: {
-    parsedGames: number;
-    /** Average dead (zero-activity) turns per parsed game. */
-    avgPerGame: number | null;
-  };
-  /** Average remaining prizes per turn across WON games (the "winning curve"). */
-  prizeCurveWins: { turn: number; avgPrizesRemaining: number; games: number }[];
 }
 
 function round(value: number, decimals = 1): number {

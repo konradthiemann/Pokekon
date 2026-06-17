@@ -1,3 +1,4 @@
+import type { DeckAnalytics } from '@pokekon/shared';
 import type { CardRole, CardType, Deck, DeckCard, DeckSnapshot, OpponentLog } from '../types';
 
 /**
@@ -319,4 +320,19 @@ export async function updateLog(id: number, patch: Partial<LogWriteBody>): Promi
 
 export async function deleteLog(id: number): Promise<void> {
   await request<void>(`/api/logs/${id}`, { method: 'DELETE' });
+}
+
+// ─── Analytics ──────────────────────────────────────────────────────────────
+
+/**
+ * Server-computed deck performance over a 1/2/3/4-week window, derived from the
+ * parsed battle logs. The response already matches the shared DeckAnalytics
+ * contract, so no boundary adapter is needed.
+ */
+export async function getDeckAnalytics(
+  deckId: number,
+  weeks?: 1 | 2 | 3 | 4,
+): Promise<DeckAnalytics> {
+  const query = weeks === undefined ? '' : `?weeks=${weeks}`;
+  return request<DeckAnalytics>(`/api/analytics/deck/${deckId}${query}`);
 }

@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ApiError, createDeckSnapshot, listDeckSnapshots, listAllLogs } from './api';
+import {
+  ApiError,
+  createDeckSnapshot,
+  getDeckAnalytics,
+  listDeckSnapshots,
+  listAllLogs,
+} from './api';
 import type { DeckCard } from '../types';
 
 /**
@@ -130,6 +136,46 @@ describe('ApiError', () => {
       expect(apiErr.status).toBe(401);
       expect(apiErr.body).toEqual({ error: 'Unauthorized' });
     }
+  });
+});
+
+describe('getDeckAnalytics', () => {
+  it('requests the deck analytics endpoint with the week window and returns the contract shape', async () => {
+    const analytics = {
+      deckId: 3,
+      weeks: 2,
+      record: { games: 5, wins: 3, losses: 2, ties: 0, winRatePct: 60 },
+      goingFirst: { games: 3, wins: 2, losses: 1, ties: 0, winRatePct: 66.7 },
+      goingSecond: { games: 2, wins: 1, losses: 1, ties: 0, winRatePct: 50 },
+      setup: { parsedGames: 5, cleanByTurn2: 4, cleanRatePct: 80 },
+      deadTurns: { parsedGames: 5, avgPerGame: 0.4 },
+      prizeCurveWins: [{ turn: 1, avgPrizesRemaining: 4.5, games: 3 }],
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(analytics));
+
+    const result = await getDeckAnalytics(3, 2);
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/analytics/deck/3?weeks=2', expect.anything());
+    expect(result).toEqual(analytics);
+  });
+
+  it('omits the weeks query when not provided', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        deckId: 1,
+        weeks: 4,
+        record: { games: 0, wins: 0, losses: 0, ties: 0, winRatePct: null },
+        goingFirst: { games: 0, wins: 0, losses: 0, ties: 0, winRatePct: null },
+        goingSecond: { games: 0, wins: 0, losses: 0, ties: 0, winRatePct: null },
+        setup: { parsedGames: 0, cleanByTurn2: 0, cleanRatePct: null },
+        deadTurns: { parsedGames: 0, avgPerGame: null },
+        prizeCurveWins: [],
+      }),
+    );
+
+    await getDeckAnalytics(1);
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/analytics/deck/1', expect.anything());
   });
 });
 
