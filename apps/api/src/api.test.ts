@@ -3,6 +3,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
+import { eq } from 'drizzle-orm';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
 import type { Db } from './db/index.js';
@@ -18,6 +19,7 @@ const USER_A = 'user-a';
 const USER_B = 'user-b';
 
 let app: ReturnType<typeof createApp>;
+let db: Db;
 
 async function applyMigrations(client: PGlite): Promise<void> {
   const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'drizzle');
@@ -35,7 +37,7 @@ beforeAll(async () => {
   const client = new PGlite();
   await applyMigrations(client);
 
-  const db = drizzle(client, { schema }) as unknown as Db;
+  db = drizzle(client, { schema }) as unknown as Db;
   await db.insert(schema.user).values([
     { id: USER_A, name: 'User A', email: 'a@example.com' },
     { id: USER_B, name: 'User B', email: 'b@example.com' },
@@ -346,5 +348,113 @@ describe('opponent logs', () => {
       body: { result: 'T' },
     });
     expect(patchB.status).toBe(404);
+  });
+});
+
+const SAMPLE_BATTLE_LOG = `Vorbereitung
+Konrad hat den Münzwurf gewonnen.
+Konrad hat für die Starthand 7 Karten gezogen.
+GegnerX hat für die Starthand 7 Karten gezogen.
+
+Zug von Konrad
+Konrad hat Nest Ball gespielt.
+Konrad hat Iono gespielt.
+Konrad hat Psycho-Energie an Dreepy angelegt.
+
+Zug von GegnerX
+GegnerX hat Pokégear 3.0 gespielt.
+Glurak-ex von GegnerX hat Brandwunde für 90 Schadenspunkte eingesetzt.
+
+Zug von Konrad
+Dragapult-ex von Konrad hat Phantombrise für 200 Schadenspunkte eingesetzt.
+Glurak-ex von GegnerX wurde kampfunfähig gemacht!
+Konrad hat 2 Preiskarten aufgenommen.
+
+Konrad hat gewonnen!`;
+
+describe('battle-log parse-on-write pipeline', () => {
+  const baseLog = {
+    archetype: 'charizard',
+    eventType: 'Online',
+    eventDate: '2026-06-10',
+    result: 'W',
+    notes: '',
+  };
+
+  async function parsedRowFor(opponentLogId: number) {
+    const rows = await db
+      .select()
+      .from(schema.matchLogParsed)
+      .where(eq(schema.matchLogParsed.opponentLogId, opponentLogId));
+    return rows[0];
+  }
+
+  it('parses and persists a match_log_parsed row when a log is created with a battle log', async () => {
+    const create = await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: { ...baseLog, battleLog: SAMPLE_BATTLE_LOG, playerName: 'Konrad' },
+    });
+    expect(create.status).toBe(201);
+    const log = (await create.json()) as { id: number };
+
+    const parsed = await parsedRowFor(log.id);
+    expect(parsed).toBeDefined();
+    expect(parsed).toMatchObject({
+      userId: USER_A,
+      totalTurns: 3,
+      wentFirst: true,
+      parserVersion: 2,
+      setupCleanByTurn2: true,
+      deadTurns: 0,
+    });
+    expect(Array.isArray(parsed?.turns)).toBe(true);
+    expect(parsed?.turns).toHaveLength(3);
+  });
+
+  it('does not create a parsed row when no battle log is supplied', async () => {
+    const create = await request('/api/logs', { user: USER_A, method: 'POST', body: baseLog });
+    const log = (await create.json()) as { id: number };
+    expect(await parsedRowFor(log.id)).toBeUndefined();
+  });
+
+  it('clears the parsed row when the battle log is removed, and re-parses when re-added', async () => {
+    const create = await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: { ...baseLog, battleLog: SAMPLE_BATTLE_LOG, playerName: 'Konrad' },
+    });
+    const log = (await create.json()) as { id: number };
+    expect(await parsedRowFor(log.id)).toBeDefined();
+
+    const clear = await request(`/api/logs/${log.id}`, {
+      user: USER_A,
+      method: 'PATCH',
+      body: { battleLog: '' },
+    });
+    expect(clear.status).toBe(200);
+    expect(await parsedRowFor(log.id)).toBeUndefined();
+
+    const readd = await request(`/api/logs/${log.id}`, {
+      user: USER_A,
+      method: 'PATCH',
+      body: { battleLog: SAMPLE_BATTLE_LOG, playerName: 'Konrad' },
+    });
+    expect(readd.status).toBe(200);
+    expect(await parsedRowFor(log.id)).toBeDefined();
+  });
+
+  it('cascade-deletes the parsed row when the log is deleted', async () => {
+    const create = await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: { ...baseLog, battleLog: SAMPLE_BATTLE_LOG, playerName: 'Konrad' },
+    });
+    const log = (await create.json()) as { id: number };
+    expect(await parsedRowFor(log.id)).toBeDefined();
+
+    const del = await request(`/api/logs/${log.id}`, { user: USER_A, method: 'DELETE' });
+    expect(del.status).toBe(204);
+    expect(await parsedRowFor(log.id)).toBeUndefined();
   });
 });

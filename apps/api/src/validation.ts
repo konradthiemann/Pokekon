@@ -57,6 +57,9 @@ const logFields = {
   deckSnapshotId: z.number().int().positive().nullish(),
   battleLog: z.string().nullish(),
   analysis: z.string().nullish(),
+  // Not persisted on opponent_logs — used only to pin "me" when the battle log
+  // is parsed server-side (the local player's exact in-game name).
+  playerName: z.string().max(100).nullish(),
 };
 
 export const logBodySchema = z.object({ ...logFields, notes: z.string().default('') });
