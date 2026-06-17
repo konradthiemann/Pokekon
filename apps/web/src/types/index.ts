@@ -158,6 +158,9 @@ export interface RecentTournament {
   date: string; // ISO timestamp
   players: number;
   topArchetypes: { name: string; count: number; winRate: number }[];
+  /** Archetype that placed 1st (the winner), or null if undeterminable / "Other".
+   *  When the winner is not among the top-5-by-count, it replaces the 5th entry. */
+  winnerArchetype: string | null;
 }
 
 // ─── View / derived types ─────────────────────────────────────────────────────
