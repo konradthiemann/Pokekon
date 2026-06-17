@@ -233,3 +233,52 @@ Uses Promise chaining (not async/await) to stay within the IndexedDB transaction
 
 ### Snapshot parsing
 Snapshots store the card list as a JSON string. `parseDeckSnapshot(snap)` safely deserializes it and returns an empty array on parse failure.
+
+---
+
+## Server-side schema (apps/api · PostgreSQL via Drizzle)
+
+The sections above describe the browser's Dexie/IndexedDB store. The backend
+(`apps/api`) mirrors the domain tables in PostgreSQL and adds tables the client
+never had. The two relevant to the battle-log pipeline (Baustein B):
+
+### Table: `match_log_parsed`
+
+One row per `opponent_logs` row that has a battle log. The parse runs **once on
+write** (see [data-flow.md](./data-flow.md) → *Server-side Battle-Log Pipeline*);
+read queries hit these finished aggregates instead of re-parsing.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | serial PK | |
+| `opponent_log_id` | int FK → `opponent_logs.id`, **unique** | `onDelete: cascade` |
+| `user_id` | text FK → `user.id` | indexed |
+| `total_turns` | int | |
+| `went_first` | boolean (nullable) | null when undeterminable |
+| `turns` | jsonb | `ParsedTurn[]` incl. board state (active/bench/handSize/supporters/energyInPlay) |
+| `prize_progression` | jsonb | `PrizePoint[]` |
+| `parser_version` | int | bump → selective re-parse (`PARSER_VERSION` in `@pokekon/shared`) |
+| `setup_clean_by_turn2` | boolean | materialised turn-quality field |
+| `dead_turns` | int | materialised turn-quality field |
+| `created_at` | timestamptz | |
+
+### Table: `meta_snapshots` (server)
+
+The server-side counterpart of the IndexedDB `metaSnapshots` table — **global**
+(not user-scoped), so the meta sync produces one shared view for all users.
+Columns mirror the client shape (`archetype`, `frequency_pct`, `win_rate_pct`
+nullable, `wins`, `losses`, `player_count`, `period`, `source_note`,
+`created_at`) with a unique index on `(period, archetype)` and an `archetype`
+index.
+
+### Indexes for time-window analytics
+
+`opponent_logs` gains a plain `event_date` index (alongside the existing
+`(archetype, event_date)` compound) to serve the parametrised 1/2/3/4-week
+analytics queries.
+
+### Migrations
+
+Generated with `npm run db:generate -w @pokekon/api`; `0002_*` adds the two
+tables and the `event_date` index. The PGlite test harness applies the real
+migration SQL, so the generated schema is exercised in CI.

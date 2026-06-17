@@ -268,3 +268,57 @@ sequenceDiagram
 ```
 
 Once a match log is linked to a snapshot, the recommendation engine can compare win rates across deck versions for the same opponent archetype.
+
+---
+
+## Server-side Battle-Log Pipeline (parse on write)
+
+The flows above are the browser's local-first paths. The backend (`apps/api`)
+adds a **parse-on-write** pipeline (plan §4): the expensive battle-log parse
+runs once when a log is saved, and the structured result is persisted so later
+analytics reads never re-parse.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Logs as POST/PATCH /api/logs
+    participant Parser as @pokekon/shared parseBattleLog
+    participant DB as PostgreSQL
+
+    Client->>Logs: save log { ..., battleLog, playerName }
+    Logs->>DB: INSERT/UPDATE opponent_logs
+    alt battleLog present
+        Logs->>Parser: parseBattleLog(battleLog, playerName)
+        Parser-->>Logs: turns + board state + turn-quality signals
+        Logs->>DB: UPSERT match_log_parsed (unique opponent_log_id)
+    else battleLog cleared
+        Logs->>DB: DELETE match_log_parsed for the log
+    end
+    Logs-->>Client: 201/200 (parse is best-effort, never blocks the write)
+```
+
+`playerName` pins which side is "me"; absent, the parser falls back to its
+heuristic player detection. The parse step is wrapped so a parser failure logs a
+warning but never fails the log write. Parsed rows cascade-delete with their
+`opponent_logs` row.
+
+## Deck Analytics Read Path
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as GET /api/analytics/deck/:id?weeks=
+    participant DB as PostgreSQL
+
+    Client->>API: getDeckAnalytics(deckId, weeks)
+    API->>API: verify deck ownership, validate weeks (1–4)
+    API->>DB: opponent_logs ⨝ match_log_parsed WHERE deck, user, event_date ≥ today − weeks·7d
+    DB-->>API: rows (result + parsed turn-quality fields)
+    API->>API: computeDeckAnalytics (pure)
+    API-->>Client: DeckAnalytics (record, going-first/second WR, setup %, dead-turn rate, prize curve)
+```
+
+The window filter is served by the new plain `event_date` index. The aggregation
+covers plan §3.7.1: going-first/second win rate, clean-setup-by-turn-2 share,
+dead-turn rate, and the average remaining-prize curve of won games. The response
+shape is the shared `DeckAnalytics` contract in `@pokekon/shared`.
