@@ -3,7 +3,11 @@ dist
 coverage
 package-lock.json
 apps/web/public
-docs
+/docs
 documents
 todo
 *.md
+
+# Astro (apps/docs) generated artifacts — content is synced from /docs at build time
+apps/docs/.astro
+apps/docs/src/content/docs
