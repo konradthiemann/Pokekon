@@ -15,6 +15,13 @@
       "when": 1781245384360,
       "tag": "0001_mute_mathemanic",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781687928372,
+      "tag": "0002_high_blue_marvel",
+      "breakpoints": true
     }
   ]
 }
