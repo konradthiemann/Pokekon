@@ -74,3 +74,10 @@ export const logsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
+
+// ─── Analytics ──────────────────────────────────────────────────────────────
+
+/** Time window for deck analytics — 1/2/3/4 weeks (plan §5.4), default 4. */
+export const analyticsQuerySchema = z.object({
+  weeks: z.coerce.number().int().min(1).max(4).default(4),
+});

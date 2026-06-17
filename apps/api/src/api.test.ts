@@ -458,3 +458,124 @@ describe('battle-log parse-on-write pipeline', () => {
     expect(await parsedRowFor(log.id)).toBeUndefined();
   });
 });
+
+// A second log where the opponent takes the first turn → player1 (Konrad) went second.
+const SECOND_TURN_LOG = `Vorbereitung
+GegnerX hat den Münzwurf gewonnen.
+Konrad hat für die Starthand 7 Karten gezogen.
+GegnerX hat für die Starthand 7 Karten gezogen.
+
+Zug von GegnerX
+GegnerX hat Iono gespielt.
+GegnerX hat Feuer-Energie an Glumanda angelegt.
+
+Zug von Konrad
+Konrad hat Nest Ball gespielt.
+
+GegnerX hat gewonnen!`;
+
+describe('GET /api/analytics/deck/:id', () => {
+  const today = new Date().toISOString().slice(0, 10);
+
+  type Analytics = {
+    deckId: number;
+    weeks: number;
+    record: { games: number; wins: number; losses: number; winRatePct: number | null };
+    goingFirst: { games: number; wins: number; winRatePct: number | null };
+    goingSecond: { games: number; wins: number; winRatePct: number | null };
+    setup: { parsedGames: number; cleanRatePct: number | null };
+    deadTurns: { parsedGames: number; avgPerGame: number | null };
+    prizeCurveWins: { turn: number; avgPrizesRemaining: number; games: number }[];
+  };
+
+  async function seedDeckWithLogs(): Promise<number> {
+    const deckId = await createDeck(USER_A);
+    const base = { archetype: 'charizard', eventType: 'Online', notes: '' };
+    // In-window: a went-first win, a went-second loss, and an unparsed win.
+    await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: {
+        ...base,
+        deckId,
+        eventDate: today,
+        result: 'W',
+        battleLog: SAMPLE_BATTLE_LOG,
+        playerName: 'Konrad',
+      },
+    });
+    await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: {
+        ...base,
+        deckId,
+        eventDate: today,
+        result: 'L',
+        battleLog: SECOND_TURN_LOG,
+        playerName: 'Konrad',
+      },
+    });
+    await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: { ...base, deckId, eventDate: today, result: 'W' },
+    });
+    // Out of the 4-week window: must be excluded.
+    await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: {
+        ...base,
+        deckId,
+        eventDate: '2020-01-01',
+        result: 'L',
+        battleLog: SAMPLE_BATTLE_LOG,
+        playerName: 'Konrad',
+      },
+    });
+    return deckId;
+  }
+
+  it('aggregates record and going-first/second win rates within the window', async () => {
+    const deckId = await seedDeckWithLogs();
+
+    const res = await request(`/api/analytics/deck/${deckId}?weeks=4`, { user: USER_A });
+    expect(res.status).toBe(200);
+    const a = (await res.json()) as Analytics;
+
+    // 3 in-window logs (the 2020 one is excluded).
+    expect(a.record.games).toBe(3);
+    expect(a.record.wins).toBe(2);
+    expect(a.record.losses).toBe(1);
+    expect(a.record.winRatePct).toBe(66.7);
+
+    // Turn-quality metrics only cover the 2 parsed in-window games.
+    expect(a.goingFirst).toMatchObject({ games: 1, wins: 1, winRatePct: 100 });
+    expect(a.goingSecond).toMatchObject({ games: 1, wins: 0, winRatePct: 0 });
+    expect(a.setup.parsedGames).toBe(2);
+    expect(a.deadTurns.parsedGames).toBe(2);
+    // The won, parsed game contributes a prize curve.
+    expect(a.prizeCurveWins.length).toBeGreaterThan(0);
+  });
+
+  it('excludes older games when the window is narrowed', async () => {
+    const deckId = await seedDeckWithLogs();
+    const res = await request(`/api/analytics/deck/${deckId}?weeks=1`, { user: USER_A });
+    const a = (await res.json()) as Analytics;
+    expect(a.weeks).toBe(1);
+    expect(a.record.games).toBe(3); // all in-window logs are "today"
+  });
+
+  it('rejects a weeks value outside 1–4 with 400', async () => {
+    const deckId = await createDeck(USER_A);
+    const res = await request(`/api/analytics/deck/${deckId}?weeks=9`, { user: USER_A });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 for another user's deck", async () => {
+    const deckId = await createDeck(USER_A);
+    const res = await request(`/api/analytics/deck/${deckId}`, { user: USER_B });
+    expect(res.status).toBe(404);
+  });
+});
