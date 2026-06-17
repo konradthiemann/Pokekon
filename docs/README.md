@@ -1,7 +1,9 @@
 # Pokemon TCG Meta Dashboard — Documentation Index
 
-This directory contains all technical documentation for the TCG Meta Dashboard project.
-The application source lives at `/Users/konrad.thiemann/tcg/tcg-dashboard/`.
+This directory contains all technical documentation for the Pokékon project.
+It is an npm-workspace monorepo: the frontend lives in `apps/web`, the
+Hono + PostgreSQL backend in `apps/api`, and this documentation site in
+`apps/docs` (Astro Starlight → GitHub Pages).
 
 ## Documents
 
@@ -17,23 +19,35 @@ The application source lives at `/Users/konrad.thiemann/tcg/tcg-dashboard/`.
 | [features.md](./features.md) | All app features explained: meta sync, battle log, deck comparison, recommendations, snapshots |
 | [getting-started.md](./getting-started.md) | Dev setup, build, deploy |
 
-> ⚠️ **Drift-Hinweis:** Die „Quick orientation" unten beschreibt die App noch als reines local-first SPA ohne Backend. Das ist veraltet — es existiert ein Hono+Postgres-Backend (`apps/api`), das ausgebaut wird. Siehe [backend-evolution-plan.md](./backend-evolution-plan.md) Abschnitt 1. Korrektur erfolgt beim Doku-Viewer-Aufbau.
-
 ## Quick orientation
 
-The app is a **local-first, single-page React application** with no backend server. All data is stored in the browser's IndexedDB via Dexie. Live tournament data is fetched from the public Limitless TCG API when the user explicitly triggers a sync.
+Pokékon is a **local-first React SPA backed by a Hono + PostgreSQL service**. The
+frontend (`apps/web`) keeps the IndexedDB/Dexie store and most analysis logic; the
+backend (`apps/api`, on Railway) handles auth (Better Auth) and CRUD today and is
+being expanded into the analytics backend. The migration "IndexedDB → API as the
+source of truth" is in progress — see [architecture.md](./architecture.md) and
+[backend-evolution-plan.md](./backend-evolution-plan.md) §1.
 
 ```
-tcg-dashboard/
-  src/
-    pages/          Five pages: Overview, Deck, Recommendations, Meta, Opponents
-    components/     UI components grouped by domain (deck/, meta/, opponent/, recommendations/, layout/)
-    store/          dashboardStore.ts — single Zustand store
-    db/             database.ts (Dexie schema), queries.ts (all DB operations)
-    lib/            Pure logic: metaFetch, deckComparison, battleLogParser, battleLogAnalysis,
-                    deckImport, deckPerformanceStats, preferences
-    hooks/          useRecommendations — the recommendation engine hook
-    types/          index.ts — all shared TypeScript types
-  .claude/
-    agents/         Eleven specialized Claude agents for different tasks
+apps/
+  web/                 React 19 + Vite frontend (local-first)
+    src/
+      pages/           Overview, Deck, Recommendations, Meta (+ embedded Opponents)
+      components/      UI by domain (deck/, meta/, opponent/, recommendations/, layout/)
+      store/           dashboardStore.ts — single Zustand store
+      db/              database.ts (Dexie schema), queries.ts (all DB operations)
+      lib/             Logic: metaFetch, deckComparison, battleLogParser,
+                       battleLogAnalysis, deckImport, deckPerformanceStats, api.ts
+      hooks/           useRecommendations — the recommendation engine hook
+      types/           index.ts — shared TypeScript types
+  api/                 Hono + Drizzle + PostgreSQL backend (Better Auth)
+    src/
+      app.ts           Hono app factory; routes: /health, /api/auth/*,
+                       /api/decks, /api/snapshots, /api/logs
+      auth.ts          Better Auth (email/password + optional Google)
+      db/schema.ts     Drizzle schema (Postgres tables)
+      static.ts        single-origin serving of the built web app
+  docs/                Astro Starlight documentation site (this content)
+.claude/
+  agents/              Specialized Claude agents for different tasks
 ```
