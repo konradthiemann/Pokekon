@@ -1,10 +1,14 @@
+// Encryption key for the AI-settings tests. crypto.ts reads ENCRYPTION_KEY lazily,
+// so this is in effect before the first encrypt/decrypt call.
+process.env.ENCRYPTION_KEY ??= '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
+
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { eq } from 'drizzle-orm';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from './app.js';
 import type { Db } from './db/index.js';
 import * as schema from './db/schema.js';
@@ -577,5 +581,126 @@ describe('GET /api/analytics/deck/:id', () => {
     const deckId = await createDeck(USER_A);
     const res = await request(`/api/analytics/deck/${deckId}`, { user: USER_B });
     expect(res.status).toBe(404);
+  });
+});
+
+describe('AI analysis (/api/analysis)', () => {
+  // A model response with one grounded item (evidence in the log) and one fabricated
+  // item (evidence absent) — the fabricated one must be filtered out server-side.
+  const ANALYSIS_LOG = `Zug von Konrad
+Konrad hat Iono gespielt.
+Konrad hat gewonnen!`;
+
+  function modelResponse(): Response {
+    const content = JSON.stringify({
+      playerName: 'Konrad',
+      opponentName: 'GegnerX',
+      summary: 'Konrad won.',
+      keyMoments: [
+        {
+          turn: 1,
+          observation: 'Played Iono',
+          evidence: 'Konrad hat Iono gespielt.',
+          impact: 'high',
+        },
+        {
+          turn: 2,
+          observation: 'Hallucinated',
+          evidence: 'This line does not exist',
+          impact: 'low',
+        },
+      ],
+      playMistakes: [],
+      cardNotes: [],
+      deckSuggestions: [],
+      analyzedAt: '2026-06-17T00:00:00.000Z',
+    });
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('stores a key (encrypted) and reports hasApiKey without ever returning the key', async () => {
+    const put = await request('/api/analysis/settings', {
+      user: USER_A,
+      method: 'PUT',
+      body: { provider: 'github-models', apiKey: 'ghp_secret_token', model: 'openai/gpt-4.1' },
+    });
+    expect(put.status).toBe(200);
+    expect(await put.json()).toEqual({
+      provider: 'github-models',
+      model: 'openai/gpt-4.1',
+      hasApiKey: true,
+    });
+
+    const get = await request('/api/analysis/settings', { user: USER_A });
+    const body = (await get.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({ provider: 'github-models', hasApiKey: true });
+    expect(JSON.stringify(body)).not.toContain('ghp_secret_token');
+
+    // The key is encrypted at rest (not stored as plaintext).
+    const [row] = await db
+      .select()
+      .from(schema.userAiSettings)
+      .where(eq(schema.userAiSettings.userId, USER_A));
+    expect(row?.encryptedApiKey).toMatch(/^v1:/);
+    expect(row?.encryptedApiKey).not.toContain('ghp_secret_token');
+  });
+
+  it('analyzes a log via the configured provider and drops ungrounded items', async () => {
+    await request('/api/analysis/settings', {
+      user: USER_A,
+      method: 'PUT',
+      body: { apiKey: 'ghp_secret_token' },
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue(modelResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await request('/api/analysis/log', {
+      user: USER_A,
+      method: 'POST',
+      body: { battleLog: ANALYSIS_LOG, playerName: 'Konrad' },
+    });
+    expect(res.status).toBe(200);
+    const analysis = (await res.json()) as {
+      playerName: string;
+      keyMoments: { observation: string }[];
+    };
+    expect(analysis.playerName).toBe('Konrad');
+    // Fabricated key moment filtered; only the grounded one survives.
+    expect(analysis.keyMoments).toHaveLength(1);
+    expect(analysis.keyMoments[0]?.observation).toBe('Played Iono');
+
+    // Called the GitHub Models endpoint with the decrypted key as a Bearer token.
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://models.github.ai/inference/chat/completions');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer ghp_secret_token');
+  });
+
+  it('returns 400 when the user has no API key configured', async () => {
+    const res = await request('/api/analysis/log', {
+      user: USER_B,
+      method: 'POST',
+      body: { battleLog: ANALYSIS_LOG, playerName: 'Konrad' },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('clears the stored key when an empty apiKey is sent', async () => {
+    await request('/api/analysis/settings', {
+      user: USER_A,
+      method: 'PUT',
+      body: { apiKey: 'ghp_secret_token' },
+    });
+    const cleared = await request('/api/analysis/settings', {
+      user: USER_A,
+      method: 'PUT',
+      body: { apiKey: '' },
+    });
+    expect(await cleared.json()).toMatchObject({ hasApiKey: false });
   });
 });

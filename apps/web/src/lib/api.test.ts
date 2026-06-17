@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   ApiError,
+  analyzeBattleLogViaApi,
   createDeckSnapshot,
+  getAiSettings,
   getDeckAnalytics,
   listDeckSnapshots,
   listAllLogs,
+  updateAiSettings,
 } from './api';
 import type { DeckCard } from '../types';
 
@@ -176,6 +179,57 @@ describe('getDeckAnalytics', () => {
     await getDeckAnalytics(1);
 
     expect(fetchMock).toHaveBeenCalledWith('/api/analytics/deck/1', expect.anything());
+  });
+});
+
+describe('AI analysis client', () => {
+  it('getAiSettings reads the settings endpoint', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ provider: 'github-models', model: null, hasApiKey: true }),
+    );
+    const settings = await getAiSettings();
+    expect(fetchMock).toHaveBeenCalledWith('/api/analysis/settings', expect.anything());
+    expect(settings).toEqual({ provider: 'github-models', model: null, hasApiKey: true });
+  });
+
+  it('updateAiSettings PUTs the provided fields', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ provider: 'github-models', model: null, hasApiKey: true }),
+    );
+    await updateAiSettings({ apiKey: 'ghp_abc' });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/analysis/settings');
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(init.body as string)).toEqual({ apiKey: 'ghp_abc' });
+  });
+
+  it('analyzeBattleLogViaApi POSTs the log + player name', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        playerName: 'Konrad',
+        opponentName: 'X',
+        summary: 's',
+        keyMoments: [],
+        playMistakes: [],
+        cardNotes: [],
+        deckSuggestions: [],
+        analyzedAt: '2026-06-17T00:00:00.000Z',
+      }),
+    );
+    const result = await analyzeBattleLogViaApi('Zug von Konrad', 'Konrad');
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/analysis/log');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      battleLog: 'Zug von Konrad',
+      playerName: 'Konrad',
+    });
+    expect(result.playerName).toBe('Konrad');
+  });
+
+  it('surfaces a 400 (no key configured) as an ApiError', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'No API key configured.' }, 400));
+    await expect(analyzeBattleLogViaApi('log', 'Konrad')).rejects.toBeInstanceOf(ApiError);
   });
 });
 

@@ -2,3 +2,4 @@
 // apps/api so the battle-log parser lives in exactly one place (no duplication).
 export * from './battleLogParser.js';
 export * from './analytics.js';
+export * from './battleAnalysis.js';
