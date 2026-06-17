@@ -1,4 +1,4 @@
-import { parseBattleLog } from './battleLogParser';
+import { parseBattleLog } from '@pokekon/shared';
 import type { OpponentLog, DeckPerformanceStats, CardPerformance } from '../types';
 
 function avg(arr: number[]): number {

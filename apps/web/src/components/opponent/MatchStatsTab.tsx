@@ -11,7 +11,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import type { ParsedBattleLog } from '../../lib/battleLogParser';
+import type { ParsedBattleLog } from '@pokekon/shared';
 
 // Brand: #d946ef  Opponent: #f87171  Neutral: #60a5fa
 

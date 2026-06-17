@@ -14,6 +14,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@pokekon/shared": "*",
     "@tanstack/react-query": "^5.99.0",
     "better-auth": "^1.6.16",
     "dexie": "^4.4.2",
