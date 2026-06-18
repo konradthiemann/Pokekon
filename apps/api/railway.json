@@ -5,6 +5,7 @@
     "buildCommand": "npm ci && npm run build -w @pokekon/api"
   },
   "deploy": {
+    "preDeployCommand": "npm run migrate:deploy -w @pokekon/api",
     "startCommand": "npm run start -w @pokekon/api",
     "healthcheckPath": "/health",
     "restartPolicyType": "ON_FAILURE"
