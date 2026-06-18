@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { LogOut, X } from 'lucide-react';
+import { Brain, LogOut, X } from 'lucide-react';
 import { authClient } from '../../lib/authClient';
 import { LanguageSwitcher } from '../layout/LanguageSwitcher';
+import { AiSettingsModal } from '../settings/AiSettingsModal';
 
 /**
  * Derives up to two initials from a display name (fallback: email) for the
@@ -30,6 +31,7 @@ export function MobileAccountSheet() {
   const { t } = useTranslation('auth');
   const { data: session } = authClient.useSession();
   const [open, setOpen] = useState(false);
+  const [showAiSettings, setShowAiSettings] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -99,6 +101,14 @@ export function MobileAccountSheet() {
                 </div>
               </div>
 
+              <button
+                onClick={() => setShowAiSettings(true)}
+                className="w-full flex items-center gap-2 px-3 py-2 mb-3 rounded-xl text-xs font-medium bg-white/[0.06] hover:bg-white/[0.10] text-white/70 hover:text-white/90 border border-white/[0.08] transition-colors"
+              >
+                <Brain className="w-3.5 h-3.5 text-brand-400" aria-hidden="true" />
+                {t('aiSettings.title')}
+              </button>
+
               <div className="flex items-center justify-between border-t border-white/[0.07] pt-4">
                 <LanguageSwitcher />
                 <button
@@ -113,6 +123,8 @@ export function MobileAccountSheet() {
           </div>,
           document.body,
         )}
+
+      {showAiSettings && <AiSettingsModal onClose={() => setShowAiSettings(false)} />}
     </>
   );
 }

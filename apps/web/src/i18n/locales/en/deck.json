@@ -132,6 +132,26 @@
     "noActiveDeck": "Cannot replace deck: no active deck selected."
   },
   "analytics": {
+    "turnQuality": {
+      "title": "Turn quality",
+      "subtitle": "server-side, from parsed logs",
+      "weeksLabel": "Time window",
+      "weeksShort": "{{count}}w",
+      "error": "Could not load analytics.",
+      "empty": "No parsed logs in this window yet. Log matches with a battle log to see turn-quality metrics.",
+      "winRate": "Win rate",
+      "goingFirst": "Going first",
+      "goingSecond": "Going second",
+      "setupClean": "Clean setup (by turn 2)",
+      "deadTurns": "Dead turns / game",
+      "prizeCurve": "Prize curve (wins)",
+      "prizeCurveHint": "avg. remaining prizes per turn in won games",
+      "turn": "Turn {{turn}}",
+      "games_one": "{{count}} game",
+      "games_other": "{{count}} games",
+      "parsedGames_one": "{{count}} with log",
+      "parsedGames_other": "{{count}} with log"
+    },
     "noDecks": "No decks yet. Create your first deck above.",
     "overallTitle": "{{name}} — Overall",
     "variantsCombined_one": "· {{count}} variant combined",

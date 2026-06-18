@@ -132,6 +132,26 @@
     "noActiveDeck": "Deck kann nicht ersetzt werden: kein aktives Deck ausgewählt."
   },
   "analytics": {
+    "turnQuality": {
+      "title": "Zug-Qualität",
+      "subtitle": "serverseitig aus geparsten Logs",
+      "weeksLabel": "Zeitraum",
+      "weeksShort": "{{count}} Wo.",
+      "error": "Analytics konnten nicht geladen werden.",
+      "empty": "Noch keine geparsten Logs in diesem Zeitraum. Logge Matches mit Battle-Log, um Zug-Qualitäts-Kennzahlen zu sehen.",
+      "winRate": "Siegrate",
+      "goingFirst": "Anziehen (1.)",
+      "goingSecond": "Nachziehen (2.)",
+      "setupClean": "Sauberes Setup (bis Zug 2)",
+      "deadTurns": "Dead Turns / Spiel",
+      "prizeCurve": "Preiskarten-Kurve (Siege)",
+      "prizeCurveHint": "Ø verbleibende Preiskarten je Zug in gewonnenen Spielen",
+      "turn": "Zug {{turn}}",
+      "games_one": "{{count}} Spiel",
+      "games_other": "{{count}} Spiele",
+      "parsedGames_one": "{{count}} mit Log",
+      "parsedGames_other": "{{count}} mit Log"
+    },
     "noDecks": "Noch keine Decks. Erstelle oben dein erstes Deck.",
     "overallTitle": "{{name}} — Gesamt",
     "variantsCombined_one": "· {{count}} Variante kombiniert",
