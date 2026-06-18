@@ -29,6 +29,8 @@ export interface Env {
   readonly databaseUrl: string;
   /** Better Auth signing secret. Required in production — throws when missing there. */
   readonly betterAuthSecret: string | undefined;
+  /** AES key (32 bytes, hex/base64) for encrypting per-user LLM API keys. Throws when accessed unset. */
+  readonly encryptionKey: string;
 }
 
 function nonEmpty(value: string | undefined): string | undefined {
@@ -70,6 +72,16 @@ export function getEnv(): Env {
         throw new Error('BETTER_AUTH_SECRET is required in production.');
       }
       return secret;
+    },
+
+    get encryptionKey(): string {
+      const key = nonEmpty(process.env.ENCRYPTION_KEY);
+      if (key === undefined) {
+        throw new Error(
+          'ENCRYPTION_KEY is not set. It is required to encrypt per-user LLM API keys at rest (32 bytes, hex or base64).',
+        );
+      }
+      return key;
     },
   };
 }

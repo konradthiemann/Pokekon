@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { cardTypeValues, cardRoleValues, eventTypeValues, matchResultValues } from './db/schema.js';
+import {
+  aiProviderValues,
+  cardTypeValues,
+  cardRoleValues,
+  eventTypeValues,
+  matchResultValues,
+} from './db/schema.js';
 
 // ─── Decks ────────────────────────────────────────────────────────────────────
 
@@ -80,4 +86,25 @@ export const logsQuerySchema = z.object({
 /** Time window for deck analytics — 1/2/3/4 weeks (plan §5.4), default 4. */
 export const analyticsQuerySchema = z.object({
   weeks: z.coerce.number().int().min(1).max(4).default(4),
+});
+
+// ─── LLM analysis (B6) ────────────────────────────────────────────────────────
+
+/**
+ * Upsert per-user AI settings. All fields optional (partial update):
+ * - `apiKey` omitted → keep the stored key; `""` → clear it; otherwise → (re)encrypt.
+ * - `model` `""`/null → use the adapter default.
+ */
+export const aiSettingsPutSchema = z
+  .object({
+    provider: z.enum(aiProviderValues).optional(),
+    model: z.string().max(100).nullish(),
+    apiKey: z.string().max(400).nullish(),
+  })
+  .refine((b) => Object.keys(b).length > 0, { message: 'At least one field is required' });
+
+/** Body for POST /api/analysis/log — the raw battle log and the local player's name. */
+export const analyzeLogSchema = z.object({
+  battleLog: z.string().min(1),
+  playerName: z.string().min(1).max(100),
 });

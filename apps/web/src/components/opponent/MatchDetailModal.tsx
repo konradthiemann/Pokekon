@@ -15,12 +15,11 @@ import {
 } from 'lucide-react';
 import type { OpponentLog, BattleAnalysis, BattleAnalysisPlay, DeckCard } from '../../types';
 import { updateOpponentLog, getDeckSnapshotById, parseDeckSnapshot } from '../../db/queries';
-import { analyzeBattleLog } from '../../lib/battleLogAnalysis';
+import { analyzeBattleLogViaApi, getAiSettings, updateAiSettings } from '../../lib/api';
 import { parseBattleLog } from '@pokekon/shared';
 import { MatchStatsTab } from './MatchStatsTab';
 import { useDashboardStore } from '../../store/dashboardStore';
 
-const LS_API_KEY = 'tcg-anthropic-key';
 const LS_PLAYER = 'tcg-player-name';
 
 interface Props {
@@ -220,10 +219,19 @@ export function MatchDetailModal({ log, onClose }: Props) {
   const [logDirty, setLogDirty] = useState(false);
   const [savingLog, setSavingLog] = useState(false);
 
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem(LS_API_KEY) ?? '');
+  // The LLM key lives server-side (encrypted, BYOK). `apiKey` is only the value being
+  // entered now; `hasApiKey` reflects whether a key is already stored on the server.
+  const [apiKey, setApiKey] = useState('');
+  const [hasApiKey, setHasApiKey] = useState(false);
   const [playerName, setPlayerName] = useState(() => localStorage.getItem(LS_PLAYER) ?? '');
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getAiSettings()
+      .then((s) => setHasApiKey(s.hasApiKey))
+      .catch(() => setHasApiKey(false));
+  }, []);
 
   const storedAnalysis: BattleAnalysis | null = (() => {
     try {
@@ -276,18 +284,23 @@ export function MatchDetailModal({ log, onClose }: Props) {
   }, [log.id, battleLog, refresh]);
 
   const handleAnalyze = useCallback(async () => {
-    if (!battleLog.trim() || !apiKey.trim() || !playerName.trim()) return;
+    if (!battleLog.trim() || !playerName.trim() || (!apiKey.trim() && !hasApiKey)) return;
     setAnalyzing(true);
     setAnalysisError(null);
-    localStorage.setItem(LS_API_KEY, apiKey);
     localStorage.setItem(LS_PLAYER, playerName);
     try {
+      // Persist a newly entered key server-side (encrypted), then forget it locally.
+      if (apiKey.trim()) {
+        await updateAiSettings({ apiKey: apiKey.trim() });
+        setApiKey('');
+        setHasApiKey(true);
+      }
       // Save log first if dirty
       if (logDirty && log.id != null) {
         await updateOpponentLog(log.id, { battleLog: battleLog.trim() });
         setLogDirty(false);
       }
-      const result = await analyzeBattleLog(battleLog, playerName, apiKey);
+      const result = await analyzeBattleLogViaApi(battleLog, playerName);
       setAnalysis(result);
       if (log.id != null) {
         await updateOpponentLog(log.id, { analysis: JSON.stringify(result) });
@@ -299,7 +312,7 @@ export function MatchDetailModal({ log, onClose }: Props) {
     } finally {
       setAnalyzing(false);
     }
-  }, [battleLog, apiKey, playerName, logDirty, log.id, refresh]);
+  }, [battleLog, apiKey, hasApiKey, playerName, logDirty, log.id, refresh]);
 
   const resultBadge =
     log.result === 'W' ? 'badge-win' : log.result === 'L' ? 'badge-loss' : 'badge-tie';
@@ -533,9 +546,14 @@ export function MatchDetailModal({ log, onClose }: Props) {
                       type="password"
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="sk-ant-…"
+                      placeholder={
+                        hasApiKey ? '•••••••• (gespeichert)' : 'GitHub Models Token (ghp_…)'
+                      }
                       className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 font-mono"
                     />
+                    <p className="mt-1 text-[10px] text-gray-600">
+                      Wird serverseitig verschlüsselt gespeichert, nie im Browser.
+                    </p>
                   </div>
                 </div>
                 {!battleLog.trim() && (
@@ -543,7 +561,12 @@ export function MatchDetailModal({ log, onClose }: Props) {
                 )}
                 <button
                   onClick={handleAnalyze}
-                  disabled={!battleLog.trim() || !apiKey.trim() || !playerName.trim() || analyzing}
+                  disabled={
+                    !battleLog.trim() ||
+                    !playerName.trim() ||
+                    (!apiKey.trim() && !hasApiKey) ||
+                    analyzing
+                  }
                   className="btn-primary text-xs disabled:opacity-40"
                 >
                   {analyzing ? (

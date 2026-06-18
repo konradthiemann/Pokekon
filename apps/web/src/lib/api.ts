@@ -1,4 +1,4 @@
-import type { DeckAnalytics } from '@pokekon/shared';
+import type { AiSettings, BattleAnalysis, DeckAnalytics } from '@pokekon/shared';
 import type { CardRole, CardType, Deck, DeckCard, DeckSnapshot, OpponentLog } from '../types';
 
 /**
@@ -335,4 +335,37 @@ export async function getDeckAnalytics(
 ): Promise<DeckAnalytics> {
   const query = weeks === undefined ? '' : `?weeks=${weeks}`;
   return request<DeckAnalytics>(`/api/analytics/deck/${deckId}${query}`);
+}
+
+// ─── AI analysis (server-side, BYOK) ──────────────────────────────────────────
+
+/** Read the current user's AI settings (provider/model + whether a key is stored). */
+export async function getAiSettings(): Promise<AiSettings> {
+  return request<AiSettings>('/api/analysis/settings');
+}
+
+/**
+ * Update AI settings. `apiKey` is stored server-side encrypted and never returned:
+ * omit it to keep the existing key, send `""` to clear it, or a value to (re)set it.
+ */
+export async function updateAiSettings(body: {
+  provider?: string;
+  model?: string | null;
+  apiKey?: string | null;
+}): Promise<AiSettings> {
+  return request<AiSettings>('/api/analysis/settings', {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Run the server-side LLM analysis on a battle log (key stays on the server). */
+export async function analyzeBattleLogViaApi(
+  battleLog: string,
+  playerName: string,
+): Promise<BattleAnalysis> {
+  return request<BattleAnalysis>('/api/analysis/log', {
+    method: 'POST',
+    body: JSON.stringify({ battleLog, playerName }),
+  });
 }

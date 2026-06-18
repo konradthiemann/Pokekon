@@ -120,9 +120,12 @@ export const cardRoleValues = [
 ] as const;
 export const eventTypeValues = ['LC', 'LCup', 'Regional', 'Worlds', 'Online'] as const;
 export const matchResultValues = ['W', 'L', 'T'] as const;
+/** LLM analysis providers. GitHub Models is the default; further adapters can be added later. */
+export const aiProviderValues = ['github-models'] as const;
 
 export type CardType = (typeof cardTypeValues)[number];
 export type CardRole = (typeof cardRoleValues)[number];
+export type AiProvider = (typeof aiProviderValues)[number];
 export type EventType = (typeof eventTypeValues)[number];
 export type MatchResult = (typeof matchResultValues)[number];
 
@@ -308,3 +311,21 @@ export const matchLogParsedRelations = relations(matchLogParsed, ({ one }) => ({
     references: [opponentLogs.id],
   }),
 }));
+
+// ─── Per-user LLM analysis settings (BYOK) ───────────────────────────────────
+// The API key is stored AES-256-GCM-encrypted (see lib/crypto.ts) and is only
+// ever decrypted server-side for the analysis call — never returned to clients.
+
+export const userAiSettings = pgTable('user_ai_settings', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  provider: text('provider', { enum: aiProviderValues }).default('github-models').notNull(),
+  model: text('model'), // null → adapter default
+  encryptedApiKey: text('encrypted_api_key'), // null → no key configured
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});

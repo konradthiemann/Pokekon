@@ -104,38 +104,15 @@ export interface DeckPerformanceStats {
 }
 
 // ─── Battle log analysis types ────────────────────────────────────────────────
+// Defined once in @pokekon/shared (the API produces them, the web renders them);
+// re-exported here so existing `../types` imports keep working.
 
-export interface BattleAnalysisPlay {
-  turn: number;
-  observation: string;
-  evidence: string;
-  suggestion?: string;
-  impact: 'high' | 'medium' | 'low';
-}
-
-export interface BattleAnalysisCardNote {
-  card: string;
-  observation: string;
-  evidence: string;
-  deckSuggestion?: 'add' | 'remove' | 'increase' | 'decrease' | null;
-  deckSuggestionReason?: string;
-}
-
-export interface BattleAnalysis {
-  playerName: string;
-  opponentName: string;
-  summary: string;
-  keyMoments: BattleAnalysisPlay[];
-  playMistakes: BattleAnalysisPlay[];
-  cardNotes: BattleAnalysisCardNote[];
-  deckSuggestions: {
-    action: 'add' | 'remove' | 'increase' | 'decrease';
-    card: string;
-    reasoning: string;
-    evidence: string;
-  }[];
-  analyzedAt: string;
-}
+export type {
+  BattleAnalysis,
+  BattleAnalysisPlay,
+  BattleAnalysisCardNote,
+  BattleAnalysisDeckSuggestion,
+} from '@pokekon/shared';
 
 export interface MetaSnapshot {
   id?: number;
