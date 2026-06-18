@@ -277,8 +277,23 @@ index.
 `(archetype, event_date)` compound) to serve the parametrised 1/2/3/4-week
 analytics queries.
 
+### Table: `user_ai_settings`
+
+Per-user LLM-analysis settings (BYOK). The API key is stored **AES-256-GCM
+encrypted** (`apps/api/src/lib/crypto.ts`, server key from `ENCRYPTION_KEY`) and
+is only decrypted server-side for the analysis call — never returned to clients.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `user_id` | text PK FK → `user.id` | one settings row per user, `onDelete: cascade` |
+| `provider` | text | default `github-models` (only adapter today) |
+| `model` | text (nullable) | null → adapter default (`openai/gpt-4.1`) |
+| `encrypted_api_key` | text (nullable) | `v1:iv:tag:ciphertext`; null → no key configured |
+| `created_at` / `updated_at` | timestamptz | |
+
 ### Migrations
 
-Generated with `npm run db:generate -w @pokekon/api`; `0002_*` adds the two
-tables and the `event_date` index. The PGlite test harness applies the real
-migration SQL, so the generated schema is exercised in CI.
+Generated with `npm run db:generate -w @pokekon/api`: `0002_*` adds
+`match_log_parsed` + `meta_snapshots` + the `event_date` index; `0003_*` adds
+`user_ai_settings`. The PGlite test harness applies the real migration SQL, so the
+generated schema is exercised in CI.

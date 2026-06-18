@@ -70,7 +70,7 @@ flowchart TD
     subgraph Browser["Browser — apps/web (React SPA)"]
         UI["Pages & Components"]
         Store["dashboardStore (Zustand)"]
-        Logic["src/lib (analysis logic)<br/>metaFetch · deckComparison<br/>battleLogParser · battleLogAnalysis<br/>deckPerformanceStats · deckImport"]
+        Logic["src/lib (analysis logic)<br/>metaFetch · deckComparison<br/>deckPerformanceStats · deckImport"]
         ApiClient["api.ts (typed REST client)"]
         Dexie["Dexie / IndexedDB<br/>(local-first store)"]
     end
@@ -78,7 +78,8 @@ flowchart TD
     subgraph Server["Railway — apps/api (Hono)"]
         Health["/health (DB-free)"]
         AuthH["/api/auth/* (Better Auth)"]
-        ApiRoutes["/api/decks · /api/snapshots · /api/logs<br/>(session-guarded)"]
+        ApiRoutes["/api/decks · /api/snapshots · /api/logs<br/>/api/analytics · /api/analysis<br/>(session-guarded)"]
+        AiLayer["ai/ provider abstraction<br/>(GitHub Models adapter)"]
         Static["Static serving of built SPA<br/>(single-origin)"]
         Drizzle["Drizzle ORM"]
     end
@@ -90,7 +91,7 @@ flowchart TD
     subgraph External["External"]
         LimitlessAPI["Limitless TCG API"]
         CORSProxy["corsproxy.io (legacy fallback)"]
-        ClaudeAPI["LLM provider API"]
+        LLMProvider["LLM provider API<br/>(GitHub Models)"]
     end
 
     UI --> Store
@@ -101,11 +102,12 @@ flowchart TD
     ApiClient -->|sign-in / session| AuthH
     Static -.serves.-> UI
     ApiRoutes --> Drizzle
+    ApiRoutes -->|battle-log analysis| AiLayer
+    AiLayer -->|"server-side, BYOK key"| LLMProvider
     AuthH --> Drizzle
     Drizzle --> PG
     Logic -->|legacy, browser-side| LimitlessAPI
     Logic --> CORSProxy
-    Logic -->|legacy, moving server-side| ClaudeAPI
 ```
 
 > Dashed arrow: in production the API process also serves the built web app, so
@@ -129,7 +131,18 @@ Registration order matters:
    so sign-in works without an existing session.
 4. **Guarded `/api` sub-app** — a `sessionMiddleware` runs first, then `db` is
    injected into the context, then the domain routes mount:
-   `/api/decks`, `/api/snapshots`, `/api/logs`.
+   `/api/decks`, `/api/snapshots`, `/api/logs`, `/api/analytics`, `/api/analysis`.
+
+**Battle-log pipeline & analytics** — `POST /api/logs` parses the log server-side
+once on write into `match_log_parsed` (plan §4); `GET /api/analytics/deck/:id?weeks=`
+reads the turn-quality aggregates. See [data-flow.md](./data-flow.md).
+
+**LLM analysis** ([ai/](../apps/api/src/ai/)): a provider-agnostic `AnalysisProvider`
+abstraction (GitHub Models adapter today) powers `POST /api/analysis/log`. The
+per-user API key is stored AES-256-GCM-encrypted ([lib/crypto.ts](../apps/api/src/lib/crypto.ts),
+key from `ENCRYPTION_KEY`) in `user_ai_settings` and only decrypted server-side —
+never sent to the browser. Anti-hallucination (verbatim evidence, `temperature=0`)
+lives in the shared engine so every provider is grounded.
 
 **Auth** ([auth.ts](../apps/api/src/auth.ts)): Better Auth with the Drizzle
 adapter (`provider: 'pg'`). Email + password is always on (password reset emails
@@ -141,8 +154,9 @@ process serves the built web SPA (`apps/web/dist`, overridable via
 `WEB_DIST_PATH`), so the browser talks to exactly one origin for both the app
 shell and `/api/*` and the session cookie remains first-party.
 
-**Secrets** (`DATABASE_URL`, Better-Auth secret, Resend key, future LLM keys) are
-Railway variables — never in the browser bundle.
+**Secrets** (`DATABASE_URL`, Better-Auth secret, Resend key, `ENCRYPTION_KEY` for
+per-user LLM keys) are Railway variables — never in the browser bundle. User LLM
+keys themselves are BYOK: entered by the user, stored encrypted, server-side only.
 
 ---
 
@@ -215,7 +229,9 @@ stores coexist:
 | Data | Storage | Notes |
 |------|---------|-------|
 | Decks, cards, logs, snapshots | PostgreSQL via `apps/api` | server-side source of truth (target state) |
+| Parsed logs, meta snapshots, AI settings | PostgreSQL (`match_log_parsed`, `meta_snapshots`, `user_ai_settings`) | server-side; see [database.md](./database.md) |
 | Decks, cards, logs, snapshots, meta | IndexedDB via Dexie (`TCGMetaDashboard`) | local-first store, still authoritative for parts of the app |
+| LLM API key | PostgreSQL (`user_ai_settings`, AES-256-GCM encrypted) | BYOK, server-side only — never localStorage |
 | Active deck ID | localStorage (`tcg-active-deck-id-v3`) | UI preference |
 | Local meta archetypes | localStorage (`tcg-local-meta-v1`) | UI preference |
 | Deck archetype slug | localStorage (`tcg-deck-arch-slug-v1`) | UI preference |
@@ -228,8 +244,9 @@ boundary adapters between the client types and the wire format
 (`DeckSnapshot.cards` string ↔ jsonb array, the `DeckCard.cardId` sentinel,
 `null` ↔ `undefined` for optional log columns).
 
-`metaSnapshots` currently exists **only** in IndexedDB; bringing it server-side is
-the first backend step (plan §5.1).
+The `meta_snapshots` table now exists server-side (plan §5.1), but the sync job
+that populates it is still the browser-side `metaFetch.ts` — porting that to a
+server cron (plan §6.2) is the next migration step.
 
 ---
 
@@ -238,10 +255,11 @@ the first backend step (plan §5.1).
 - **Limitless TCG API** — `metaFetch.ts` and `deckComparison.ts` fetch directly,
   falling back to `corsproxy.io` on CORS/HTTP failure. This browser-side path is
   legacy: it moves to a server-side cron job (no CORS proxy needed) per plan §6.2.
-- **LLM analysis** — `battleLogAnalysis.ts` currently calls an LLM provider from
-  the browser with a user-entered key. This is acknowledged tech debt
-  ("Alt-Schuld"): it moves server-side and provider-agnostic, key never in the
-  bundle, per plan §6.3 / CLAUDE.md golden rule 3.
+- **LLM analysis** — now **server-side and provider-agnostic** ([ai/](../apps/api/src/ai/),
+  `POST /api/analysis/log`). The default provider is GitHub Models; the per-user
+  API key is BYOK, stored encrypted server-side and never in the browser bundle
+  (plan §6.3 / CLAUDE.md golden rule 3). The former browser-side
+  `battleLogAnalysis.ts` has been removed.
 
 ---
 

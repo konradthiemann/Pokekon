@@ -181,34 +181,44 @@ The slug matching uses bidirectional substring matching: `"n-zoroark"` matches a
 
 ---
 
-## Battle Log Analysis (Claude AI)
+## Battle Log Analysis (LLM, server-side · BYOK)
+
+The LLM analysis runs **server-side** behind a provider abstraction (plan §6.3 Phase A).
+The user's API key is stored encrypted in PostgreSQL and only decrypted on the
+server for the call — it never reaches the browser. The default (and currently
+only) provider is **GitHub Models**. Anti-hallucination is enforced by the shared
+engine: every `evidence` field must be a verbatim log quote, suggestions only for
+cards shown in hand, `temperature=0`, and ungrounded items are dropped.
 
 ```mermaid
 sequenceDiagram
     participant User
     participant MatchDetailModal
-    participant BattleAI as battleLogAnalysis.ts
-    participant BattleParser as battleLogParser.ts
-    participant Claude as Anthropic API
+    participant API as POST /api/analysis/log
+    participant DB as PostgreSQL
+    participant Engine as @pokekon/shared (analysis engine)
+    participant LLM as GitHub Models
 
-    User->>MatchDetailModal: Open match with battle log
-    User->>MatchDetailModal: Click "Analyze with AI" + enter API key
-    MatchDetailModal->>BattleParser: parseBattleLog(rawText, playerName)
-    BattleParser->>BattleParser: detectPlayers() — frequency analysis on German action lines
-    BattleParser->>BattleParser: Split into turn blocks at "Zug von " markers
-    BattleParser->>BattleParser: Parse each turn: cards played, damage, KOs, prizes
-    BattleParser-->>MatchDetailModal: ParsedBattleLog
-    MatchDetailModal->>BattleAI: analyzeBattleLog(rawText, playerName, apiKey)
-    BattleAI->>BattleAI: extractRevealedCards() — find bullet-point card listings
-    BattleAI->>Claude: POST /v1/messages {model: claude-opus-4-6, temperature: 0}
-    Claude-->>BattleAI: JSON response
-    BattleAI->>BattleAI: Validate evidence fields — drop items not found in raw log
-    BattleAI-->>MatchDetailModal: BattleAnalysis
-    MatchDetailModal->>DB: updateOpponentLog(id, {analysis: JSON.stringify(result)})
-    MatchDetailModal-->>User: Show key moments, mistakes, card notes, suggestions
+    User->>MatchDetailModal: Open match, enter GitHub Models token (once)
+    MatchDetailModal->>API: PUT /api/analysis/settings { apiKey } (encrypted at rest)
+    User->>MatchDetailModal: Click "Analyze"
+    MatchDetailModal->>API: analyzeBattleLogViaApi(battleLog, playerName)
+    API->>DB: load user_ai_settings (provider, model, encrypted key)
+    API->>API: decryptSecret(encrypted key)  [lib/crypto.ts, AES-256-GCM]
+    API->>Engine: buildAnalysisPrompts(log, playerName) + extractRevealedCards
+    API->>LLM: POST chat/completions { temperature: 0, response_format: json_object }
+    LLM-->>API: JSON analysis
+    API->>Engine: validateAnalysis() — drop items whose evidence isn't in the log
+    API-->>MatchDetailModal: BattleAnalysis (grounded)
+    MatchDetailModal->>DB: updateOpponentLog(id, { analysis }) (IndexedDB)
+    MatchDetailModal-->>User: key moments, mistakes, card notes, suggestions
 ```
 
-The battle log protocol is in **German** (exported from Pokemon TCG Live). Turn boundaries are marked by `"Zug von "` lines. Player detection uses frequency analysis on action lines matching `"Name hat ..."` patterns, filtering out German stop-words.
+The battle log protocol is in **German** (exported from Pokémon TCG Live). Turn
+boundaries are marked by `"Zug von "` lines; player detection uses frequency
+analysis on `"Name hat ..."` lines, filtering German stop-words. Activation requires
+the `ENCRYPTION_KEY` server variable and a per-user GitHub Models token (see
+[getting-started.md](./getting-started.md)).
 
 ---
 
