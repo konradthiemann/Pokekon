@@ -1,22 +1,36 @@
 # Getting Started
 
+Pokékon is an npm-workspace monorepo:
+
+| Workspace | Stack | Role |
+|-----------|-------|------|
+| `apps/web` | React 19 · Vite · Zustand · Dexie | frontend UI |
+| `apps/api` | Hono · Drizzle · PostgreSQL · Better Auth | API + auth, serves the SPA in prod |
+| `apps/docs` | Astro · Starlight | this documentation site (GitHub Pages) |
+| `packages/shared` | TypeScript | `@pokekon/shared` — battle-log parser, analytics/meta types, analysis engine |
+
+Domain data (decks, cards, snapshots, match logs) and the tournament meta live
+**server-side in PostgreSQL** behind the REST API; the browser talks to it via a
+session cookie. (IndexedDB remains only as a legacy local cache for the one-time
+import of pre-account data.)
+
+---
+
 ## Prerequisites
 
 - **Node.js** 22 or later (the repo targets Node ≥ 22)
 - **npm** 9 or later (comes with Node)
-- A modern browser (Chrome, Firefox, Edge, Safari) — IndexedDB support required
-
-The frontend (`apps/web`) runs entirely in the browser (local-first) and needs no
-backend for local development. The API (`apps/api`, Hono + PostgreSQL on Railway)
-is required only for auth and the server-side features (analytics, LLM analysis);
-see [API server environment](#api-server-environment-appsapi).
+- A modern browser (Chrome, Firefox, Edge, Safari)
+- For the API: a **PostgreSQL** database (`DATABASE_URL`) — or point the web dev
+  server at the deployed API (see [Development](#development)).
 
 ---
 
 ## Installation
 
+From the repository root (installs all workspaces):
+
 ```bash
-cd /Users/konrad.thiemann/tcg/tcg-dashboard
 npm install
 ```
 
@@ -24,218 +38,159 @@ npm install
 
 ## Development
 
+Because domain data is session-scoped behind the API, the web app needs an API
+to talk to. Two options:
+
+**Option A — proxy to the deployed API (no local Postgres):**
 ```bash
-npm run dev
+# apps/web/.env.local
+VITE_API_PROXY_TARGET=https://<your-api>.up.railway.app
+```
+```bash
+npm run dev          # web on http://localhost:5173, /api proxied to the target
+```
+The Vite proxy rewrites the cookie domain so the Better Auth session works.
+
+**Option B — full local stack:**
+```bash
+# apps/api/.env  (DATABASE_URL + BETTER_AUTH_SECRET at minimum)
+npm run db:migrate -w @pokekon/api   # apply migrations to your local DB
+npm run dev:api                       # API on http://localhost:8080
+npm run dev                           # web on http://localhost:5173 (proxy → :8080)
 ```
 
-Starts Vite's dev server. Open [http://localhost:5173](http://localhost:5173) in your browser.
-
-The first time the app loads in a fresh browser profile, it seeds IndexedDB with a demo deck and some example data so the UI is not empty.
-
-**Hot module replacement (HMR) is active** — saving any file in `src/` immediately reflects in the browser without a full page reload. IndexedDB state is preserved across HMR updates.
+Then sign in (or create an account) — domain data starts empty for a new account.
+Hot module replacement is active for the web app.
 
 ---
 
-## Available Scripts
+## Available Scripts (root)
 
-| Script | Command | What it does |
-|--------|---------|-------------|
-| Dev server | `npm run dev` | Start Vite dev server on port 5173 |
-| Build | `npm run build` | TypeScript compile + Vite production build → `dist/` |
-| Preview | `npm run preview` | Serve the production build locally for final checks |
-| Lint | `npm run lint` | ESLint with TypeScript rules |
+| Script | What it does |
+|--------|--------------|
+| `npm run dev` | Web dev server (Vite, port 5173) |
+| `npm run dev:api` | API dev server (tsx watch, port 8080) |
+| `npm run build` | Build all workspaces (shared → web/api/docs) |
+| `npm run lint` | ESLint across workspaces |
+| `npm run typecheck` | Type-check across workspaces |
+| `npm run test` | Vitest across workspaces |
+| `npm run format` / `format:check` | Prettier write / check |
 
----
-
-## Production Build
-
-```bash
-npm run build
-```
-
-Output is written to `tcg-dashboard/dist/`. The output is a fully static site — a single `index.html` with bundled JS and CSS assets. No server needed.
-
-To verify the build works correctly before deploying:
-```bash
-npm run preview
-```
-This serves `dist/` via Vite's preview server (default: [http://localhost:4173](http://localhost:4173)).
+API-only: `db:generate` / `db:migrate` (Drizzle), `job:sync-meta` (meta cron),
+`migrate:deploy` (programmatic migrator used on deploy).
 
 ---
 
 ## Deployment
 
-The frontend (`apps/web`) is a static bundle. In production it is served by the
-**API process** (`apps/api`) on Railway from a single origin (so the Better Auth
-session cookie stays first-party). The static-host options below still work for a
-frontend-only / API-less deployment.
+Production runs on **Railway, single-origin**: the API process (`apps/api`) serves
+both `/api/*` and the built web SPA, so the Better Auth session cookie stays
+first-party. Deploys are gated by CI (`.github/workflows/deploy.yml`: typecheck +
+test → `railway up`), and migrations run automatically via the `preDeployCommand`
+in `railway.json`.
 
 ### API server environment (`apps/api`)
 
-The API reads these environment variables (Railway variables — never in the bundle):
+Railway variables (never in the browser bundle):
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `DATABASE_URL` | yes (for any `/api` DB access) | PostgreSQL connection string |
+| `DATABASE_URL` | yes | PostgreSQL connection string |
 | `BETTER_AUTH_SECRET` | yes in production | Better Auth signing secret |
-| `ENCRYPTION_KEY` | for LLM analysis | 32-byte AES key encrypting per-user LLM keys — `openssl rand -hex 32` |
+| `ENCRYPTION_KEY` | for LLM analysis | 32-byte AES key for per-user LLM keys — `openssl rand -hex 32` |
 | `WEB_ORIGIN` | split-origin only | allowed browser origin for CORS |
 | `RESEND_API_KEY`, `EMAIL_FROM` | optional | transactional email (else logged to stdout) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | optional | enables Google OAuth |
 
-Migrations run via `npm run db:migrate -w @pokekon/api` (Railway pre-deploy).
-Without `ENCRYPTION_KEY` the app still runs — only the AI-analysis endpoints error
-when used; everything else is unaffected.
-
-### Static frontend hosting
-
-Because the web bundle is static, it can also be deployed to any static file host:
-
-**Option A — Netlify / Vercel / GitHub Pages:**
-```bash
-npm run build
-# Then deploy the dist/ folder via the platform's CLI or drag-and-drop
-```
-
-For Netlify, add a `netlify.toml` with a redirect rule to handle single-page app routing:
-```toml
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-```
-
-**Option B — Any web server (nginx, Apache, Caddy):**
-Copy the contents of `dist/` to your web root. Configure the server to serve `index.html` for all routes.
-
-**Option C — Local file:**
-Opening `dist/index.html` directly from the filesystem (`file://` protocol) does not work reliably because browsers restrict IndexedDB on `file://` origins. Use a local server (`npm run preview` or `npx serve dist`).
+CI deploy needs a repo secret `RAILWAY_TOKEN` (Railway project token). The docs
+site deploys separately to GitHub Pages via `.github/workflows/docs.yml`.
 
 ---
 
 ## First Use
 
-1. Open the app — a demo deck is seeded automatically on first load.
-2. Go to **Deck** → replace the demo cards with your real deck via "Import" (paste your PTCG export list).
-3. Set your archetype in **Deck Settings**: enter the display name (e.g., "N's Zoroark") and the Limitless slug (e.g., `n-zoroark`).
-4. Go to **Sidebar** and click **Sync Live Meta** to fetch current tournament data.
-5. Start logging matches in the **Match Log** section.
+1. Sign in / create an account (top-right or sidebar). A fresh account starts empty.
+2. **Deck** → create a deck, then "Import" your list (paste your PTCG export).
+3. Set the archetype + Limitless slug (e.g. `n-zoroark`) in Deck Settings.
+4. **Sync Live Meta** (sidebar) to fetch current tournament data (server-side sync).
+5. Log matches in the **Match Log** section; paste battle logs for turn-quality
+   analytics and (optional) LLM analysis.
 
 ---
 
 ## Using the Battle Log Analysis
 
-The AI analysis runs **server-side** (via the API). It is provider-agnostic with
-**GitHub Models** as the default, and uses your own API key (BYOK) — the key is
-stored **encrypted on the server**, never in the browser. Activation requires the
-server to have `ENCRYPTION_KEY` set (see [API server environment](#api-server-environment-appsapi)).
+The AI analysis runs **server-side** (provider-agnostic, GitHub Models by default)
+with your own key (BYOK) — stored **encrypted on the server**, never in the browser.
+Requires `ENCRYPTION_KEY` set on the API.
 
-1. Export a battle log from Pokémon TCG Live (in-game menu → Battle Log → Copy)
-2. In the Match Log, open a match and paste the log text into the "Battle Log" field
-3. Click "Analyze" — the first time, enter your **GitHub Models token** (a GitHub
-   Personal Access Token with Models access). It is saved server-side, encrypted.
-4. The grounded analysis (every claim quotes the log verbatim) is returned and
-   saved to the match record.
+1. Set your **GitHub Models token** once: account menu → **KI-Analyse / AI analysis**
+   (a fine-grained PAT with the *Models: Read-only* permission). Stored encrypted.
+2. Export a battle log from Pokémon TCG Live (Battle Log → Copy).
+3. In a match's detail → **Analyse** tab, paste the log and click "Analyze".
+4. The grounded analysis (every claim quotes the log verbatim, `temperature=0`) is
+   saved to the match.
 
-Note: TCG Live exports battle logs in **German** regardless of the UI language setting. The parser is built for German protocol text.
+> TCG Live exports battle logs in **German** regardless of UI language — the parser
+> targets German protocol text.
 
 ---
 
 ## Resetting Data
 
-All data is in the browser's IndexedDB. To reset:
-
-**Option A — Clear via DevTools:**
-1. Open DevTools → Application → Storage → IndexedDB
-2. Find `TCGMetaDashboard`
-3. Delete the database
-
-**Option B — Clear via JavaScript console:**
-```javascript
-indexedDB.deleteDatabase('TCGMetaDashboard');
-```
-
-After clearing, reload the page — the demo seed data will be re-inserted.
+Domain data is server-side per account. To clear it, delete your decks/logs in the
+app (cascades remove their cards, snapshots and parsed logs). The legacy local
+cache can be cleared via DevTools → Application → IndexedDB → delete
+`TCGMetaDashboard`.
 
 ---
 
 ## Project Structure
 
 ```
-tcg-dashboard/
-├── src/
-│   ├── App.tsx                    # App shell: layout + page routing
-│   ├── main.tsx                   # React entry point
-│   ├── index.css                  # Tailwind base styles
-│   ├── components/
-│   │   ├── deck/                  # Deck management UI components
-│   │   ├── layout/                # Sidebar, BottomNav, StatCard, CollapsibleSection
-│   │   ├── meta/                  # Meta charts and tables
-│   │   ├── opponent/              # Match log, detail modal, stats tab
-│   │   └── recommendations/       # Recommendations panel, deck comparison panel
-│   ├── data/
-│   │   └── seedMeta.ts            # Demo meta snapshot data for seeding
-│   ├── db/
-│   │   ├── database.ts            # Dexie TCGDatabase class and schema
-│   │   ├── queries.ts             # All database read/write operations
-│   │   └── seed.ts                # First-run seed logic
-│   ├── hooks/
-│   │   └── useRecommendations.ts  # Recommendation engine hook (useMemo)
-│   ├── lib/
-│   │   ├── battleLogAnalysis.ts   # Claude API integration for match analysis
-│   │   ├── battleLogParser.ts     # German battle log text parser
-│   │   ├── deckComparison.ts      # Tournament list diff against user deck
-│   │   ├── deckImport.ts          # Decklist text parser + card type inference
-│   │   ├── deckPerformanceStats.ts# Aggregates parsed logs into performance stats
-│   │   ├── metaFetch.ts           # Limitless TCG API integration
-│   │   └── preferences.ts         # localStorage wrapper (active deck, local meta, slug)
-│   ├── pages/
-│   │   ├── DeckPage.tsx
-│   │   ├── MetaPage.tsx
-│   │   ├── OpponentsPage.tsx
-│   │   ├── OverviewPage.tsx
-│   │   └── RecommendationsPage.tsx
-│   ├── store/
-│   │   └── dashboardStore.ts      # Zustand store — single source of UI state
-│   └── types/
-│       └── index.ts               # All shared TypeScript interfaces
-├── .claude/
-│   ├── agents/                    # Claude agent definition files
-│   └── agent-memory/              # Persistent memory for each agent
-├── docs/                          # This documentation directory
-├── index.html
-├── package.json
-├── tsconfig.json
-└── vite.config.ts
+tcg/                      # repo root (npm workspaces)
+├── apps/
+│   ├── web/              # React 19 + Vite frontend
+│   │   └── src/
+│   │       ├── pages/            # Overview, Deck, Recommendations, Meta
+│   │       ├── components/       # deck/ meta/ opponent/ recommendations/ layout/ auth/ settings/
+│   │       ├── store/            # dashboardStore.ts (Zustand)
+│   │       ├── db/               # queries.ts (delegates to the API), database.ts (Dexie legacy cache)
+│   │       ├── lib/              # api.ts (REST client), metaFetch, deckComparison, deckImport, deckPerformanceStats
+│   │       ├── hooks/ types/ i18n/  # recommendations hook, shared types, de/en translations
+│   ├── api/              # Hono + Drizzle + PostgreSQL
+│   │   ├── src/
+│   │   │   ├── app.ts            # Hono app factory; routes mounted here
+│   │   │   ├── auth.ts           # Better Auth
+│   │   │   ├── db/               # schema.ts (Drizzle), index.ts (pg pool)
+│   │   │   ├── routes/           # decks, snapshots, logs, analytics, analysis, meta
+│   │   │   ├── ai/               # provider abstraction + GitHub Models adapter
+│   │   │   ├── jobs/             # syncMeta.ts (meta cron)
+│   │   │   ├── lib/              # crypto, deckAnalytics, matchLogPipeline
+│   │   │   └── migrate.ts        # programmatic migrator (preDeployCommand)
+│   │   └── drizzle/              # generated SQL migrations
+│   └── docs/             # Astro Starlight site (renders ../../docs)
+├── packages/
+│   └── shared/           # @pokekon/shared: parser, analytics/meta/analysis types + engine, season helpers
+├── docs/                 # Markdown docs (source of truth)
+├── .claude/              # agents, commands, plans
+├── railway.json          # Railway build + deploy (single-origin) + preDeployCommand
+└── package.json          # workspaces root
 ```
-
----
-
-## TypeScript Configuration
-
-The project uses `TypeScript ~6.0.2` in strict mode. Key compiler options:
-- `"strict": true` — enables all strict type checks
-- `"moduleResolution": "bundler"` — Vite-compatible module resolution
-- `"jsx": "react-jsx"` — React 19 JSX transform (no `import React` needed)
-
-Type errors will cause `npm run build` to fail. During development, Vite allows type-error-free HMR (types are checked separately by `tsc`).
 
 ---
 
 ## Troubleshooting
 
-**"No meta data yet" on Overview page:**
-Click "Sync Live Meta" in the sidebar. This requires an internet connection to reach Limitless TCG.
+**"No meta data yet":** click **Sync Live Meta** — the server fetches Limitless (needs the API + an internet connection).
 
-**Battle log parsing produces wrong player names:**
-Set your player name in localStorage: open the browser console and run:
+**Battle-log parsing shows the wrong player:** set your TCG Live username so the parser pins "you" correctly:
 ```javascript
 localStorage.setItem('tcg-player-name', 'YourTCGLiveUsername');
 ```
-Then re-open the match detail.
 
-**Deck comparison returns "No public decklists found":**
-Check that the Limitless slug in Deck Settings exactly matches the format used on Limitless (e.g., `"n-zoroark"`, not `"N's Zoroark"` or `"nzoroark"`). You can verify by searching the archetype on [play.limitlesstcg.com](https://play.limitlesstcg.com) and checking the deck ID in the URL.
+**AI analysis returns an error:** ensure `ENCRYPTION_KEY` is set on the API and that you saved a valid GitHub Models token (account menu → AI analysis).
 
-**App is slow after logging many matches:**
-All data is loaded into memory on `refresh()`. This is rarely a problem in practice since typical usage involves hundreds, not thousands, of logs. If needed, `getArchetypeStats()` in `queries.ts` is the most expensive operation and could be memoized.
+**Deck comparison returns "No public decklists found":** the Limitless slug must match Limitless exactly (e.g. `n-zoroark`). Verify it by searching the archetype on [play.limitlesstcg.com](https://play.limitlesstcg.com).
+
+**`@pokekon/shared` not found during a build:** build the shared package first (`npm run build -w @pokekon/shared`) — the root `build`/`typecheck`/`test` scripts already do this.
