@@ -13,7 +13,7 @@ import {
   getDeckCards,
   getOpponentLogs,
   getLatestMetaSnapshots,
-  deletePreRotationMetaSnapshots,
+  syncMeta as syncMetaViaApi,
   getArchetypeStats,
   getDeckSnapshots,
   saveDeckSnapshot,
@@ -23,8 +23,8 @@ import {
   deleteDeck as deleteDeckFromDb,
   copyDeckCards,
 } from '../db/queries';
-import { syncLiveMeta, fetchRecentTournaments } from '../lib/metaFetch';
-import type { MetaSyncResult } from '../lib/metaFetch';
+import { fetchRecentTournaments } from '../lib/metaFetch';
+import type { MetaSyncResult } from '@pokekon/shared';
 import { fetchArchetypeComparison } from '../lib/deckComparison';
 import type { ComparisonResult } from '../lib/deckComparison';
 import {
@@ -138,9 +138,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   refresh: async () => {
     set({ isLoading: true });
     try {
-      // Season hygiene: drop meta snapshots recorded before the current
-      // rotation so no view can mix old- and new-format meta data.
-      await deletePreRotationMetaSnapshots();
+      // Meta now comes from the server, which already serves only in-season
+      // data — no local season hygiene needed.
 
       // Load decks first to determine active deck
       const decks = await getDecks();
@@ -248,7 +247,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   syncMeta: async () => {
     set({ isSyncing: true, syncError: null, syncProgress: i18n.t('layout:sync.starting') });
     try {
-      const result = await syncLiveMeta((msg) => set({ syncProgress: msg }));
+      // Server-side sync — one round trip, no per-step progress stream.
+      const result = await syncMetaViaApi();
       set({ isSyncing: false, syncProgress: '', lastSynced: new Date(), syncError: null });
       await get().refresh();
       return result;
