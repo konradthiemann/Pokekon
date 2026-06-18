@@ -3,3 +3,5 @@
 export * from './battleLogParser.js';
 export * from './analytics.js';
 export * from './battleAnalysis.js';
+export * from './season.js';
+export * from './meta.js';
