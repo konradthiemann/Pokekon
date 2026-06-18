@@ -8,6 +8,7 @@ import { createAnalysisRoutes } from './routes/analysis.js';
 import { createAnalyticsRoutes } from './routes/analytics.js';
 import { createDecksRoutes } from './routes/decks.js';
 import { createLogsRoutes } from './routes/logs.js';
+import { createMetaRoutes } from './routes/meta.js';
 import { createSnapshotsRoutes } from './routes/snapshots.js';
 
 /** Injection points for tests: a pre-built database and/or session resolver. */
@@ -53,6 +54,7 @@ export function createApp(deps: AppDeps = {}): Hono {
   api.route('/logs', createLogsRoutes());
   api.route('/analytics', createAnalyticsRoutes());
   api.route('/analysis', createAnalysisRoutes());
+  api.route('/meta', createMetaRoutes());
   app.route('/api', api);
 
   return app;

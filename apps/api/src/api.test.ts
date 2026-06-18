@@ -704,3 +704,74 @@ Konrad hat gewonnen!`;
     expect(await cleared.json()).toMatchObject({ hasApiKey: false });
   });
 });
+
+describe('meta (/api/meta)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('returns only in-season (post-rotation) snapshots', async () => {
+    await db.insert(schema.metaSnapshots).values([
+      {
+        archetype: 'Charizard',
+        frequencyPct: 20,
+        winRatePct: 55,
+        wins: 11,
+        losses: 9,
+        playerCount: 10,
+        period: '2026-W20',
+        sourceNote: 'test',
+      },
+      {
+        archetype: 'OldDeck',
+        frequencyPct: 30,
+        winRatePct: 60,
+        wins: 6,
+        losses: 4,
+        playerCount: 8,
+        period: '2026-W05', // pre-rotation → excluded
+        sourceNote: 'test',
+      },
+    ]);
+
+    const res = await request('/api/meta', { user: USER_A });
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as { archetype: string; period: string }[];
+    expect(rows.some((r) => r.archetype === 'Charizard')).toBe(true);
+    expect(rows.some((r) => r.archetype === 'OldDeck')).toBe(false);
+  });
+
+  it('syncs meta from Limitless (mocked) and upserts snapshots', async () => {
+    const today = new Date().toISOString();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/api/tournaments/T1/standings')) {
+        return jsonResponse([
+          { deck: { id: 'char', name: 'Charizard' }, record: { wins: 6, losses: 1, ties: 0 } },
+          { deck: { id: 'char', name: 'Charizard' }, record: { wins: 4, losses: 3, ties: 0 } },
+          { deck: { id: 'gard', name: 'Gardevoir' }, record: { wins: 5, losses: 2, ties: 0 } },
+          { deck: { id: 'gard', name: 'Gardevoir' }, record: { wins: 3, losses: 4, ties: 0 } },
+        ]);
+      }
+      // tournament list
+      return jsonResponse([{ id: 'T1', name: 'Online Weekly', players: 64, date: today }]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await request('/api/meta/sync', { user: USER_A, method: 'POST' });
+    expect(res.status).toBe(200);
+    const summary = (await res.json()) as { archetypes: number; tournaments: number };
+    expect(summary.tournaments).toBe(1);
+    expect(summary.archetypes).toBe(2);
+
+    // The snapshots are now readable via GET (current ISO week is in-season).
+    const get = await request('/api/meta', { user: USER_A });
+    const rows = (await get.json()) as { archetype: string }[];
+    expect(rows.some((r) => r.archetype === 'Charizard')).toBe(true);
+    expect(rows.some((r) => r.archetype === 'Gardevoir')).toBe(true);
+  });
+});
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}

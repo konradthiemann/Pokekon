@@ -1,5 +1,4 @@
-import { db } from './database';
-import { isPostRotationPeriod, ROTATION_PERIOD } from '../constants/season';
+import type { MetaSyncResult } from '@pokekon/shared';
 import i18n from '../i18n';
 import * as api from '../lib/api';
 import type {
@@ -195,51 +194,27 @@ export async function updateOpponentLog(
   await api.updateLog(id, patch);
 }
 
-// ─── Meta snapshot queries (local Dexie cache — intentionally NOT server-side) ─
+// ─── Meta snapshot queries (server-side, global) ──────────────────────────────
+// Meta now lives in Postgres and is populated by the server-side sync job
+// (GET /api/meta returns only in-season periods). The former local Dexie cache,
+// per-browser sync and demo seed have been removed (single source of truth).
 
-/**
- * Returns all meta snapshots that belong to the most-recent period string (e.g. "2026-W15").
- * Two-step query: first walks the `period` index to find the latest value, then fetches
- * all rows that share that period — avoids loading the entire history into memory.
- */
-export async function getLatestMetaSnapshots(): Promise<MetaSnapshot[]> {
-  const latest = await db.metaSnapshots.orderBy('period').last();
-  if (!latest) return [];
-  // Pre-rotation periods are never served — a stale local history must not
-  // surface old-format meta data (see constants/season.ts).
-  if (!isPostRotationPeriod(latest.period)) return [];
-  return db.metaSnapshots.where('period').equals(latest.period).toArray();
-}
-
+/** All in-season meta snapshots across every post-rotation period. */
 export async function getAllMetaSnapshots(): Promise<MetaSnapshot[]> {
-  const all = await db.metaSnapshots.orderBy('period').toArray();
-  return all.filter((s) => isPostRotationPeriod(s.period));
+  return api.getMeta();
 }
 
-/**
- * One-time hygiene at app start: removes snapshots recorded before the
- * current rotation so trend views and "latest period" lookups can never
- * resurface data from the previous card pool.
- */
-export async function deletePreRotationMetaSnapshots(): Promise<number> {
-  return db.metaSnapshots.where('period').below(ROTATION_PERIOD).delete();
+/** Meta snapshots for the most-recent period only. */
+export async function getLatestMetaSnapshots(): Promise<MetaSnapshot[]> {
+  const all = await api.getMeta();
+  if (all.length === 0) return [];
+  const latestPeriod = all.reduce((max, s) => (s.period > max ? s.period : max), all[0]!.period);
+  return all.filter((s) => s.period === latestPeriod);
 }
 
-export async function upsertMetaSnapshot(snap: Omit<MetaSnapshot, 'id'>): Promise<number> {
-  const existing = await db.metaSnapshots
-    .where('[archetype+period]')
-    .equals([snap.archetype, snap.period])
-    .first()
-    .catch(() => undefined);
-  if (existing?.id != null) {
-    await db.metaSnapshots.update(existing.id, snap);
-    return existing.id;
-  }
-  return db.metaSnapshots.add(snap);
-}
-
-export async function clearMetaSnapshots(): Promise<void> {
-  await db.metaSnapshots.clear();
+/** Trigger the server-side meta sync; returns the run summary. */
+export async function syncMeta(): Promise<MetaSyncResult> {
+  return api.syncMeta();
 }
 
 // ─── Derived stats ────────────────────────────────────────────────────────────

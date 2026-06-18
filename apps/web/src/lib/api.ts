@@ -1,5 +1,13 @@
-import type { AiSettings, BattleAnalysis, DeckAnalytics } from '@pokekon/shared';
-import type { CardRole, CardType, Deck, DeckCard, DeckSnapshot, OpponentLog } from '../types';
+import type { AiSettings, BattleAnalysis, DeckAnalytics, MetaSyncResult } from '@pokekon/shared';
+import type {
+  CardRole,
+  CardType,
+  Deck,
+  DeckCard,
+  DeckSnapshot,
+  MetaSnapshot,
+  OpponentLog,
+} from '../types';
 
 /**
  * Thin typed client for the deployed REST API (apps/api).
@@ -368,4 +376,44 @@ export async function analyzeBattleLogViaApi(
     method: 'POST',
     body: JSON.stringify({ battleLog, playerName }),
   });
+}
+
+// ─── Meta snapshots (global, server-side) ─────────────────────────────────────
+
+interface MetaSnapshotRow {
+  id: number;
+  archetype: string;
+  frequencyPct: number;
+  winRatePct: number | null;
+  wins: number;
+  losses: number;
+  playerCount: number;
+  period: string;
+  sourceNote: string;
+  createdAt: string;
+}
+
+function toMetaSnapshot(row: MetaSnapshotRow): MetaSnapshot {
+  return {
+    id: row.id,
+    archetype: row.archetype,
+    frequencyPct: row.frequencyPct,
+    winRatePct: row.winRatePct,
+    wins: row.wins,
+    losses: row.losses,
+    playerCount: row.playerCount,
+    period: row.period,
+    sourceNote: row.sourceNote,
+  };
+}
+
+/** All in-season meta snapshots (every post-rotation period), oldest first. */
+export async function getMeta(): Promise<MetaSnapshot[]> {
+  const rows = await request<MetaSnapshotRow[]>('/api/meta');
+  return rows.map(toMetaSnapshot);
+}
+
+/** Trigger the server-side meta sync (fetches Limitless, upserts snapshots). */
+export async function syncMeta(): Promise<MetaSyncResult> {
+  return request<MetaSyncResult>('/api/meta/sync', { method: 'POST' });
 }

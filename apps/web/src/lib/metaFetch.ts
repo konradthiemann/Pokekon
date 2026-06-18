@@ -1,5 +1,4 @@
-import type { MetaSnapshot, RecentTournament } from '../types';
-import { upsertMetaSnapshot } from '../db/queries';
+import type { RecentTournament } from '../types';
 import { isPostRotation } from '../constants/season';
 import i18n from '../i18n';
 
@@ -43,20 +42,6 @@ async function limitlessFetch(path: string): Promise<Response> {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Returns an ISO 8601 week label like "2026-W15" for the given date.
- * The algorithm shifts the date to the nearest Thursday (`+4 - weekday`) because
- * ISO 8601 defines week 1 as the week containing the year's first Thursday, and
- * uses `|| 7` to remap Sunday (0) to 7 so the arithmetic stays correct for every day.
- */
-function isoWeekLabel(date: Date): string {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
-  return `${d.getUTCFullYear()}-W${week.toString().padStart(2, '0')}`;
-}
 
 /**
  * Heuristic: determine if a tournament is likely online-only by inspecting its name.
@@ -213,116 +198,4 @@ export async function fetchRecentTournaments(
   }
 
   return results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-}
-
-// ─── Meta sync ────────────────────────────────────────────────────────────────
-
-export interface MetaSyncResult {
-  archetypes: number;
-  tournaments: number;
-  totalPlayers: number;
-  period: string;
-}
-
-/**
- * Fetches standings from recent tournaments and persists archetype frequency/win-rate
- * data as `MetaSnapshot` rows for the current ISO week period.
- * Snapshots are upserted — existing periods are updated, new periods are appended.
- * In-season history is kept for trend analysis; periods before the current
- * rotation are purged at app start (see deletePreRotationMetaSnapshots).
- */
-export async function syncLiveMeta(onProgress?: (msg: string) => void): Promise<MetaSyncResult> {
-  onProgress?.(i18n.t('layout:sync.fetchingTournaments'));
-
-  const res = await limitlessFetch(
-    '/api/tournaments?game=PTCG&completed=true&limit=50&format=standard',
-  );
-  if (!res.ok)
-    throw new Error(i18n.t('layout:sync.errors.tournamentListFailed', { status: res.status }));
-  const allTourneys: LimitlessTournament[] = await res.json();
-
-  // Only include tournaments from the last 7 days with 30+ players — and never
-  // anything before the current rotation, even if the API window reaches back.
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const eligible = allTourneys
-    .filter((t) => t.players >= 30 && new Date(t.date) >= sevenDaysAgo && isPostRotation(t.date))
-    .sort((a, b) => b.players - a.players)
-    .slice(0, 6);
-
-  if (eligible.length === 0) throw new Error(i18n.t('layout:sync.errors.noTournaments'));
-
-  onProgress?.(i18n.t('layout:sync.foundTournaments', { count: eligible.length }));
-
-  type ArchStat = {
-    displayName: string;
-    wins: number;
-    losses: number;
-    ties: number;
-    playerCount: number;
-  };
-  const archMap = new Map<string, ArchStat>();
-  let totalPlayers = 0;
-  let successCount = 0;
-
-  for (const t of eligible) {
-    try {
-      onProgress?.(i18n.t('layout:sync.loadingTournament', { name: t.name, players: t.players }));
-      const res = await limitlessFetch(`/api/tournaments/${t.id}/standings`);
-      if (!res.ok) continue;
-
-      const standings: LimitlessStanding[] = await res.json();
-      if (!Array.isArray(standings) || standings.length === 0) continue;
-
-      successCount++;
-      totalPlayers += standings.length;
-
-      for (const player of standings) {
-        const id = player.deck?.id ?? 'other';
-        const displayName = player.deck?.name ?? 'Other';
-        const existing = archMap.get(id) ?? {
-          displayName,
-          wins: 0,
-          losses: 0,
-          ties: 0,
-          playerCount: 0,
-        };
-        existing.wins += player.record?.wins ?? 0;
-        existing.losses += player.record?.losses ?? 0;
-        existing.ties += player.record?.ties ?? 0;
-        existing.playerCount++;
-        archMap.set(id, existing);
-      }
-    } catch (err) {
-      console.warn(`[metaFetch] Skipped ${t.id}:`, err);
-    }
-  }
-
-  if (successCount === 0) throw new Error(i18n.t('layout:sync.errors.noStandings'));
-
-  onProgress?.(i18n.t('layout:sync.savingMetaData'));
-  const period = isoWeekLabel(new Date());
-  const sourceNote = `Limitless TCG · ${successCount} tournaments · ${totalPlayers} players`;
-
-  const snapshots: Omit<MetaSnapshot, 'id'>[] = [];
-  for (const [, s] of archMap) {
-    if (s.playerCount < 2) continue;
-    const frequencyPct = parseFloat(((s.playerCount / totalPlayers) * 100).toFixed(1));
-    const decisive = s.wins + s.losses;
-    const winRatePct = decisive > 0 ? Math.round((s.wins / decisive) * 100) : null;
-    snapshots.push({
-      archetype: s.displayName,
-      frequencyPct,
-      winRatePct,
-      wins: s.wins,
-      losses: s.losses,
-      playerCount: s.playerCount,
-      period,
-      sourceNote,
-    });
-  }
-
-  for (const snap of snapshots) await upsertMetaSnapshot(snap);
-
-  return { archetypes: snapshots.length, tournaments: successCount, totalPlayers, period };
 }

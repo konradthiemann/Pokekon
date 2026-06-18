@@ -1,5 +1,4 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { seedIfEmpty } from './db/seed';
 import { useDashboardStore } from './store/dashboardStore';
 import { authClient } from './lib/authClient';
 import { Sidebar } from './components/layout/Sidebar';
@@ -33,7 +32,7 @@ function Dashboard() {
 
   useEffect(() => {
     void (async () => {
-      await seedIfEmpty(); // demo meta snapshots only — domain data lives server-side
+      // Meta + domain data are server-side; nothing to seed locally.
       if (await shouldOfferLocalImport()) setShowLocalImport(true);
       await refresh();
     })();

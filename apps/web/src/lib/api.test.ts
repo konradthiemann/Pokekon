@@ -5,8 +5,10 @@ import {
   createDeckSnapshot,
   getAiSettings,
   getDeckAnalytics,
+  getMeta,
   listDeckSnapshots,
   listAllLogs,
+  syncMeta,
   updateAiSettings,
 } from './api';
 import type { DeckCard } from '../types';
@@ -230,6 +232,43 @@ describe('AI analysis client', () => {
   it('surfaces a 400 (no key configured) as an ApiError', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'No API key configured.' }, 400));
     await expect(analyzeBattleLogViaApi('log', 'Konrad')).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+describe('meta client', () => {
+  it('getMeta maps wire rows to MetaSnapshot (drops createdAt)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse([
+        {
+          id: 1,
+          archetype: 'Charizard',
+          frequencyPct: 20,
+          winRatePct: 55,
+          wins: 11,
+          losses: 9,
+          playerCount: 10,
+          period: '2026-W20',
+          sourceNote: 'Limitless',
+          createdAt: '2026-06-01T00:00:00.000Z',
+        },
+      ]),
+    );
+    const meta = await getMeta();
+    expect(fetchMock).toHaveBeenCalledWith('/api/meta', expect.anything());
+    expect(meta).toHaveLength(1);
+    expect(meta[0]).not.toHaveProperty('createdAt');
+    expect(meta[0]).toMatchObject({ archetype: 'Charizard', period: '2026-W20', winRatePct: 55 });
+  });
+
+  it('syncMeta POSTs to the sync endpoint and returns the summary', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ archetypes: 12, tournaments: 4, totalPlayers: 240, period: '2026-W25' }),
+    );
+    const result = await syncMeta();
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/meta/sync');
+    expect(init.method).toBe('POST');
+    expect(result).toMatchObject({ archetypes: 12, tournaments: 4 });
   });
 });
 

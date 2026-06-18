@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "job:sync-meta": "node dist/jobs/syncMeta.js"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.16",
