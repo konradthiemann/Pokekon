@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "migrate:deploy": "node dist/migrate.js",
     "job:sync-meta": "node dist/jobs/syncMeta.js"
   },
   "dependencies": {

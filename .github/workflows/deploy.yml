@@ -1,0 +1,55 @@
+name: Deploy (Railway)
+
+# Deploy the API + web app to Railway, but only after typecheck and tests pass.
+# Migrations run automatically on Railway via deploy.preDeployCommand (railway.json).
+# Requires repo secret RAILWAY_TOKEN (a Railway project token, production env).
+
+on:
+  push:
+    branches: [main]
+    # Docs-only changes deploy via docs.yml (GitHub Pages), not the app.
+    paths-ignore:
+      - 'docs/**'
+      - 'apps/docs/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: railway-deploy
+  cancel-in-progress: false
+
+env:
+  RAILWAY_SERVICE: api # Railway service name (the single-origin API that also serves the SPA)
+
+jobs:
+  deploy:
+    name: Typecheck, Test & Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Gate: deploy only if these pass ──────────────────────────────────
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+      # ── Deploy ───────────────────────────────────────────────────────────
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --service "$RAILWAY_SERVICE" --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
