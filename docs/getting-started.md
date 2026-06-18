@@ -2,11 +2,14 @@
 
 ## Prerequisites
 
-- **Node.js** 18 or later (LTS recommended)
+- **Node.js** 22 or later (the repo targets Node ≥ 22)
 - **npm** 9 or later (comes with Node)
 - A modern browser (Chrome, Firefox, Edge, Safari) — IndexedDB support required
 
-No backend server, no database server, no Docker. The app runs entirely in the browser.
+The frontend (`apps/web`) runs entirely in the browser (local-first) and needs no
+backend for local development. The API (`apps/api`, Hono + PostgreSQL on Railway)
+is required only for auth and the server-side features (analytics, LLM analysis);
+see [API server environment](#api-server-environment-appsapi).
 
 ---
 
@@ -62,7 +65,31 @@ This serves `dist/` via Vite's preview server (default: [http://localhost:4173](
 
 ## Deployment
 
-Because the app is entirely static (no backend), it can be deployed to any static file host:
+The frontend (`apps/web`) is a static bundle. In production it is served by the
+**API process** (`apps/api`) on Railway from a single origin (so the Better Auth
+session cookie stays first-party). The static-host options below still work for a
+frontend-only / API-less deployment.
+
+### API server environment (`apps/api`)
+
+The API reads these environment variables (Railway variables — never in the bundle):
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `DATABASE_URL` | yes (for any `/api` DB access) | PostgreSQL connection string |
+| `BETTER_AUTH_SECRET` | yes in production | Better Auth signing secret |
+| `ENCRYPTION_KEY` | for LLM analysis | 32-byte AES key encrypting per-user LLM keys — `openssl rand -hex 32` |
+| `WEB_ORIGIN` | split-origin only | allowed browser origin for CORS |
+| `RESEND_API_KEY`, `EMAIL_FROM` | optional | transactional email (else logged to stdout) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | optional | enables Google OAuth |
+
+Migrations run via `npm run db:migrate -w @pokekon/api` (Railway pre-deploy).
+Without `ENCRYPTION_KEY` the app still runs — only the AI-analysis endpoints error
+when used; everything else is unaffected.
+
+### Static frontend hosting
+
+Because the web bundle is static, it can also be deployed to any static file host:
 
 **Option A — Netlify / Vercel / GitHub Pages:**
 ```bash
@@ -98,12 +125,17 @@ Opening `dist/index.html` directly from the filesystem (`file://` protocol) does
 
 ## Using the Battle Log Analysis
 
-The AI analysis feature requires an Anthropic API key. The key is **never stored** — you enter it each time you trigger an analysis:
+The AI analysis runs **server-side** (via the API). It is provider-agnostic with
+**GitHub Models** as the default, and uses your own API key (BYOK) — the key is
+stored **encrypted on the server**, never in the browser. Activation requires the
+server to have `ENCRYPTION_KEY` set (see [API server environment](#api-server-environment-appsapi)).
 
-1. Export a battle log from Pokemon TCG Live (in-game menu → Battle Log → Copy)
+1. Export a battle log from Pokémon TCG Live (in-game menu → Battle Log → Copy)
 2. In the Match Log, open a match and paste the log text into the "Battle Log" field
-3. Click "Analyze with AI", enter your Anthropic API key
-4. The analysis is saved to the match record in IndexedDB
+3. Click "Analyze" — the first time, enter your **GitHub Models token** (a GitHub
+   Personal Access Token with Models access). It is saved server-side, encrypted.
+4. The grounded analysis (every claim quotes the log verbatim) is returned and
+   saved to the match record.
 
 Note: TCG Live exports battle logs in **German** regardless of the UI language setting. The parser is built for German protocol text.
 
