@@ -10,6 +10,7 @@ Hono + PostgreSQL backend in `apps/api`, and this documentation site in
 | File | What it covers |
 |------|---------------|
 | [architecture.md](./architecture.md) | App architecture overview — component tree, tech stack, layer diagram |
+| [design-system.md](./design-system.md) | Visual design system — "Poké-Light" palette, tokens, component classes, WCAG-AA baseline |
 | [database.md](./database.md) | Dexie/IndexedDB schema, all tables, indexes, migration history, ER diagram |
 | [data-types.md](./data-types.md) | All TypeScript interfaces and types explained in plain language |
 | [data-flow.md](./data-flow.md) | How data moves from user action to store to DB to component |

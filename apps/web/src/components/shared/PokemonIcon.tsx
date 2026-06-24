@@ -29,9 +29,11 @@ function Pokeball({ px }: { px: number }) {
       aria-hidden="true"
     >
       <svg viewBox="0 0 24 24" fill="none" style={{ width: px, height: px }}>
-        <circle cx="12" cy="12" r="10" stroke="#6b7280" strokeWidth="2" />
-        <path d="M2 12h20" stroke="#6b7280" strokeWidth="2" />
-        <circle cx="12" cy="12" r="3" fill="#6b7280" />
+        {/* Fallback glyph (no sprite resolved) — soft slate-400 to sit quietly
+            on the light playmat; the archetype name renders alongside it. */}
+        <circle cx="12" cy="12" r="10" stroke="#94a3b8" strokeWidth="2" />
+        <path d="M2 12h20" stroke="#94a3b8" strokeWidth="2" />
+        <circle cx="12" cy="12" r="3" fill="#94a3b8" />
       </svg>
     </span>
   );

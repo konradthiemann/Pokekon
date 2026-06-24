@@ -14,19 +14,19 @@ const PAGE_SIZE = 10;
 
 function WinRateBadge({ rate, encounters }: { rate: number | null; encounters: number }) {
   const { t } = useTranslation('meta');
-  if (encounters === 0 || rate === null) return <span className="text-gray-600 text-xs">—</span>;
+  if (encounters === 0 || rate === null) return <span className="text-slate-400 text-xs">—</span>;
   if (encounters < 5) {
     return (
-      <span className="text-gray-500 font-semibold">
+      <span className="text-slate-500 font-bold">
         {rate}%{' '}
-        <span className="text-gray-600 font-normal">
+        <span className="text-slate-400 font-medium">
           {t('myMatchups.sampleSize', { count: encounters })}
         </span>
       </span>
     );
   }
-  const color = rate >= 60 ? 'text-emerald-400' : rate >= 40 ? 'text-yellow-400' : 'text-red-400';
-  return <span className={`font-semibold ${color}`}>{rate}%</span>;
+  const color = rate >= 60 ? 'text-emerald-700' : rate >= 40 ? 'text-amber-700' : 'text-red-700';
+  return <span className={`font-bold ${color}`}>{rate}%</span>;
 }
 
 export function MetaTable({ stats }: Props) {
@@ -37,7 +37,7 @@ export function MetaTable({ stats }: Props) {
   if (stats.length === 0) {
     return (
       <div className="card flex items-center justify-center py-12">
-        <p className="text-gray-500 text-sm">{t('myMatchups.empty')}</p>
+        <p className="text-slate-500 text-sm font-semibold">{t('myMatchups.empty')}</p>
       </div>
     );
   }
@@ -49,7 +49,7 @@ export function MetaTable({ stats }: Props) {
 
   return (
     <div className="card overflow-hidden p-0">
-      <div className="px-4 pt-4 pb-3 border-b border-gray-800">
+      <div className="px-4 pt-4 pb-3 border-b border-slate-200">
         <h3 className="card-header mb-0">{t('myMatchups.title')}</h3>
       </div>
 
@@ -69,11 +69,11 @@ export function MetaTable({ stats }: Props) {
               <col style={{ width: 72 }} />
             </colgroup>
             <thead>
-              <tr className="border-b border-gray-800">
-                <th className="py-2.5 px-2 text-gray-400 font-medium text-xs text-left">
+              <tr className="border-b border-slate-200">
+                <th className="py-2.5 px-2 text-slate-500 font-bold text-xs text-left">
                   <button
                     onClick={() => setNamesOpen((v) => !v)}
-                    className="flex items-center gap-1 hover:text-gray-200 transition-colors"
+                    className="flex items-center gap-1 hover:text-slate-900 transition-colors"
                     title={namesOpen ? t('myMatchups.hideNames') : t('myMatchups.showNames')}
                   >
                     <ChevronRight
@@ -84,22 +84,22 @@ export function MetaTable({ stats }: Props) {
                     <span>{namesOpen ? t('myMatchups.hide') : t('myMatchups.names')}</span>
                   </button>
                 </th>
-                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">
+                <th className="text-right px-4 py-2.5 text-slate-500 font-bold text-xs">
                   {t('myMatchups.headers.metaPct')}
                 </th>
-                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">
+                <th className="text-right px-4 py-2.5 text-slate-500 font-bold text-xs">
                   {t('myMatchups.headers.encounters')}
                 </th>
-                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">
+                <th className="text-right px-4 py-2.5 text-slate-500 font-bold text-xs">
                   {t('myMatchups.headers.wins')}
                 </th>
-                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">
+                <th className="text-right px-4 py-2.5 text-slate-500 font-bold text-xs">
                   {t('myMatchups.headers.losses')}
                 </th>
-                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">
+                <th className="text-right px-4 py-2.5 text-slate-500 font-bold text-xs">
                   {t('myMatchups.headers.ties')}
                 </th>
-                <th className="text-right px-4 py-2.5 text-gray-400 font-medium text-xs">
+                <th className="text-right px-4 py-2.5 text-slate-500 font-bold text-xs">
                   {t('myMatchups.headers.winRate')}
                 </th>
               </tr>
@@ -108,8 +108,8 @@ export function MetaTable({ stats }: Props) {
               {visible.map((s, i) => (
                 <tr
                   key={s.archetype}
-                  className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors ${
-                    i % 2 === 0 ? '' : 'bg-gray-800/10'
+                  className={`border-b border-slate-100 hover:bg-brand-50/60 transition-colors ${
+                    i % 2 === 0 ? '' : 'bg-slate-50'
                   }`}
                 >
                   <td className="py-2 px-2 overflow-hidden">
@@ -118,7 +118,7 @@ export function MetaTable({ stats }: Props) {
                         <PokemonIcon archetype={s.archetype} size="sm" dual reserveSecondary />
                       </div>
                       {namesOpen && (
-                        <span className="text-xs font-medium text-gray-100 truncate leading-tight min-w-0">
+                        <span className="text-xs font-bold text-slate-800 truncate leading-tight min-w-0">
                           {s.archetype}
                         </span>
                       )}
@@ -126,21 +126,29 @@ export function MetaTable({ stats }: Props) {
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <div className="w-16 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-brand-500 rounded-full"
+                          className="h-full bg-gradient-to-r from-brand-400 to-brand-600 rounded-full"
                           style={{ width: `${Math.min((s.frequencyPct / maxFreq) * 100, 100)}%` }}
                         />
                       </div>
-                      <span className="text-gray-300 text-xs w-8 text-right">
+                      <span className="text-slate-600 text-xs font-bold w-8 text-right">
                         {s.frequencyPct}%
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-right text-gray-400">{s.encounters || '—'}</td>
-                  <td className="px-4 py-2.5 text-right text-emerald-400">{s.wins || '—'}</td>
-                  <td className="px-4 py-2.5 text-right text-red-400">{s.losses || '—'}</td>
-                  <td className="px-4 py-2.5 text-right text-yellow-400">{s.ties || '—'}</td>
+                  <td className="px-4 py-2.5 text-right text-slate-600 font-semibold">
+                    {s.encounters || '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-emerald-700 font-bold">
+                    {s.wins || '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-red-700 font-bold">
+                    {s.losses || '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-amber-700 font-bold">
+                    {s.ties || '—'}
+                  </td>
                   <td className="px-4 py-2.5 text-right">
                     <WinRateBadge rate={s.winRate} encounters={s.encounters} />
                   </td>
@@ -151,15 +159,15 @@ export function MetaTable({ stats }: Props) {
         </div>
 
         {!expanded && hasMore && (
-          <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-gray-900 to-transparent pointer-events-none" />
+          <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white to-transparent pointer-events-none" />
         )}
       </div>
 
       {hasMore && (
-        <div className="px-4 py-2.5 border-t border-gray-800 flex items-center justify-between">
+        <div className="px-4 py-2.5 border-t border-slate-200 flex items-center justify-between">
           <button
             onClick={() => setExpanded((v) => !v)}
-            className="text-xs text-brand-400 hover:text-brand-300 transition-colors font-medium flex items-center gap-1"
+            className="text-xs text-brand-700 hover:text-brand-800 transition-colors font-bold flex items-center gap-1"
           >
             <ChevronRight
               className="w-3 h-3 transition-transform duration-200"
@@ -170,7 +178,7 @@ export function MetaTable({ stats }: Props) {
               ? t('myMatchups.showTop', { count: PAGE_SIZE })
               : t('myMatchups.showAll', { count: stats.length })}
           </button>
-          <span className="text-xs text-gray-600">
+          <span className="text-xs text-slate-400 font-semibold">
             {expanded ? stats.length : Math.min(PAGE_SIZE, stats.length)} / {stats.length}
           </span>
         </div>

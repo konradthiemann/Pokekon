@@ -378,6 +378,17 @@ export async function analyzeBattleLogViaApi(
   });
 }
 
+// ─── Demo (guest accounts) ────────────────────────────────────────────────────
+
+/**
+ * Seed the current (anonymous) account with sample decks + documented matches.
+ * Server-side this is restricted to guest accounts and is idempotent, so calling
+ * it more than once is safe. Returns whether data was actually written.
+ */
+export async function seedDemo(): Promise<{ seeded: boolean }> {
+  return request<{ seeded: boolean }>('/api/demo/seed', { method: 'POST' });
+}
+
 // ─── Meta snapshots (global, server-side) ─────────────────────────────────────
 
 interface MetaSnapshotRow {

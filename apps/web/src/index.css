@@ -3,70 +3,105 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Light "playmat" palette — the single source of truth for raw tokens.
+       Component utilities below and the deck background read from these. */
+    --playmat: #eef3fb; /* cool light blue-gray play surface */
+    --ink: #0f172a; /* slate-900 — body text, 17.9:1 on white */
+    --focus: #2563eb; /* brand-600 focus ring */
+  }
+
   * {
     box-sizing: border-box;
   }
   body {
-    @apply bg-gray-950 text-gray-100 antialiased;
-    font-family:
-      system-ui,
-      -apple-system,
-      sans-serif;
+    @apply bg-[#eef3fb] text-slate-900 antialiased font-sans;
     margin: 0;
   }
   #root {
     min-height: 100vh;
   }
+
+  /* Visible keyboard focus on every interactive element (WCAG 2.4.7 / 2.4.11).
+     3px solid ring clears the 3:1 non-text contrast bar against any surface. */
+  *:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Honour reduced-motion preferences (WCAG 2.3.3): kill the hover lifts,
+     spinner and background fades for users who opt out. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer components {
-  /* ── Glass card ─────────────────────────────────────────────────────────── */
+  /* ── Card — a white "TCG card" floating on the playmat ─────────────────── */
   .card {
-    @apply bg-white/[0.06] backdrop-blur-md border border-white/[0.12] rounded-2xl p-4;
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.4),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    @apply bg-white border border-slate-200 rounded-2xl p-4 shadow-card;
   }
 
-  /* Section title inside a card */
+  /* Eyebrow label inside a card */
   .card-header {
-    @apply text-[11px] font-semibold text-blue-300/70 uppercase tracking-widest mb-3;
+    @apply text-[11px] font-extrabold text-slate-500 uppercase tracking-widest mb-3;
   }
 
   /* Large metric number */
   .stat-value {
-    @apply text-2xl font-bold text-white;
+    @apply text-3xl font-black text-slate-900 tracking-tight;
   }
 
-  /* ── Badges ─────────────────────────────────────────────────────────────── */
+  /* ── Badges — friendly pills, dark text on a soft tint ─────────────────── */
   .badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold;
   }
   .badge-win {
-    @apply badge bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 font-bold;
+    @apply badge bg-emerald-100 text-emerald-800 px-2.5 py-1;
   }
   .badge-loss {
-    @apply badge bg-red-500/15 text-red-300 border border-red-500/30 px-2.5 py-1 font-bold;
+    @apply badge bg-red-100 text-red-800 px-2.5 py-1;
   }
   .badge-tie {
-    @apply badge bg-yellow-500/15 text-yellow-300 border border-yellow-500/30 px-2.5 py-1 font-bold;
+    @apply badge bg-amber-100 text-amber-800 px-2.5 py-1;
   }
   .badge-lc {
-    @apply badge bg-blue-500/15 text-blue-300 border border-blue-500/30;
+    @apply badge bg-blue-100 text-blue-800;
   }
   .badge-lcup {
-    @apply badge bg-purple-500/15 text-purple-300 border border-purple-500/30;
+    @apply badge bg-purple-100 text-purple-800;
   }
 
-  /* ── Buttons ─────────────────────────────────────────────────────────────── */
+  /* ── Buttons — chunky, rounded, easy to hit (≥44px tall) ───────────────── */
   .btn {
-    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px]
+      rounded-xl text-sm font-bold transition-all;
   }
   .btn-primary {
-    @apply btn bg-brand-600 hover:bg-brand-500 text-white;
-    box-shadow: 0 2px 12px rgba(37, 99, 235, 0.35);
+    @apply btn text-white shadow-pop hover:-translate-y-0.5 active:translate-y-0
+      active:scale-[0.98];
+    background-image: linear-gradient(135deg, #3b82f6, #2563eb);
+  }
+  .btn-primary:hover {
+    background-image: linear-gradient(135deg, #2563eb, #1d4ed8);
   }
   .btn-ghost {
-    @apply btn bg-white/[0.07] hover:bg-white/[0.12] text-gray-300 border border-white/[0.08];
+    @apply btn bg-white text-slate-700 border border-slate-300
+      hover:bg-slate-50 hover:border-slate-400;
+  }
+
+  /* ── Form controls ─────────────────────────────────────────────────────── */
+  .input {
+    @apply w-full rounded-xl bg-white border border-slate-300 px-3 py-2.5 text-sm
+      text-slate-900 placeholder:text-slate-400
+      focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none transition-colors;
   }
 }

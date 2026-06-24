@@ -14,7 +14,7 @@ function Stat({
   label,
   value,
   sub,
-  color = 'text-white',
+  color = 'text-slate-900',
 }: {
   label: string;
   value: string | number;
@@ -22,10 +22,10 @@ function Stat({
   color?: string;
 }) {
   return (
-    <div className="bg-gray-800/50 rounded-lg border border-gray-700/40 px-3 py-2.5">
+    <div className="bg-slate-100 rounded-lg border border-slate-200 px-3 py-2.5">
       <div className={`text-lg font-bold ${color}`}>{value}</div>
-      <div className="text-xs text-gray-400 mt-0.5">{label}</div>
-      {sub && <div className="text-[10px] text-gray-600 mt-0.5">{sub}</div>}
+      <div className="text-xs text-slate-600 mt-0.5">{label}</div>
+      {sub && <div className="text-[10px] text-slate-400 mt-0.5">{sub}</div>}
     </div>
   );
 }
@@ -34,9 +34,9 @@ function Stat({
 
 function WRDelta({ wr, baseline, n }: { wr: number; baseline: number; n: number }) {
   const { t } = useTranslation('deck');
-  if (n < 3) return <span className="text-[10px] text-gray-600">{t('performance.lowData')}</span>;
+  if (n < 3) return <span className="text-[10px] text-slate-400">{t('performance.lowData')}</span>;
   const delta = wr - baseline;
-  const cls = delta > 8 ? 'text-emerald-400' : delta < -8 ? 'text-red-400' : 'text-gray-400';
+  const cls = delta > 8 ? 'text-emerald-700' : delta < -8 ? 'text-red-700' : 'text-slate-600';
   const sign = delta > 0 ? '+' : '';
   return (
     <span className={`text-xs font-medium tabular-nums ${cls}`}>
@@ -92,26 +92,26 @@ function CardTable({ cards, overallWR }: { cards: CardPerformance[]; overallWR: 
     <div className="overflow-x-auto">
       <table className="w-full text-sm min-w-[480px]">
         <thead>
-          <tr className="border-b border-gray-800">
-            <th className="text-left py-2 pr-3 text-xs text-gray-400 font-medium">
+          <tr className="border-b border-slate-200">
+            <th className="text-left py-2 pr-3 text-xs text-slate-600 font-medium">
               {t('performance.table.card')}
             </th>
             <th
-              className="text-right py-2 px-3 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 select-none whitespace-nowrap"
+              className="text-right py-2 px-3 text-xs text-slate-600 font-medium cursor-pointer hover:text-slate-800 select-none whitespace-nowrap"
               onClick={() => handleSort('playRate')}
             >
               {t('performance.table.playRate')}{' '}
               <SortIcon k="playRate" sortKey={sortKey} asc={asc} />
             </th>
             <th
-              className="text-right py-2 px-3 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 select-none whitespace-nowrap"
+              className="text-right py-2 px-3 text-xs text-slate-600 font-medium cursor-pointer hover:text-slate-800 select-none whitespace-nowrap"
               onClick={() => handleSort('avgPlays')}
             >
               {t('performance.table.avgPerGame')}{' '}
               <SortIcon k="avgPlays" sortKey={sortKey} asc={asc} />
             </th>
             <th
-              className="text-right py-2 pl-3 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 select-none whitespace-nowrap"
+              className="text-right py-2 pl-3 text-xs text-slate-600 font-medium cursor-pointer hover:text-slate-800 select-none whitespace-nowrap"
               onClick={() => handleSort('winRate')}
             >
               {t('performance.table.wrWhenPlayed')}{' '}
@@ -123,28 +123,28 @@ function CardTable({ cards, overallWR }: { cards: CardPerformance[]; overallWR: 
           {sorted.map((c) => {
             const decisive = c.winsWithCard + c.lossesWithCard;
             return (
-              <tr key={c.card} className="border-b border-gray-800/40 hover:bg-gray-800/20">
-                <td className="py-2 pr-3 text-gray-200">{c.card}</td>
+              <tr key={c.card} className="border-b border-slate-100 hover:bg-slate-50">
+                <td className="py-2 pr-3 text-slate-800">{c.card}</td>
                 <td className="py-2 px-3 text-right">
                   <div className="flex items-center justify-end gap-2">
                     {/* Mini progress bar */}
-                    <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                    <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full ${c.playRate < 25 ? 'bg-red-500' : c.playRate >= 75 ? 'bg-emerald-500' : 'bg-brand-500'}`}
                         style={{ width: `${c.playRate}%` }}
                       />
                     </div>
                     <span
-                      className={`text-xs tabular-nums ${c.playRate < 25 ? 'text-red-400' : 'text-gray-300'}`}
+                      className={`text-xs tabular-nums ${c.playRate < 25 ? 'text-red-700' : 'text-slate-700'}`}
                     >
                       {c.playRate}%
                     </span>
-                    <span className="text-[10px] text-gray-600">
+                    <span className="text-[10px] text-slate-400">
                       ({c.gamesPlayed}/{c.totalGames})
                     </span>
                   </div>
                 </td>
-                <td className="py-2 px-3 text-right text-xs text-gray-400 tabular-nums">
+                <td className="py-2 px-3 text-right text-xs text-slate-600 tabular-nums">
                   {c.avgPlaysPerGame}×
                 </td>
                 <td className="py-2 pl-3 text-right">
@@ -153,10 +153,10 @@ function CardTable({ cards, overallWR }: { cards: CardPerformance[]; overallWR: 
                       <span
                         className={`text-xs tabular-nums ${
                           c.winRate >= 60
-                            ? 'text-emerald-400'
+                            ? 'text-emerald-700'
                             : c.winRate <= 35
-                              ? 'text-red-400'
-                              : 'text-gray-300'
+                              ? 'text-red-700'
+                              : 'text-slate-700'
                         }`}
                       >
                         {c.winRate}%
@@ -164,7 +164,7 @@ function CardTable({ cards, overallWR }: { cards: CardPerformance[]; overallWR: 
                       <WRDelta wr={c.winRate} baseline={overallWR} n={decisive} />
                     </div>
                   ) : (
-                    <span className="text-[10px] text-gray-600">—</span>
+                    <span className="text-[10px] text-slate-400">—</span>
                   )}
                 </td>
               </tr>
@@ -172,7 +172,7 @@ function CardTable({ cards, overallWR }: { cards: CardPerformance[]; overallWR: 
           })}
         </tbody>
       </table>
-      <p className="text-[10px] text-gray-700 mt-2">
+      <p className="text-[10px] text-slate-400 mt-2">
         {t('performance.table.footnote', { overallWR })}
       </p>
     </div>
@@ -184,10 +184,10 @@ function CardTable({ cards, overallWR }: { cards: CardPerformance[]; overallWR: 
 function Insight({ text, severity }: { text: string; severity: 'warn' | 'ok' | 'info' }) {
   const cls =
     severity === 'warn'
-      ? 'bg-yellow-900/30 border-yellow-700/40 text-yellow-300'
+      ? 'bg-amber-50 border-amber-200 text-amber-800'
       : severity === 'ok'
-        ? 'bg-emerald-900/30 border-emerald-700/40 text-emerald-300'
-        : 'bg-gray-800/60 border-gray-700/40 text-gray-400';
+        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+        : 'bg-slate-100 border-slate-200 text-slate-600';
   const Icon = severity === 'warn' ? AlertTriangle : Info;
   return (
     <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${cls}`}>
@@ -289,10 +289,10 @@ export function DeckPerformancePanel() {
     return (
       <div className="card">
         <div className="flex items-center gap-2 mb-3">
-          <BarChart2 className="w-4 h-4 text-brand-400" />
+          <BarChart2 className="w-4 h-4 text-brand-700" />
           <h3 className="card-header mb-0">{t('performance.title')}</h3>
         </div>
-        <p className="text-sm text-gray-500">{t('performance.emptyHint')}</p>
+        <p className="text-sm text-slate-500">{t('performance.emptyHint')}</p>
       </div>
     );
   }
@@ -301,10 +301,10 @@ export function DeckPerformancePanel() {
     return (
       <div className="card">
         <div className="flex items-center gap-2 mb-2">
-          <BarChart2 className="w-4 h-4 text-brand-400" />
+          <BarChart2 className="w-4 h-4 text-brand-700" />
           <h3 className="card-header mb-0">{t('performance.title')}</h3>
         </div>
-        <p className="text-sm text-gray-500">{t('performance.parseFailed')}</p>
+        <p className="text-sm text-slate-500">{t('performance.parseFailed')}</p>
       </div>
     );
   }
@@ -316,13 +316,13 @@ export function DeckPerformancePanel() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <BarChart2 className="w-4 h-4 text-brand-400" />
+          <BarChart2 className="w-4 h-4 text-brand-700" />
           <h3 className="card-header mb-0">{t('performance.title')}</h3>
         </div>
-        <span className="text-xs text-gray-600">
+        <span className="text-xs text-slate-500">
           {t('performance.gamesWithLog', { count: stats.totalGamesAnalyzed })}
           {!playerName && (
-            <span className="text-yellow-500 ml-2">{t('performance.setPlayerHint')}</span>
+            <span className="text-amber-700 ml-2">{t('performance.setPlayerHint')}</span>
           )}
         </span>
       </div>
@@ -338,10 +338,10 @@ export function DeckPerformancePanel() {
           })}
           color={
             stats.overallWinRate >= 55
-              ? 'text-emerald-400'
+              ? 'text-emerald-700'
               : stats.overallWinRate <= 40
-                ? 'text-red-400'
-                : 'text-white'
+                ? 'text-red-700'
+                : 'text-slate-900'
           }
         />
         <Stat
@@ -359,13 +359,13 @@ export function DeckPerformancePanel() {
         <Stat
           label={t('performance.avgTurn1')}
           value={stats.avgTurn1Actions}
-          color={stats.avgTurn1Actions < 1.5 ? 'text-yellow-400' : 'text-white'}
+          color={stats.avgTurn1Actions < 1.5 ? 'text-amber-700' : 'text-slate-900'}
         />
         <Stat
           label={t('performance.brickRate')}
           value={`${stats.lowActivityTurnRate}%`}
           sub={t('performance.brickSub')}
-          color={stats.lowActivityTurnRate > 35 ? 'text-yellow-400' : 'text-white'}
+          color={stats.lowActivityTurnRate > 35 ? 'text-amber-700' : 'text-slate-900'}
         />
         <Stat
           label={t('performance.prizesInWins')}
@@ -391,8 +391,8 @@ export function DeckPerformancePanel() {
           color={
             stats.prizeEfficiency.lossGamesCount > 0 &&
             stats.prizeEfficiency.avgPrizesYouTookInLosses < 2
-              ? 'text-red-400'
-              : 'text-white'
+              ? 'text-red-700'
+              : 'text-slate-900'
           }
         />
       </div>
@@ -409,10 +409,10 @@ export function DeckPerformancePanel() {
       {/* Card performance */}
       {stats.cardPerformance.length > 0 && (
         <section>
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">
             {t('performance.cardPerformance')}
           </h4>
-          <div className="bg-gray-800/20 rounded-lg border border-gray-700/30 p-3">
+          <div className="bg-slate-50 rounded-lg border border-slate-200 p-3">
             <CardTable cards={stats.cardPerformance} overallWR={stats.overallWinRate} />
           </div>
         </section>

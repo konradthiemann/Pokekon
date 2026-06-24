@@ -267,4 +267,13 @@ server cron (plan §6.2) is the next migration step.
 
 The app uses sidebar navigation on medium+ screens and a bottom nav bar on mobile.
 The main content area is capped at `max-w-screen-2xl` with `p-3 md:p-4` padding,
-on a dark `bg-gray-950` base using Tailwind utilities throughout.
+on the light **"playmat"** surface (`#eef3fb`, see [design-system.md](./design-system.md))
+using Tailwind utilities throughout.
+
+## Visual design
+
+The UI is a light, playful, WCAG-AA theme — white "cards" on a deck-tinted light
+playmat, with the self-hosted Nunito font and Pokémon blue/yellow accents. The
+token layer lives in [`apps/web/src/index.css`](../apps/web/src/index.css) and
+[`tailwind.config.js`](../apps/web/tailwind.config.js). Full reference, palette
+and accessibility baseline: [design-system.md](./design-system.md).

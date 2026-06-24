@@ -14,6 +14,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/nunito": "^5.2.7",
     "@pokekon/shared": "*",
     "@tanstack/react-query": "^5.99.0",
     "better-auth": "^1.6.16",

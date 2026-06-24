@@ -21,26 +21,26 @@ const ROLE_OPTIONS: Record<CardType, { value: CardRole }[]> = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  attacker: 'bg-red-900/40 text-red-300 border-red-800 hover:bg-red-900/60',
-  tech: 'bg-purple-900/40 text-purple-300 border-purple-800 hover:bg-purple-900/60',
-  supporter: 'bg-blue-900/40 text-blue-300 border-blue-800 hover:bg-blue-900/60',
-  item: 'bg-green-900/40 text-green-300 border-green-800 hover:bg-green-900/60',
-  stadium: 'bg-yellow-900/40 text-yellow-300 border-yellow-800 hover:bg-yellow-900/60',
-  energy: 'bg-orange-900/40 text-orange-300 border-orange-800 hover:bg-orange-900/60',
+  attacker: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200',
+  tech: 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200',
+  supporter: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',
+  item: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200',
+  stadium: 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200',
+  energy: 'bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-200',
 };
 
 const COLUMN_STYLES: Record<CardType, { header: string; accent: string }> = {
   Pokemon: {
-    header: 'text-red-300 border-red-900/40 bg-red-950/30',
-    accent: 'focus:border-red-700',
+    header: 'text-red-800 border-red-200 bg-red-50',
+    accent: 'focus:border-red-500',
   },
   Trainer: {
-    header: 'text-blue-300 border-blue-900/40 bg-blue-950/30',
-    accent: 'focus:border-blue-700',
+    header: 'text-blue-800 border-blue-200 bg-blue-50',
+    accent: 'focus:border-blue-500',
   },
   Energy: {
-    header: 'text-orange-300 border-orange-900/40 bg-orange-950/30',
-    accent: 'focus:border-orange-700',
+    header: 'text-orange-800 border-orange-200 bg-orange-50',
+    accent: 'focus:border-orange-500',
   },
 };
 
@@ -289,7 +289,8 @@ function RoleDropdown({
   }, [open]);
 
   const options = ROLE_OPTIONS[type];
-  const cls = ROLE_COLORS[role] ?? 'bg-gray-800 text-gray-400 border-gray-700 hover:bg-gray-700';
+  const cls =
+    ROLE_COLORS[role] ?? 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200';
 
   return (
     <div ref={ref} className="relative">
@@ -305,7 +306,7 @@ function RoleDropdown({
         <ChevronDown className="w-2.5 h-2.5 opacity-60" aria-hidden="true" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-30 bg-gray-900 border border-gray-700 rounded-lg shadow-lg py-1 min-w-[150px]">
+        <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-slate-200 rounded-lg shadow-card py-1 min-w-[150px]">
           {options.map((opt) => (
             <button
               key={opt.value}
@@ -314,10 +315,10 @@ function RoleDropdown({
                 onChange(opt.value);
                 setOpen(false);
               }}
-              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-800 flex items-center justify-between gap-2 ${role === opt.value ? 'text-brand-400 font-medium' : 'text-gray-300'}`}
+              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 flex items-center justify-between gap-2 ${role === opt.value ? 'text-brand-700 font-medium' : 'text-slate-700'}`}
             >
               <span>{t(`roles.${opt.value}`)}</span>
-              <span className="text-[10px] text-gray-600">{t(`roleHints.${opt.value}`)}</span>
+              <span className="text-[10px] text-slate-400">{t(`roleHints.${opt.value}`)}</span>
             </button>
           ))}
         </div>
@@ -347,10 +348,10 @@ function CountStepper({
   };
 
   return (
-    <div className="flex items-center gap-0.5 bg-gray-800/70 border border-gray-700 rounded">
+    <div className="flex items-center gap-0.5 bg-slate-100 border border-slate-200 rounded">
       <button
         onClick={dec}
-        className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded-l"
+        className="w-5 h-5 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-l"
         title={count <= 1 ? 'Remove card' : 'Decrease'}
         aria-label={count <= 1 ? t('panel.removeCard') : t('panel.decrease')}
       >
@@ -360,11 +361,11 @@ function CountStepper({
           <Minus className="w-3 h-3" aria-hidden="true" />
         )}
       </button>
-      <span className="text-xs text-gray-200 font-mono w-4 text-center tabular-nums">{count}</span>
+      <span className="text-xs text-slate-800 font-mono w-4 text-center tabular-nums">{count}</span>
       <button
         onClick={inc}
         disabled={count >= 4}
-        className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded-r disabled:opacity-30 disabled:hover:bg-transparent"
+        className="w-5 h-5 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-r disabled:opacity-30 disabled:hover:bg-transparent"
         title={count >= 4 ? 'Max 4 copies' : 'Increase'}
         aria-label={count >= 4 ? t('panel.maxCopies') : t('panel.increase')}
       >
@@ -388,8 +389,8 @@ function CardRow({
   onDelete: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-800/30 group transition-colors">
-      <span className="flex-1 text-sm text-gray-200 min-w-0 truncate">{card.name}</span>
+    <div className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-100 group transition-colors">
+      <span className="flex-1 text-sm text-slate-800 min-w-0 truncate">{card.name}</span>
       <RoleDropdown role={card.role} type={card.type} onChange={onChangeRole} />
       <CountStepper count={card.count} onChange={onChangeCount} onRemove={onDelete} />
     </div>
@@ -462,20 +463,20 @@ function CardNameCombobox({
           if (e.key === 'Escape') setOpen(false);
         }}
         placeholder={placeholder}
-        className={`flex-1 bg-gray-800 border border-gray-700 rounded-md px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none ${accent}`}
+        className={`flex-1 bg-white border border-slate-300 rounded-md px-2 py-1 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none ${accent}`}
         autoComplete="off"
       />
       <button
         onClick={() => submit()}
         disabled={!value.trim()}
-        className="px-2 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-30 text-xs"
+        className="px-2 py-1 rounded-md bg-slate-100 border border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-200 disabled:opacity-30 text-xs"
         title="Add card"
         aria-label={t('panel.addCard')}
       >
         <Plus className="w-3 h-3" aria-hidden="true" />
       </button>
       {open && filtered.length > 0 && (
-        <div className="absolute left-0 bottom-full mb-1 z-40 w-full bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 max-h-48 overflow-y-auto">
+        <div className="absolute left-0 bottom-full mb-1 z-40 w-full bg-white border border-slate-200 rounded-lg shadow-card py-1 max-h-48 overflow-y-auto">
           {filtered.map((name) => (
             <button
               key={name}
@@ -483,7 +484,7 @@ function CardNameCombobox({
                 e.preventDefault();
                 submit(name);
               }}
-              className="w-full text-left px-3 py-1.5 text-xs text-gray-200 hover:bg-gray-800 truncate"
+              className="w-full text-left px-3 py-1.5 text-xs text-slate-800 hover:bg-slate-100 truncate"
             >
               {name}
             </button>
@@ -524,9 +525,9 @@ function CardColumn({
         <span className="text-xs font-normal ml-1.5 opacity-70">({total})</span>
       </div>
 
-      <div className="overflow-y-auto max-h-[320px] divide-y divide-gray-800/40">
+      <div className="overflow-y-auto max-h-[320px] divide-y divide-slate-200">
         {sorted.length === 0 ? (
-          <div className="py-6 text-center text-xs text-gray-600">None</div>
+          <div className="py-6 text-center text-xs text-slate-400">None</div>
         ) : (
           sorted.map((card) => (
             <CardRow
@@ -540,7 +541,7 @@ function CardColumn({
         )}
       </div>
 
-      <div className="px-2 py-2 border-t border-gray-800 bg-gray-900/50">
+      <div className="px-2 py-2 border-t border-slate-200 bg-slate-50">
         <CardNameCombobox
           type={type}
           deckCards={allDeckCards}
@@ -645,16 +646,16 @@ export function DeckPanel({ deckCards }: Props) {
   return (
     <div className="card overflow-hidden p-0">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-800">
+      <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-200">
         <div>
           <h3 className="card-header mb-0">Deck List</h3>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5 font-semibold">
             {totalCards}/60 cards · click role to change · use{' '}
-            <kbd className="px-1 rounded bg-gray-800 border border-gray-700 text-[10px] font-mono">
+            <kbd className="px-1 rounded bg-slate-100 border border-slate-200 text-[10px] font-mono">
               +
             </kbd>
             /
-            <kbd className="px-1 rounded bg-gray-800 border border-gray-700 text-[10px] font-mono">
+            <kbd className="px-1 rounded bg-slate-100 border border-slate-200 text-[10px] font-mono">
               −
             </kbd>{' '}
             to adjust counts
@@ -671,16 +672,16 @@ export function DeckPanel({ deckCards }: Props) {
       </div>
 
       {/* Progress bar */}
-      <div className="px-4 py-2 border-b border-gray-800">
+      <div className="px-4 py-2 border-b border-slate-200">
         <div className="flex items-center gap-2">
-          <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+          <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${totalCards === 60 ? 'bg-emerald-500' : totalCards > 60 ? 'bg-red-500' : 'bg-brand-500'}`}
               style={{ width: `${Math.min((totalCards / 60) * 100, 100)}%` }}
             />
           </div>
           <span
-            className={`text-xs font-mono shrink-0 ${totalCards === 60 ? 'text-emerald-400' : totalCards > 60 ? 'text-red-400' : 'text-gray-500'}`}
+            className={`text-xs font-mono shrink-0 ${totalCards === 60 ? 'text-emerald-700' : totalCards > 60 ? 'text-red-700' : 'text-slate-500'}`}
           >
             {totalCards}/60
           </span>
@@ -688,7 +689,7 @@ export function DeckPanel({ deckCards }: Props) {
       </div>
 
       {/* Mobile tab switcher */}
-      <div className="flex border-b border-gray-800 md:hidden">
+      <div className="flex border-b border-slate-200 md:hidden">
         {(
           [
             ['Pokemon', pokemon] as const,
@@ -703,8 +704,8 @@ export function DeckPanel({ deckCards }: Props) {
               onClick={() => setMobileTab(type)}
               className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${
                 mobileTab === type
-                  ? 'text-white border-b-2 border-brand-500'
-                  : 'text-gray-500 hover:text-gray-300'
+                  ? 'text-slate-900 border-b-2 border-brand-500'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               {type} <span className="opacity-60">({count})</span>
@@ -751,7 +752,7 @@ export function DeckPanel({ deckCards }: Props) {
       </div>
 
       {/* Desktop: three-column layout */}
-      <div className="hidden md:grid grid-cols-3 divide-x divide-gray-800">
+      <div className="hidden md:grid grid-cols-3 divide-x divide-slate-200">
         <CardColumn
           type="Pokemon"
           cards={pokemon}

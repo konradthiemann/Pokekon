@@ -136,21 +136,20 @@ export function AuthModal({ onClose }: Props) {
     }
   };
 
-  const inputClass =
-    'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500';
+  const inputClass = 'input';
 
   // Portal: the sidebar's backdrop-filter creates a containing block that
   // would trap position:fixed descendants — render at document.body instead.
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-modal-title"
-        className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-xl p-5 sm:p-6 w-full max-w-md shadow-xl max-h-[92vh] overflow-y-auto"
+        className="bg-white border border-slate-200 rounded-t-2xl sm:rounded-xl p-5 sm:p-6 w-full max-w-md shadow-card max-h-[92vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between mb-5">
-          <h2 id="auth-modal-title" className="text-white font-semibold">
+          <h2 id="auth-modal-title" className="text-slate-900 font-bold">
             {mode === 'signIn'
               ? t('modal.signInTitle')
               : mode === 'signUp'
@@ -160,7 +159,7 @@ export function AuthModal({ onClose }: Props) {
           <button
             onClick={onClose}
             aria-label={t('close', { ns: 'common' })}
-            className="text-gray-500 hover:text-gray-300"
+            className="text-slate-500 hover:text-slate-700"
           >
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -168,7 +167,7 @@ export function AuthModal({ onClose }: Props) {
 
         {/* Mode toggle (not shown while requesting a password reset) */}
         {mode !== 'forgotPassword' && (
-          <div className="grid grid-cols-2 gap-1 p-1 mb-5 bg-gray-800 border border-gray-700 rounded-lg">
+          <div className="grid grid-cols-2 gap-1 p-1 mb-5 bg-slate-100 border border-slate-200 rounded-lg">
             {(['signIn', 'signUp'] as const).map((m) => (
               <button
                 key={m}
@@ -178,7 +177,7 @@ export function AuthModal({ onClose }: Props) {
                 className={`py-1.5 rounded-md text-sm font-medium transition-colors ${
                   mode === m
                     ? 'bg-brand-600 text-white'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/[0.06]'
+                    : 'text-slate-600 hover:text-slate-800 hover:bg-white'
                 }`}
               >
                 {m === 'signIn' ? t('modal.tabSignIn') : t('modal.tabSignUp')}
@@ -189,8 +188,8 @@ export function AuthModal({ onClose }: Props) {
 
         {mode === 'forgotPassword' && resetRequested ? (
           <div className="space-y-4">
-            <div role="status" className="p-3 bg-gray-800 border border-gray-700 rounded-lg">
-              <p className="text-sm text-gray-300">{t('forgot.success')}</p>
+            <div role="status" className="p-3 bg-slate-100 border border-slate-200 rounded-lg">
+              <p className="text-sm text-slate-700">{t('forgot.success')}</p>
             </div>
             <button
               type="button"
@@ -203,11 +202,11 @@ export function AuthModal({ onClose }: Props) {
         ) : (
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
             {mode === 'forgotPassword' && (
-              <p className="text-sm text-gray-400">{t('forgot.description')}</p>
+              <p className="text-sm text-slate-600">{t('forgot.description')}</p>
             )}
             {mode === 'signUp' && (
               <div>
-                <label htmlFor="auth-name" className="block text-xs text-gray-400 mb-1">
+                <label htmlFor="auth-name" className="block text-xs text-slate-600 mb-1">
                   {t('modal.name')}
                 </label>
                 <input
@@ -224,7 +223,7 @@ export function AuthModal({ onClose }: Props) {
             )}
 
             <div>
-              <label htmlFor="auth-email" className="block text-xs text-gray-400 mb-1">
+              <label htmlFor="auth-email" className="block text-xs text-slate-600 mb-1">
                 {t('modal.email')}
               </label>
               <input
@@ -241,7 +240,7 @@ export function AuthModal({ onClose }: Props) {
 
             {mode !== 'forgotPassword' && (
               <div>
-                <label htmlFor="auth-password" className="block text-xs text-gray-400 mb-1">
+                <label htmlFor="auth-password" className="block text-xs text-slate-600 mb-1">
                   {t('modal.password')}
                 </label>
                 <input
@@ -259,7 +258,7 @@ export function AuthModal({ onClose }: Props) {
                   <button
                     type="button"
                     onClick={() => switchMode('forgotPassword')}
-                    className="mt-1.5 text-xs text-brand-400 hover:text-brand-300 hover:underline"
+                    className="mt-1.5 text-xs text-brand-700 hover:text-brand-800 hover:underline"
                   >
                     {t('modal.forgotPassword')}
                   </button>
@@ -268,8 +267,8 @@ export function AuthModal({ onClose }: Props) {
             )}
 
             {errorKey && (
-              <div role="alert" className="p-3 bg-red-900/20 border border-red-800/40 rounded-lg">
-                <p className="text-xs text-red-400">{t(errorKey)}</p>
+              <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-xs text-red-700">{t(errorKey)}</p>
               </div>
             )}
 
@@ -291,7 +290,7 @@ export function AuthModal({ onClose }: Props) {
               <button
                 type="button"
                 onClick={() => switchMode('signIn')}
-                className="w-full text-center text-xs text-gray-400 hover:text-gray-200 hover:underline pt-1"
+                className="w-full text-center text-xs text-slate-600 hover:text-slate-800 hover:underline pt-1"
               >
                 {t('forgot.backToSignIn')}
               </button>
@@ -303,15 +302,15 @@ export function AuthModal({ onClose }: Props) {
           <>
             {/* Divider */}
             <div className="flex items-center gap-3 my-4">
-              <span className="h-px flex-1 bg-gray-700" aria-hidden="true" />
-              <span className="text-xs text-gray-500">{t('modal.or')}</span>
-              <span className="h-px flex-1 bg-gray-700" aria-hidden="true" />
+              <span className="h-px flex-1 bg-slate-200" aria-hidden="true" />
+              <span className="text-xs text-slate-500">{t('modal.or')}</span>
+              <span className="h-px flex-1 bg-slate-200" aria-hidden="true" />
             </div>
 
             <button
               type="button"
               onClick={() => void handleGoogle()}
-              className="w-full flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium bg-white hover:bg-gray-100 text-gray-800 border border-gray-300 transition-colors"
+              className="w-full flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 transition-colors"
             >
               <GoogleLogo />
               {t('modal.google')}

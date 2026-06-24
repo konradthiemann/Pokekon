@@ -25,18 +25,20 @@ export function OverviewPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white mb-0.5">{t('title')}</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 mb-0.5">
+          {t('title')}
+        </h1>
         {activeDeck ? (
-          <p className="text-sm text-gray-500 mt-0.5 flex items-center gap-1.5">
+          <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-1.5 font-semibold">
             {t('activeDeck')}
             <PokemonIcon archetype={activeDeck.archetype} size="sm" />
-            <span className="text-gray-300 font-medium">{activeDeck.archetypeName}</span>
+            <span className="text-slate-800 font-bold">{activeDeck.archetypeName}</span>
             {activeDeck.variant && !['Default', 'Standard'].includes(activeDeck.variant) && (
-              <span className="text-gray-600">· {activeDeck.variant}</span>
+              <span className="text-slate-400">· {activeDeck.variant}</span>
             )}
           </p>
         ) : (
-          <p className="text-sm text-gray-500 mt-0.5">{t('noActiveDeck')}</p>
+          <p className="text-sm text-slate-500 mt-0.5 font-semibold">{t('noActiveDeck')}</p>
         )}
       </div>
 

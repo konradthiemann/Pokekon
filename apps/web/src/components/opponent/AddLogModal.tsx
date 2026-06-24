@@ -14,24 +14,27 @@ import { KNOWN_ARCHETYPES } from '../../constants/archetypes';
  * conditionals needed in the JSX. Labels are i18n keys in the `opponents`
  * namespace, resolved at render time.
  */
+// Active fills use deep shades so the label clears WCAG AA (4.5:1): white on
+// emerald-700 (4.6:1) / red-700 (5.9:1); the bright amber "tie" carries dark
+// slate text instead (8.8:1) — energetic and still readable.
 const RESULT_BUTTONS = [
   [
     'W',
     'addLog.win',
-    'bg-emerald-600 hover:bg-emerald-500 border-emerald-500 text-white',
-    'bg-emerald-950/40 border-emerald-800 text-emerald-400',
+    'bg-emerald-700 hover:bg-emerald-600 border-emerald-600 text-white',
+    'bg-emerald-50 border-emerald-200 text-emerald-700',
   ],
   [
     'L',
     'addLog.loss',
-    'bg-red-600 hover:bg-red-500 border-red-500 text-white',
-    'bg-red-950/40 border-red-800 text-red-400',
+    'bg-red-700 hover:bg-red-600 border-red-600 text-white',
+    'bg-red-50 border-red-200 text-red-700',
   ],
   [
     'T',
     'addLog.tie',
-    'bg-yellow-600 hover:bg-yellow-500 border-yellow-500 text-white',
-    'bg-yellow-950/40 border-yellow-800 text-yellow-400',
+    'bg-amber-500 hover:bg-amber-400 border-amber-400 text-slate-900',
+    'bg-amber-50 border-amber-200 text-amber-700',
   ],
 ] as const;
 
@@ -151,20 +154,20 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-log-modal-title"
-        className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-xl p-5 sm:p-6 w-full max-w-md shadow-xl max-h-[92vh] overflow-y-auto"
+        className="bg-white border border-slate-200 rounded-t-2xl sm:rounded-xl p-5 sm:p-6 w-full max-w-md shadow-card max-h-[92vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
-            <h2 id="add-log-modal-title" className="text-white font-semibold">
+            <h2 id="add-log-modal-title" className="text-slate-900 font-bold">
               {t('addLog.title')}
             </h2>
             {loggedCount > 0 && (
-              <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800 rounded-full px-2 py-0.5">
+              <span className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
                 <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
                 {loggedCount === 1
                   ? t('addLog.loggedOne')
@@ -175,7 +178,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
           <button
             onClick={onClose}
             aria-label={t('close', { ns: 'common' })}
-            className="text-gray-500 hover:text-gray-300"
+            className="text-slate-500 hover:text-slate-700"
           >
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -184,7 +187,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
         <div className="space-y-4">
           {/* My Deck — always first */}
           <div>
-            <label className="block text-xs text-gray-400 mb-1">{t('addLog.myDeck')}</label>
+            <label className="block text-xs text-slate-600 mb-1">{t('addLog.myDeck')}</label>
             <select
               value={selectedDeckId ?? ''}
               onChange={(e) => {
@@ -192,7 +195,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
                 setSelectedDeckId(val);
                 setDeckSnapshotId('');
               }}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+              className="input"
             >
               <option value="">{t('addLog.noDeckSelected')}</option>
               {decks.map((d) => (
@@ -206,7 +209,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
 
           {/* Opponent deck — visual tap grid */}
           <div>
-            <label className="block text-xs text-gray-400 mb-2">{t('addLog.opponentDeck')}</label>
+            <label className="block text-xs text-slate-600 mb-2">{t('addLog.opponentDeck')}</label>
             <div className="grid grid-cols-2 gap-1.5">
               {KNOWN_ARCHETYPES.map((a) => (
                 <button
@@ -218,8 +221,8 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
                   }}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-all ${
                     archetype === a.slug
-                      ? 'bg-brand-700/50 border-brand-500 text-white'
-                      : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-500'
+                      ? 'bg-brand-100 border-brand-200 text-brand-800'
+                      : 'bg-slate-100 border-slate-300 text-slate-700 hover:border-slate-400'
                   }`}
                   aria-pressed={archetype === a.slug}
                 >
@@ -235,8 +238,8 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
                 }}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-all ${
                   isCustomMode && archetype === ''
-                    ? 'bg-brand-700/50 border-brand-500 text-white'
-                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
+                    ? 'bg-brand-100 border-brand-200 text-brand-800'
+                    : 'bg-slate-100 border-slate-300 text-slate-600 hover:border-slate-400'
                 }`}
               >
                 <span className="text-lg leading-none" aria-hidden="true">
@@ -252,14 +255,14 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
                 value={customArch}
                 onChange={(e) => setCustomArch(e.target.value)}
                 placeholder={t('addLog.archetypePlaceholder')}
-                className="mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500"
+                className="input mt-2"
               />
             )}
           </div>
 
           {/* Result — 3-button tap row */}
           <div>
-            <label className="block text-xs text-gray-400 mb-2">{t('addLog.result')}</label>
+            <label className="block text-xs text-slate-600 mb-2">{t('addLog.result')}</label>
             <div className="grid grid-cols-3 gap-2">
               {RESULT_BUTTONS.map(([val, labelKey, activeCls, inactiveCls]) => (
                 <button
@@ -267,7 +270,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
                   type="button"
                   onClick={() => setResult(val as MatchResult)}
                   className={`py-3 rounded-xl border-2 text-sm font-bold transition-all ${
-                    result === val ? activeCls + ' scale-105 shadow-lg' : inactiveCls
+                    result === val ? activeCls + ' scale-105 shadow-pop' : inactiveCls
                   }`}
                   aria-pressed={result === val}
                 >
@@ -280,11 +283,11 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
           {/* Event type, date, and round — always visible, 3-column grid */}
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="block text-xs text-gray-400 mb-1">{t('addLog.eventType')}</label>
+              <label className="block text-xs text-slate-600 mb-1">{t('addLog.eventType')}</label>
               <select
                 value={eventType}
                 onChange={(e) => setEventType(e.target.value as EventType)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+                className="w-full bg-white border border-slate-300 rounded-xl px-2 py-2 text-sm text-slate-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
               >
                 {EVENT_TYPES.map((et) => (
                   <option key={et} value={et}>
@@ -294,49 +297,49 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">{t('addLog.eventDate')}</label>
+              <label className="block text-xs text-slate-600 mb-1">{t('addLog.eventDate')}</label>
               <input
                 type="date"
                 value={eventDate}
                 onChange={(e) => setEventDate(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+                className="w-full bg-white border border-slate-300 rounded-xl px-2 py-2 text-sm text-slate-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">{t('addLog.round')}</label>
+              <label className="block text-xs text-slate-600 mb-1">{t('addLog.round')}</label>
               <input
                 type="number"
                 min={1}
                 value={round}
                 onChange={(e) => setRound(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="—"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500"
+                className="w-full bg-white border border-slate-300 rounded-xl px-2 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
               />
             </div>
           </div>
 
           {/* Secondary fields — collapsible to keep modal compact on mobile */}
           <details className="group">
-            <summary className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer select-none list-none py-1">
+            <summary className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 cursor-pointer select-none list-none py-1">
               <span className="group-open:rotate-180 transition-transform inline-block">▾</span>
               {t('addLog.moreOptions')}
             </summary>
             <div className="space-y-3 mt-3">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">{t('addLog.notes')}</label>
+                <label className="block text-xs text-slate-600 mb-1">{t('addLog.notes')}</label>
                 <input
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={t('addLog.notesPlaceholder')}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500"
+                  className="input"
                 />
               </div>
 
               {/* Deck version — filtered to selected deck */}
               {relevantSnapshots.length > 0 && (
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">
+                  <label className="block text-xs text-slate-600 mb-1">
                     {t('addLog.deckVersion')}
                   </label>
                   <select
@@ -344,7 +347,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
                     onChange={(e) =>
                       setDeckSnapshotId(e.target.value === '' ? '' : Number(e.target.value))
                     }
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+                    className="input"
                   >
                     <option value="">{t('addLog.untagged')}</option>
                     {relevantSnapshots.map((s) => (
@@ -357,16 +360,16 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
               )}
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1">
+                <label className="block text-xs text-slate-600 mb-1">
                   {t('addLog.battleLog')}
-                  <span className="ml-1 text-gray-600">{t('addLog.battleLogHint')}</span>
+                  <span className="ml-1 text-slate-400">{t('addLog.battleLogHint')}</span>
                 </label>
                 <textarea
                   value={battleLog}
                   onChange={(e) => setBattleLog(e.target.value)}
                   placeholder={t('addLog.battleLogPlaceholder')}
                   rows={4}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 resize-y font-mono text-xs"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200 resize-y font-mono text-xs"
                 />
               </div>
             </div>
@@ -374,8 +377,8 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
         </div>
 
         {saveError && (
-          <div className="mt-4 p-3 bg-red-900/20 border border-red-800/40 rounded-lg">
-            <p className="text-xs text-red-400">{saveError}</p>
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-xs text-red-700">{saveError}</p>
           </div>
         )}
 
@@ -386,7 +389,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
           <button
             onClick={() => void handleSave(true)}
             disabled={!finalArchetype.trim() || result === null || saving}
-            className="btn-ghost flex-1 justify-center py-3 text-sm font-bold border border-brand-400/30 text-brand-300 disabled:opacity-50"
+            className="btn-ghost flex-1 justify-center py-3 text-sm font-bold border border-brand-200 text-brand-700 hover:bg-brand-100 disabled:opacity-50"
             title={t('addLog.saveAndNext')}
           >
             {t('addLog.saveAndNext')}

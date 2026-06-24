@@ -17,8 +17,8 @@ import type { ParsedBattleLog } from '@pokekon/shared';
 
 const C_P1 = '#d946ef';
 const C_P2 = '#f87171';
-const C_TIP = { background: '#111827', border: '1px solid #374151', borderRadius: 8 };
-const C_LAB = { color: '#f9fafb', fontWeight: 600, fontSize: 12 };
+const C_TIP = { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 8 };
+const C_LAB = { color: '#0f172a', fontWeight: 600, fontSize: 12 };
 
 interface Props {
   data: ParsedBattleLog;
@@ -34,10 +34,10 @@ function SummaryCard({
   sub?: string;
 }) {
   return (
-    <div className="bg-gray-800/50 rounded-lg border border-gray-700/40 px-3 py-2.5 text-center">
-      <div className="text-lg font-bold text-white">{value}</div>
-      <div className="text-xs text-gray-400 mt-0.5">{label}</div>
-      {sub && <div className="text-[10px] text-gray-600 mt-0.5">{sub}</div>}
+    <div className="bg-slate-100 rounded-lg border border-slate-200 px-3 py-2.5 text-center">
+      <div className="text-lg font-bold text-slate-900">{value}</div>
+      <div className="text-xs text-slate-600 mt-0.5">{label}</div>
+      {sub && <div className="text-[10px] text-slate-400 mt-0.5">{sub}</div>}
     </div>
   );
 }
@@ -89,19 +89,19 @@ export function MatchStatsTab({ data }: Props) {
       {/* Prize race */}
       {hasPrizes && (
         <section>
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">
             {t('statsTab.prizeRace')}
           </h4>
-          <div className="bg-gray-800/30 rounded-lg border border-gray-700/40 p-3">
+          <div className="bg-slate-50 rounded-lg border border-slate-200 p-3">
             <ResponsiveContainer width="100%" height={180}>
               <LineChart
                 data={prizeProgression}
                 margin={{ top: 4, right: 8, left: -20, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis
                   dataKey="label"
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  tick={{ fill: '#64748b', fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
                   interval="preserveStartEnd"
@@ -109,7 +109,7 @@ export function MatchStatsTab({ data }: Props) {
                 <YAxis
                   domain={[0, 6]}
                   ticks={[0, 1, 2, 3, 4, 5, 6]}
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  tick={{ fill: '#64748b', fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -123,7 +123,7 @@ export function MatchStatsTab({ data }: Props) {
                 />
                 <Legend
                   formatter={(value) => (
-                    <span style={{ color: '#9ca3af', fontSize: 11 }}>{value}</span>
+                    <span style={{ color: '#475569', fontSize: 11 }}>{value}</span>
                   )}
                 />
                 <Line
@@ -152,21 +152,21 @@ export function MatchStatsTab({ data }: Props) {
       {/* Damage per turn */}
       {hasDamage && (
         <section>
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">
             {t('statsTab.damagePerTurn')}
           </h4>
-          <div className="bg-gray-800/30 rounded-lg border border-gray-700/40 p-3">
+          <div className="bg-slate-50 rounded-lg border border-slate-200 p-3">
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={damageByTurn} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis
                   dataKey="label"
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  tick={{ fill: '#64748b', fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
                   interval="preserveStartEnd"
                 />
-                <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
                 <Tooltip
                   contentStyle={C_TIP}
                   labelStyle={C_LAB}
@@ -177,7 +177,7 @@ export function MatchStatsTab({ data }: Props) {
                 />
                 <Legend
                   formatter={(value) => (
-                    <span style={{ color: '#9ca3af', fontSize: 11 }}>{value}</span>
+                    <span style={{ color: '#475569', fontSize: 11 }}>{value}</span>
                   )}
                 />
                 <Bar
@@ -203,21 +203,21 @@ export function MatchStatsTab({ data }: Props) {
       {/* Card frequency */}
       {hasCards && (
         <section>
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">
             {t('statsTab.mostPlayedCards', { player: player1 })}
           </h4>
-          <div className="bg-gray-800/30 rounded-lg border border-gray-700/40 p-3">
+          <div className="bg-slate-50 rounded-lg border border-slate-200 p-3">
             <ResponsiveContainer width="100%" height={Math.max(140, cardFrequency.length * 24)}>
               <BarChart
                 data={cardFrequency}
                 layout="vertical"
                 margin={{ top: 0, right: 32, left: 8, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
                 <XAxis
                   type="number"
                   allowDecimals={false}
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  tick={{ fill: '#64748b', fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -225,7 +225,7 @@ export function MatchStatsTab({ data }: Props) {
                   type="category"
                   dataKey="card"
                   width={160}
-                  tick={{ fill: '#d1d5db', fontSize: 11 }}
+                  tick={{ fill: '#334155', fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -242,7 +242,7 @@ export function MatchStatsTab({ data }: Props) {
       )}
 
       {!hasPrizes && !hasDamage && !hasCards && (
-        <p className="text-sm text-gray-600 text-center py-8">{t('statsTab.noEvents')}</p>
+        <p className="text-sm text-slate-500 text-center py-8">{t('statsTab.noEvents')}</p>
       )}
     </div>
   );
