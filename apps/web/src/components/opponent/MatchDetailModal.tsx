@@ -19,8 +19,10 @@ import { analyzeBattleLogViaApi, getAiSettings, updateAiSettings } from '../../l
 import { parseBattleLog } from '@pokekon/shared';
 import { MatchStatsTab } from './MatchStatsTab';
 import { useDashboardStore } from '../../store/dashboardStore';
+import { authClient } from '../../lib/authClient';
+import { DEMO_AI_TOKEN_KEY, PLAYER_NAME_KEY, isAnonymousUser } from '../../lib/demo';
 
-const LS_PLAYER = 'tcg-player-name';
+const LS_PLAYER = PLAYER_NAME_KEY;
 
 interface Props {
   log: OpponentLog;
@@ -222,16 +224,27 @@ export function MatchDetailModal({ log, onClose }: Props) {
   // The LLM key lives server-side (encrypted, BYOK). `apiKey` is only the value being
   // entered now; `hasApiKey` reflects whether a key is already stored on the server.
   const [apiKey, setApiKey] = useState('');
-  const [hasApiKey, setHasApiKey] = useState(false);
+  const [serverHasKey, setServerHasKey] = useState(false);
+  // Whether a demo, browser-only token is present (set when one is entered below).
+  const [demoTokenPresent, setDemoTokenPresent] = useState(() =>
+    Boolean(localStorage.getItem(DEMO_AI_TOKEN_KEY)),
+  );
   const [playerName, setPlayerName] = useState(() => localStorage.getItem(LS_PLAYER) ?? '');
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
+  // Demo guests never persist their key server-side; it lives only in the browser
+  // (DEMO_AI_TOKEN_KEY) and is sent per request. Regular users use the stored key.
+  const { data: session } = authClient.useSession();
+  const isDemo = isAnonymousUser(session?.user);
+  const hasApiKey = isDemo ? demoTokenPresent : serverHasKey;
+
   useEffect(() => {
+    if (isDemo) return; // demo mode keeps the token in the browser, not on the server
     getAiSettings()
-      .then((s) => setHasApiKey(s.hasApiKey))
-      .catch(() => setHasApiKey(false));
-  }, []);
+      .then((s) => setServerHasKey(s.hasApiKey))
+      .catch(() => setServerHasKey(false));
+  }, [isDemo]);
 
   const storedAnalysis: BattleAnalysis | null = (() => {
     try {
@@ -284,23 +297,37 @@ export function MatchDetailModal({ log, onClose }: Props) {
   }, [log.id, battleLog, refresh]);
 
   const handleAnalyze = useCallback(async () => {
-    if (!battleLog.trim() || !playerName.trim() || (!apiKey.trim() && !hasApiKey)) return;
+    const enteredKey = apiKey.trim();
+    if (!battleLog.trim() || !playerName.trim() || (!enteredKey && !hasApiKey)) return;
     setAnalyzing(true);
     setAnalysisError(null);
     localStorage.setItem(LS_PLAYER, playerName);
     try {
-      // Persist a newly entered key server-side (encrypted), then forget it locally.
-      if (apiKey.trim()) {
-        await updateAiSettings({ apiKey: apiKey.trim() });
+      let ephemeralToken: string | undefined;
+      if (isDemo) {
+        // Demo: keep the token only in the browser, send it per request.
+        if (enteredKey) {
+          localStorage.setItem(DEMO_AI_TOKEN_KEY, enteredKey);
+          setApiKey('');
+          setDemoTokenPresent(true);
+        }
+        ephemeralToken = enteredKey || localStorage.getItem(DEMO_AI_TOKEN_KEY) || undefined;
+      } else if (enteredKey) {
+        // Regular: persist server-side (encrypted), then forget it locally.
+        await updateAiSettings({ apiKey: enteredKey });
         setApiKey('');
-        setHasApiKey(true);
+        setServerHasKey(true);
       }
       // Save log first if dirty
       if (logDirty && log.id != null) {
         await updateOpponentLog(log.id, { battleLog: battleLog.trim() });
         setLogDirty(false);
       }
-      const result = await analyzeBattleLogViaApi(battleLog, playerName);
+      const result = await analyzeBattleLogViaApi(
+        battleLog,
+        playerName,
+        ephemeralToken ? { apiKey: ephemeralToken } : undefined,
+      );
       setAnalysis(result);
       if (log.id != null) {
         await updateOpponentLog(log.id, { analysis: JSON.stringify(result) });
@@ -312,7 +339,7 @@ export function MatchDetailModal({ log, onClose }: Props) {
     } finally {
       setAnalyzing(false);
     }
-  }, [battleLog, apiKey, hasApiKey, playerName, logDirty, log.id, refresh]);
+  }, [battleLog, apiKey, hasApiKey, playerName, logDirty, log.id, refresh, isDemo]);
 
   const resultBadge =
     log.result === 'W' ? 'badge-win' : log.result === 'L' ? 'badge-loss' : 'badge-tie';
@@ -547,12 +574,22 @@ export function MatchDetailModal({ log, onClose }: Props) {
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
                       placeholder={
-                        hasApiKey ? '•••••••• (gespeichert)' : 'GitHub Models Token (ghp_…)'
+                        hasApiKey
+                          ? t(
+                              isDemo
+                                ? 'matchDetail.analysisTab.apiKeyStoredDemo'
+                                : 'matchDetail.analysisTab.apiKeyStored',
+                            )
+                          : 'GitHub Models Token (ghp_…)'
                       }
                       className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 font-mono"
                     />
                     <p className="mt-1 text-[10px] text-gray-600">
-                      Wird serverseitig verschlüsselt gespeichert, nie im Browser.
+                      {t(
+                        isDemo
+                          ? 'matchDetail.analysisTab.apiKeyHintDemo'
+                          : 'matchDetail.analysisTab.apiKeyHint',
+                      )}
                     </p>
                   </div>
                 </div>

@@ -17,6 +17,7 @@ Hono + PostgreSQL backend in `apps/api`, and this documentation site in
 | [ai-system.md](./ai-system.md) | **KI-System-Gesamtübersicht** — Schichtenmodell, Guardrails, Orchestrierung, Memory, Diagramme |
 | [backend-evolution-plan.md](./backend-evolution-plan.md) | Roadmap: Backend-Ausbau, Battle-Log-Zugqualität, Doku-Viewer (Starlight) |
 | [features.md](./features.md) | All app features explained: meta sync, battle log, deck comparison, recommendations, snapshots |
+| [demo-mode.md](./demo-mode.md) | Guest/demo access — anonymous login, seeded sample data, AI analysis without spending tokens |
 | [getting-started.md](./getting-started.md) | Dev setup, build, deploy |
 
 ## Quick orientation

@@ -1,4 +1,5 @@
 import { createAuthClient } from 'better-auth/react';
+import { anonymousClient } from 'better-auth/client/plugins';
 
 /**
  * Better Auth client. The auth routes live under /api/auth/*.
@@ -16,4 +17,6 @@ import { createAuthClient } from 'better-auth/react';
  */
 export const authClient = createAuthClient({
   baseURL: import.meta.env.VITE_API_URL || window.location.origin,
+  // Enables authClient.signIn.anonymous() for the "try without signing up" demo flow.
+  plugins: [anonymousClient()],
 });

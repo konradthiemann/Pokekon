@@ -51,16 +51,31 @@ npm run dev          # web on http://localhost:5173, /api proxied to the target
 ```
 The Vite proxy rewrites the cookie domain so the Better Auth session works.
 
-**Option B — full local stack:**
+**Option B — full local stack (hot reload, two terminals):**
 ```bash
-# apps/api/.env  (DATABASE_URL + BETTER_AUTH_SECRET at minimum)
-npm run db:migrate -w @pokekon/api   # apply migrations to your local DB
-npm run dev:api                       # API on http://localhost:8080
-npm run dev                           # web on http://localhost:5173 (proxy → :8080)
+# Terminal 1 — API (DATABASE_URL must be exported; the API does NOT read .env)
+export DATABASE_URL="postgresql://$(whoami)@127.0.0.1:5432/pokekon_dev"
+npm run db:migrate -w @pokekon/api    # apply migrations to your local DB
+npm run dev:api                        # API on http://localhost:8080
+
+# Terminal 2 — web. The Vite /api proxy is ONLY active when this var is set:
+VITE_API_PROXY_TARGET="http://localhost:8080" npm run dev   # web on :5173 → proxies /api to :8080
 ```
+Open http://localhost:5173. Without `VITE_API_PROXY_TARGET`, the web app has no API
+to talk to and every request fails silently.
 
 Then sign in (or create an account) — domain data starts empty for a new account.
 Hot module replacement is active for the web app.
+
+**Option C — one-command guest demo (single-origin, closest to production):**
+```bash
+./scripts/demo-local.sh
+```
+Builds everything, applies migrations, and serves the API + web on
+**http://localhost:8080** from one process. Open it and click
+**"Ohne Anmeldung testen"** to explore with seeded sample decks and matches — no
+sign-up, no LLM token. Needs a local PostgreSQL running; override the connection
+with `DATABASE_URL="…" ./scripts/demo-local.sh`. See [demo-mode.md](./demo-mode.md).
 
 ---
 
@@ -108,6 +123,10 @@ site deploys separately to GitHub Pages via `.github/workflows/docs.yml`.
 ---
 
 ## First Use
+
+> **Just want to look around?** Click **"Ohne Anmeldung testen"** on the welcome
+> screen for an instant guest demo — a throwaway account pre-filled with sample
+> decks, documented matches and ready-made AI analyses. See [demo-mode.md](./demo-mode.md).
 
 1. Sign in / create an account (top-right or sidebar). A fresh account starts empty.
 2. **Deck** → create a deck, then "Import" your list (paste your PTCG export).

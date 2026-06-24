@@ -89,12 +89,16 @@
       "settings": "Analysis Settings",
       "playerNameLabel": "My player name in the log",
       "playerNamePlaceholder": "e.g. Premiox",
-      "apiKeyLabel": "Anthropic API Key",
+      "apiKeyLabel": "GitHub Models Token",
       "noLog": "No battle log available — paste one in the \"Battle Log\" tab first.",
       "analyzing": "Analyzing…",
       "reanalyze": "Re-analyze",
       "start": "Start analysis",
-      "empty": "No analysis yet. Enter your player name and API key, then start the analysis."
+      "empty": "No analysis yet. Enter your player name and API key, then start the analysis.",
+      "apiKeyHint": "Stored encrypted on the server, never in your browser.",
+      "apiKeyHintDemo": "Demo mode: the token stays only in your browser and is not saved.",
+      "apiKeyStored": "•••••••• (saved)",
+      "apiKeyStoredDemo": "•••••••• (browser only)"
     }
   },
   "statsTab": {

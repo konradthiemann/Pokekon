@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { AnalysisError, getAnalysisProvider } from '../ai/index.js';
-import { userAiSettings } from '../db/schema.js';
+import { userAiSettings, type AiProvider } from '../db/schema.js';
 import { decryptSecret, encryptSecret } from '../lib/crypto.js';
 import type { ApiEnv } from '../middleware/session.js';
 import { aiSettingsPutSchema, analyzeLogSchema } from '../validation.js';
@@ -81,26 +81,40 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
       return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
     }
     const userId = c.get('user').id;
+    const body = parsed.data;
 
-    const [settings] = await c
-      .get('db')
-      .select()
-      .from(userAiSettings)
-      .where(eq(userAiSettings.userId, userId))
-      .limit(1);
-
-    if (!settings?.encryptedApiKey) {
-      return c.json({ error: 'No API key configured. Add one in AI analysis settings.' }, 400);
-    }
-
+    // Ephemeral BYOK: a key in the request body is used once and never stored
+    // (demo flow). Otherwise fall back to the caller's stored, encrypted key.
     let apiKey: string;
-    try {
-      apiKey = decryptSecret(settings.encryptedApiKey);
-    } catch {
-      return c.json({ error: 'Stored API key could not be decrypted.' }, 500);
+    let providerName: AiProvider;
+    let model: string | null;
+
+    const ephemeralKey = body.apiKey?.trim();
+    if (ephemeralKey) {
+      apiKey = ephemeralKey;
+      providerName = body.provider ?? 'github-models';
+      model = body.model ?? null;
+    } else {
+      const [settings] = await c
+        .get('db')
+        .select()
+        .from(userAiSettings)
+        .where(eq(userAiSettings.userId, userId))
+        .limit(1);
+
+      if (!settings?.encryptedApiKey) {
+        return c.json({ error: 'No API key configured. Add one in AI analysis settings.' }, 400);
+      }
+      try {
+        apiKey = decryptSecret(settings.encryptedApiKey);
+      } catch {
+        return c.json({ error: 'Stored API key could not be decrypted.' }, 500);
+      }
+      providerName = settings.provider;
+      model = settings.model;
     }
 
-    const provider = getAnalysisProvider(settings.provider, { apiKey, model: settings.model });
+    const provider = getAnalysisProvider(providerName, { apiKey, model });
     try {
       const analysis = await provider.analyze({
         log: parsed.data.battleLog,
