@@ -49,21 +49,21 @@ export function AddCardModal({ onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-card-modal-title"
-        className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-sm shadow-xl"
+        className="bg-white border border-slate-200 rounded-xl p-6 w-full max-w-sm shadow-card"
       >
         <div className="flex items-center justify-between mb-5">
-          <h2 id="add-card-modal-title" className="text-white font-semibold">
+          <h2 id="add-card-modal-title" className="text-slate-900 font-bold">
             {t('addCardModal.title')}
           </h2>
           <button
             onClick={onClose}
             aria-label={t('close', { ns: 'common' })}
-            className="text-gray-500 hover:text-gray-300"
+            className="text-slate-500 hover:text-slate-700"
           >
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -71,34 +71,36 @@ export function AddCardModal({ onClose }: Props) {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">{t('addCardModal.cardName')}</label>
+            <label className="block text-xs text-slate-600 mb-1">
+              {t('addCardModal.cardName')}
+            </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t('addCardModal.cardNamePlaceholder')}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500"
+              className="input"
             />
           </div>
 
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-xs text-gray-400 mb-1">{t('addCardModal.count')}</label>
+              <label className="block text-xs text-slate-600 mb-1">{t('addCardModal.count')}</label>
               <input
                 type="number"
                 min={1}
                 max={4}
                 value={count}
                 onChange={(e) => setCount(Number(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+                className="input"
               />
             </div>
             <div className="flex-1">
-              <label className="block text-xs text-gray-400 mb-1">{t('addCardModal.type')}</label>
+              <label className="block text-xs text-slate-600 mb-1">{t('addCardModal.type')}</label>
               <select
                 value={type}
                 onChange={(e) => handleTypeChange(e.target.value as CardType)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+                className="input"
               >
                 <option value="Pokemon">{t('cardTypes.Pokemon')}</option>
                 <option value="Trainer">{t('cardTypes.Trainer')}</option>
@@ -108,11 +110,11 @@ export function AddCardModal({ onClose }: Props) {
           </div>
 
           <div>
-            <label className="block text-xs text-gray-400 mb-1">{t('addCardModal.role')}</label>
+            <label className="block text-xs text-slate-600 mb-1">{t('addCardModal.role')}</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as CardRole)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+              className="input"
             >
               {ROLES_BY_TYPE[type].map((r) => (
                 <option key={r} value={r}>

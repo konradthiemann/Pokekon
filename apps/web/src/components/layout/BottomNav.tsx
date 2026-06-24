@@ -24,7 +24,7 @@ export function BottomNav() {
 
   return (
     <>
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-gray-900 border-t border-gray-800 flex items-stretch">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-4px_20px_-8px_rgba(15,23,42,0.15)] flex items-stretch">
         {/* Left items */}
         {left.map(({ id, labelKey, Icon }) => {
           const active = activeTab === id;
@@ -32,11 +32,12 @@ export function BottomNav() {
             <button
               key={id}
               onClick={() => setActiveTab(id)}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[11px] font-semibold min-h-[56px] transition-colors ${
-                active ? 'text-brand-400' : 'text-gray-500 hover:text-gray-300'
+              aria-current={active ? 'page' : undefined}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[11px] font-bold min-h-[56px] transition-colors ${
+                active ? 'text-brand-700' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <Icon className={`w-5 h-5 ${active ? 'text-brand-400' : ''}`} aria-hidden="true" />
+              <Icon className="w-5 h-5" aria-hidden="true" />
               {t(labelKey)}
             </button>
           );
@@ -46,7 +47,7 @@ export function BottomNav() {
         <div className="flex-shrink-0 flex items-center justify-center px-2">
           <button
             onClick={() => setShowLogModal(true)}
-            className="w-14 h-14 rounded-full bg-brand-600 hover:bg-brand-500 active:scale-95 flex items-center justify-center shadow-lg shadow-brand-900/50 transition-all -translate-y-3 border-4 border-gray-900"
+            className="w-14 h-14 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 active:scale-95 flex items-center justify-center shadow-pop transition-all -translate-y-3 border-4 border-white"
             aria-label={t('bottomNav.logMatch')}
           >
             <Plus className="w-6 h-6 text-white" aria-hidden="true" />
@@ -60,11 +61,12 @@ export function BottomNav() {
             <button
               key={id}
               onClick={() => setActiveTab(id)}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[11px] font-semibold min-h-[56px] transition-colors ${
-                active ? 'text-brand-400' : 'text-gray-500 hover:text-gray-300'
+              aria-current={active ? 'page' : undefined}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[11px] font-bold min-h-[56px] transition-colors ${
+                active ? 'text-brand-700' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <Icon className={`w-5 h-5 ${active ? 'text-brand-400' : ''}`} aria-hidden="true" />
+              <Icon className="w-5 h-5" aria-hidden="true" />
               {t(labelKey)}
             </button>
           );

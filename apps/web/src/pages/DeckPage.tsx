@@ -66,7 +66,7 @@ function DeckSettingsWidget() {
       <div className="flex flex-col gap-4 h-full">
         <div className="space-y-2">
           <div>
-            <label className="block text-[11px] uppercase tracking-wider text-white/40 mb-1 font-medium">
+            <label className="block text-[11px] uppercase tracking-wider text-slate-500 mb-1 font-bold">
               {t('settings.archetype')}
             </label>
             <input
@@ -74,11 +74,11 @@ function DeckSettingsWidget() {
               value={archetypeName}
               onChange={(e) => setArchetypeName(e.target.value)}
               placeholder={t('settings.archetypePlaceholder')}
-              className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400"
+              className="input w-full px-3 py-1.5 text-sm"
             />
           </div>
           <div>
-            <label className="block text-[11px] uppercase tracking-wider text-white/40 mb-1 font-medium">
+            <label className="block text-[11px] uppercase tracking-wider text-slate-500 mb-1 font-bold">
               {t('settings.variantLabel')}
             </label>
             <input
@@ -86,12 +86,12 @@ function DeckSettingsWidget() {
               value={variant}
               onChange={(e) => setVariant(e.target.value)}
               placeholder={t('settings.variantPlaceholder')}
-              className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400"
+              className="input w-full px-3 py-1.5 text-sm"
             />
           </div>
           {showAdvanced ? (
             <div>
-              <label className="block text-[11px] uppercase tracking-wider text-white/40 mb-1 font-medium">
+              <label className="block text-[11px] uppercase tracking-wider text-slate-500 mb-1 font-bold">
                 {t('settings.slugLabel')}
               </label>
               <input
@@ -99,14 +99,14 @@ function DeckSettingsWidget() {
                 value={archetype}
                 onChange={(e) => setArchetype(e.target.value)}
                 placeholder="n-zoroark"
-                className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400 font-mono"
+                className="input w-full px-3 py-1.5 text-sm font-mono"
               />
-              <p className="text-[11px] text-white/25 mt-1">{t('settings.slugHint')}</p>
+              <p className="text-[11px] text-slate-400 mt-1">{t('settings.slugHint')}</p>
             </div>
           ) : (
             <button
               onClick={() => setShowAdvanced(true)}
-              className="text-[11px] text-white/30 hover:text-brand-300 transition-colors"
+              className="text-[11px] text-slate-500 hover:text-brand-700 transition-colors"
             >
               {t('settings.advancedToggle')}
             </button>
@@ -124,16 +124,16 @@ function DeckSettingsWidget() {
           </button>
         </div>
 
-        <div className="border-t border-white/[0.07]" />
+        <div className="border-t border-slate-200" />
 
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Copy className="w-3.5 h-3.5 text-white/30" />
-            <span className="text-[11px] uppercase tracking-wider text-white/40 font-medium">
+            <Copy className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">
               {t('settings.newVariantTitle')}
             </span>
           </div>
-          <p className="text-[11px] text-white/25 leading-snug">
+          <p className="text-[11px] text-slate-400 leading-snug">
             {t('settings.newVariantHint', { archetype: activeDeck.archetypeName })}
           </p>
           <div className="flex gap-2">
@@ -143,12 +143,12 @@ function DeckSettingsWidget() {
               onChange={(e) => setNewVariantName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreateVariant()}
               placeholder={t('settings.variantNamePlaceholder')}
-              className="flex-1 bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400"
+              className="input flex-1 px-3 py-1.5 text-sm"
             />
             <button
               onClick={handleCreateVariant}
               disabled={!newVariantName.trim() || copying}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-500/15 hover:bg-brand-500/25 text-brand-300 border border-brand-400/25 transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 transition-colors disabled:opacity-40"
             >
               <Plus className="w-3.5 h-3.5" aria-hidden="true" />
               {copying ? '…' : t('settings.create')}
@@ -191,7 +191,7 @@ export function DeckPage() {
       {activeDeck ? (
         <>
           {/* Section tab bar */}
-          <div className="flex rounded-2xl overflow-hidden backdrop-blur-md border border-white/[0.08] bg-white/[0.03]">
+          <div className="flex rounded-2xl overflow-hidden backdrop-blur-md border border-slate-200 bg-white">
             {SECTIONS.map(({ id, labelKey, Icon }) => (
               <button
                 key={id}
@@ -199,8 +199,8 @@ export function DeckPage() {
                 className={[
                   'flex-1 flex items-center justify-center gap-2 py-3 text-xs font-medium transition-all',
                   activeSection === id
-                    ? 'text-white bg-brand-500/15 shadow-[inset_0_-2px_0_0_rgba(96,165,250,0.6)]'
-                    : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]',
+                    ? 'text-brand-800 bg-brand-50 shadow-[inset_0_-2px_0_0_rgba(96,165,250,0.6)]'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
                 ].join(' ')}
               >
                 <Icon className="w-3.5 h-3.5" aria-hidden="true" />
@@ -215,16 +215,16 @@ export function DeckPage() {
               <>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { label: t('cardTypes.Pokemon'), value: pokemon, color: 'text-red-400' },
-                    { label: t('cardTypes.Trainer'), value: trainers, color: 'text-blue-400' },
-                    { label: t('cardTypes.Energy'), value: energy, color: 'text-orange-400' },
+                    { label: t('cardTypes.Pokemon'), value: pokemon, color: 'text-red-700' },
+                    { label: t('cardTypes.Trainer'), value: trainers, color: 'text-brand-700' },
+                    { label: t('cardTypes.Energy'), value: energy, color: 'text-orange-600' },
                   ].map(({ label, value, color }) => (
                     <div
                       key={label}
-                      className="bg-white/[0.04] border border-white/[0.07] rounded-xl py-3 text-center"
+                      className="bg-white border border-slate-200 rounded-xl py-3 text-center"
                     >
                       <div className={`text-xl font-bold ${color}`}>{value}</div>
-                      <div className="text-xs text-white/35 mt-0.5">{label}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">{label}</div>
                     </div>
                   ))}
                 </div>
@@ -233,8 +233,8 @@ export function DeckPage() {
                   <div
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
                       totalCards > 60
-                        ? 'bg-red-500/10 border border-red-500/25 text-red-300'
-                        : 'bg-yellow-500/10 border border-yellow-500/25 text-yellow-300'
+                        ? 'bg-red-50 border border-red-200 text-red-700'
+                        : 'bg-amber-50 border border-amber-200 text-amber-700'
                     }`}
                   >
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
@@ -269,7 +269,7 @@ export function DeckPage() {
         </>
       ) : /* No deck selected yet — shown only when deck list is empty */
       decks.length === 0 ? null : (
-        <div className="card py-12 text-center text-white/30 text-sm">
+        <div className="card py-12 text-center text-slate-400 text-sm">
           {t('page.selectDeckPrompt')}
         </div>
       )}

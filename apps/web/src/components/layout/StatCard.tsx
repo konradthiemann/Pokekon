@@ -18,12 +18,12 @@ interface StatCardProps {
  * Maps the `color` prop to the Tailwind text class applied to the value.
  */
 const COLOR_MAP: Record<NonNullable<StatCardProps['color']>, string> = {
-  default: 'text-white',
-  green: 'text-emerald-400',
-  red: 'text-red-400',
-  purple: 'text-brand-400',
-  blue: 'text-blue-400',
-  yellow: 'text-yellow-400',
+  default: 'text-slate-900',
+  green: 'text-emerald-700',
+  red: 'text-red-700',
+  purple: 'text-purple-700',
+  blue: 'text-brand-700',
+  yellow: 'text-amber-700',
 };
 
 /**
@@ -35,11 +35,11 @@ const COLOR_MAP: Record<NonNullable<StatCardProps['color']>, string> = {
  */
 const BORDER_MAP: Record<NonNullable<StatCardProps['color']>, string> = {
   default: '',
-  green: 'border-l-4 border-l-emerald-600',
-  red: 'border-l-4 border-l-red-600',
-  purple: 'border-l-4 border-l-brand-600',
-  blue: 'border-l-4 border-l-blue-600',
-  yellow: 'border-l-4 border-l-yellow-600',
+  green: 'border-l-4 border-l-emerald-500',
+  red: 'border-l-4 border-l-red-500',
+  purple: 'border-l-4 border-l-purple-500',
+  blue: 'border-l-4 border-l-brand-500',
+  yellow: 'border-l-4 border-l-amber-500',
 };
 
 /**
@@ -64,7 +64,7 @@ export function StatCard({ label, value, sub, color = 'default' }: StatCardProps
     <div className={`card ${BORDER_MAP[color]}`}>
       <div className="card-header">{label}</div>
       <div className={`stat-value ${COLOR_MAP[color]}`}>{value}</div>
-      {sub && <div className="text-xs text-gray-500 mt-1">{sub}</div>}
+      {sub && <div className="text-xs text-slate-500 mt-1 font-semibold">{sub}</div>}
     </div>
   );
 }

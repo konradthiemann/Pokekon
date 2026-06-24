@@ -88,26 +88,26 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-deck-modal-title"
-        className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-xl w-full max-w-md shadow-xl flex flex-col max-h-[85vh]"
+        className="bg-white border border-slate-200 rounded-t-2xl sm:rounded-xl w-full max-w-md shadow-card flex flex-col max-h-[85vh]"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/[0.07] shrink-0">
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-200 shrink-0">
           <h2
             id="create-deck-modal-title"
-            className="text-white font-semibold flex items-center gap-2"
+            className="text-slate-900 font-bold flex items-center gap-2"
           >
-            <Layers className="w-4 h-4 text-brand-400" aria-hidden="true" />
+            <Layers className="w-4 h-4 text-brand-700" aria-hidden="true" />
             {t('createModal.title')}
           </h2>
           <button
             onClick={onClose}
             aria-label={t('close', { ns: 'common' })}
-            className="text-gray-500 hover:text-gray-300"
+            className="text-slate-500 hover:text-slate-700"
           >
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -118,19 +118,19 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
           {deckCreated ? (
             /* ── Success state ── */
             <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
-              <CheckCircle2 className="w-12 h-12 text-emerald-400" />
-              <p className="text-white font-semibold">{t('createModal.created')}</p>
-              <p className="text-xs text-gray-400">{t('createModal.importPrompt')}</p>
+              <CheckCircle2 className="w-12 h-12 text-emerald-700" />
+              <p className="text-slate-900 font-bold">{t('createModal.created')}</p>
+              <p className="text-xs text-slate-600">{t('createModal.importPrompt')}</p>
             </div>
           ) : (
             <>
               {/* Archetype combobox */}
               <div>
-                <label className="block text-xs text-gray-400 mb-1.5">
+                <label className="block text-xs text-slate-600 mb-1.5">
                   {t('createModal.archetype')}
                 </label>
                 <div className="relative">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
                     {selected ? (
                       <PokemonIcon archetype={selected.slug} size="sm" />
                     ) : (
@@ -149,7 +149,7 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
                       }
                     }}
                     placeholder={t('createModal.searchPlaceholder')}
-                    className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400"
+                    className="w-full bg-white border border-slate-300 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
                     autoComplete="off"
                   />
                 </div>
@@ -157,10 +157,10 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
                 {showList && (
                   <div
                     ref={listRef}
-                    className="mt-1 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden max-h-52 overflow-y-auto"
+                    className="mt-1 bg-white border border-slate-200 rounded-lg shadow-card overflow-hidden max-h-52 overflow-y-auto"
                   >
                     {filtered.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-gray-500">
+                      <div className="px-3 py-2 text-xs text-slate-500">
                         {t('createModal.noMatch')}
                       </div>
                     ) : (
@@ -173,8 +173,8 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
                           }}
                           className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors ${
                             archetype === a.slug
-                              ? 'bg-brand-500/20 text-brand-300'
-                              : 'text-gray-200 hover:bg-gray-800'
+                              ? 'bg-brand-100 text-brand-800'
+                              : 'text-slate-800 hover:bg-slate-100'
                           }`}
                         >
                           <PokemonIcon archetype={a.slug} size="sm" dual />
@@ -191,9 +191,9 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
 
               {/* Variant / deck name */}
               <div>
-                <label className="block text-xs text-gray-400 mb-1.5">
+                <label className="block text-xs text-slate-600 mb-1.5">
                   {t('createModal.deckName')}{' '}
-                  <span className="text-gray-600">({t('optional', { ns: 'common' })})</span>
+                  <span className="text-slate-400">({t('optional', { ns: 'common' })})</span>
                 </label>
                 <input
                   type="text"
@@ -201,7 +201,7 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
                   onChange={(e) => setVariant(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSave()}
                   placeholder={t('createModal.deckNamePlaceholder')}
-                  className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-brand-400"
+                  className="input"
                 />
               </div>
             </>
@@ -209,7 +209,7 @@ export function CreateDeckModal({ onClose, onRequestImport }: Props) {
         </div>
 
         {/* Footer — always visible */}
-        <div className="px-5 pb-5 pt-3 border-t border-white/[0.07] flex gap-2 shrink-0">
+        <div className="px-5 pb-5 pt-3 border-t border-slate-200 flex gap-2 shrink-0">
           {deckCreated ? (
             <>
               <button onClick={onClose} className="btn-ghost flex-1 justify-center text-sm">

@@ -5,7 +5,6 @@ import {
   Layers,
   Lightbulb,
   RefreshCw,
-  Zap,
   Globe,
   CheckCircle2,
   AlertCircle,
@@ -14,6 +13,7 @@ import {
 import { useDashboardStore } from '../../store/dashboardStore';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { UserMenu } from '../auth/UserMenu';
+import { PokeballMark } from '../shared/PokeballMark';
 
 // Labels are i18n keys in the `layout` namespace, resolved at render time.
 const NAV_ITEMS = [
@@ -52,31 +52,29 @@ export function Sidebar() {
   };
 
   return (
-    <aside
-      className="hidden md:flex w-56 flex-shrink-0 flex-col bg-white/[0.05] backdrop-blur-md border-r border-white/[0.10] min-h-screen relative z-10"
-      style={{ boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.04)' }}
-    >
+    <aside className="hidden md:flex w-56 flex-shrink-0 flex-col bg-white/80 backdrop-blur-md border-r border-slate-200 min-h-screen relative z-10 shadow-sm">
       {/* Logo */}
-      <div className="flex items-center gap-2 px-4 py-5 border-b border-white/[0.08]">
-        <Zap className="w-5 h-5 text-brand-400" />
-        <span className="font-bold text-white text-sm tracking-wide">TCG Meta</span>
-        <span className="ml-auto text-[10px] text-white/30 tracking-widest uppercase">
+      <div className="flex items-center gap-2 px-4 py-5 border-b border-slate-200">
+        <PokeballMark className="w-7 h-7 drop-shadow-sm" />
+        <span className="font-extrabold text-slate-900 text-sm tracking-wide">TCG Meta</span>
+        <span className="ml-auto text-[10px] text-slate-400 tracking-widest uppercase font-bold">
           {t('sidebar.dashboard')}
         </span>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-2 space-y-0.5 mt-2">
+      <nav className="flex-1 p-2 space-y-1 mt-2">
         {NAV_ITEMS.map(({ id, labelKey, Icon }) => {
           const active = activeTab === id;
           return (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+              aria-current={active ? 'page' : undefined}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] rounded-xl text-sm font-bold transition-all ${
                 active
-                  ? 'bg-brand-500/20 text-brand-300 border border-brand-400/30 shadow-[0_0_12px_rgba(96,165,250,0.15)]'
-                  : 'text-white/50 hover:text-white/80 hover:bg-white/[0.06] border border-transparent'
+                  ? 'bg-brand-100 text-brand-800 border border-brand-200'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent'
               }`}
             >
               <Icon className="w-4 h-4" aria-hidden="true" />
@@ -87,15 +85,15 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom controls */}
-      <div className="p-4 border-t border-white/[0.08] space-y-2">
+      <div className="p-4 border-t border-slate-200 space-y-2">
         {/* Sync Live Meta */}
         <button
           onClick={handleSyncMeta}
           disabled={isSyncing || isLoading}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium bg-brand-500/15 hover:bg-brand-500/25 text-brand-300 border border-brand-400/25 transition-colors disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 transition-colors disabled:opacity-50"
         >
           {syncDone ? (
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" />
           ) : (
             <Globe
               className={`w-3.5 h-3.5 ${isSyncing ? 'animate-pulse' : ''}`}
@@ -110,18 +108,18 @@ export function Sidebar() {
         </button>
 
         {isSyncing && syncProgress && (
-          <p className="text-center text-gray-500 text-xs truncate px-1" title={syncProgress}>
+          <p className="text-center text-slate-500 text-xs truncate px-1" title={syncProgress}>
             {syncProgress}
           </p>
         )}
         {!isSyncing && syncError && (
-          <div className="flex items-start gap-1 text-xs text-red-500 px-1">
+          <div className="flex items-start gap-1 text-xs text-red-700 px-1 font-semibold">
             <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
             <span className="break-words">{syncError}</span>
           </div>
         )}
         {!isSyncing && !syncError && lastSynced && (
-          <p className="text-center text-gray-600 text-xs">
+          <p className="text-center text-slate-500 text-xs">
             {t('sidebar.syncedAt', { time: lastSynced.toLocaleTimeString() })}
           </p>
         )}
@@ -130,7 +128,7 @@ export function Sidebar() {
         <button
           onClick={refresh}
           disabled={isLoading}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium bg-white/[0.06] hover:bg-white/[0.10] text-white/60 hover:text-white/80 border border-white/[0.08] transition-colors disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 border border-slate-300 transition-colors disabled:opacity-50"
         >
           <RefreshCw
             className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`}
@@ -139,10 +137,10 @@ export function Sidebar() {
           {t('sidebar.refreshData')}
         </button>
         {lastRefreshed && (
-          <p className="text-center text-gray-600 text-xs">{lastRefreshed.toLocaleTimeString()}</p>
+          <p className="text-center text-slate-500 text-xs">{lastRefreshed.toLocaleTimeString()}</p>
         )}
 
-        <div className="pt-1 border-t border-white/[0.08]">
+        <div className="pt-1 border-t border-slate-200">
           <UserMenu />
         </div>
 

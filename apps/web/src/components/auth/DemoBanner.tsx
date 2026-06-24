@@ -19,17 +19,19 @@ export function DemoBanner() {
 
   return (
     <>
-      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-brand-500/30 bg-brand-500/10 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-3 shadow-card sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-2.5">
-          <FlaskConical className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" aria-hidden="true" />
+          <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-brand-100">
+            <FlaskConical className="h-4 w-4 text-brand-700" aria-hidden="true" />
+          </span>
           <div className="text-sm">
-            <span className="font-semibold text-white">{t('demo.bannerTitle')}</span>
-            <span className="text-white/60"> — {t('demo.bannerText')}</span>
+            <span className="font-extrabold text-slate-900">{t('demo.bannerTitle')}</span>
+            <span className="text-slate-600 font-semibold"> — {t('demo.bannerText')}</span>
           </div>
         </div>
         <button
           onClick={() => setShowAuthModal(true)}
-          className="btn-primary shrink-0 justify-center px-3 py-1.5 text-xs font-bold"
+          className="btn-primary shrink-0 justify-center px-3 text-xs"
         >
           {t('demo.bannerCta')}
         </button>

@@ -57,38 +57,38 @@ export function ImportLocalDataModal({ onClose }: Props) {
   const busy = phase === 'importing';
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="import-local-modal-title"
-        className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-xl p-5 sm:p-6 w-full max-w-md shadow-xl max-h-[92vh] overflow-y-auto"
+        className="bg-white border border-slate-200 rounded-t-2xl sm:rounded-xl p-5 sm:p-6 w-full max-w-md shadow-card max-h-[92vh] overflow-y-auto"
       >
         <div className="flex items-center gap-2 mb-4">
-          <Database className="w-4 h-4 text-brand-400" aria-hidden="true" />
-          <h2 id="import-local-modal-title" className="text-white font-semibold">
+          <Database className="w-4 h-4 text-brand-700" aria-hidden="true" />
+          <h2 id="import-local-modal-title" className="text-slate-900 font-bold">
             {t('localImport.title')}
           </h2>
         </div>
 
-        <p className="text-sm text-gray-300 mb-3">
+        <p className="text-sm text-slate-700 mb-3">
           {counts
             ? t('localImport.description', { decks: counts.decks, logs: counts.logs })
             : t('localImport.descriptionGeneric')}
         </p>
-        <p className="text-xs text-gray-500 mb-5">
+        <p className="text-xs text-slate-500 mb-5">
           {t('localImport.rehint', { flag: LOCAL_IMPORT_FLAG })}
         </p>
 
         {phase === 'importing' && (
           <div className="mb-5">
-            <div className="flex justify-between text-xs text-gray-400 mb-1.5">
+            <div className="flex justify-between text-xs text-slate-600 mb-1.5">
               <span>{t('localImport.importing')}</span>
               <span>
                 {t('localImport.progress', { done: progress.done, total: progress.total })}
               </span>
             </div>
-            <div className="h-1.5 rounded-full bg-gray-800 overflow-hidden">
+            <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
               <div
                 className="h-full bg-brand-500 transition-all"
                 style={{
@@ -102,10 +102,10 @@ export function ImportLocalDataModal({ onClose }: Props) {
         {phase === 'error' && (
           <div
             role="alert"
-            className="flex items-start gap-2 p-3 mb-5 bg-red-900/20 border border-red-800/40 rounded-lg"
+            className="flex items-start gap-2 p-3 mb-5 bg-red-50 border border-red-200 rounded-lg"
           >
-            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-400" aria-hidden="true" />
-            <p className="text-xs text-red-400">{t('localImport.error')}</p>
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-700" aria-hidden="true" />
+            <p className="text-xs text-red-700">{t('localImport.error')}</p>
           </div>
         )}
 

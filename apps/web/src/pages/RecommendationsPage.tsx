@@ -46,14 +46,16 @@ export function RecommendationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white mb-0.5">{t('page.title')}</h1>
-        <p className="text-gray-500 text-sm">
+        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 mb-0.5">
+          {t('page.title')}
+        </h1>
+        <p className="text-slate-500 text-sm">
           {activeDeck ? (
             <Trans
               t={t}
               i18nKey="page.subtitleForDeck"
               values={{ deckName: activeDeck.archetypeName }}
-              components={{ deck: <span className="text-gray-300 font-medium" /> }}
+              components={{ deck: <span className="text-slate-700 font-medium" /> }}
             />
           ) : (
             t('page.subtitleGeneric')
@@ -62,22 +64,22 @@ export function RecommendationsPage() {
       </div>
 
       {/* Data source notice */}
-      <div className="flex items-start gap-3 bg-gray-800/50 border border-gray-700 rounded-xl p-4">
-        <Info className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
-        <div className="text-sm text-gray-400 space-y-1">
+      <div className="flex items-start gap-3 bg-slate-100 border border-slate-200 rounded-xl p-4">
+        <Info className="w-4 h-4 text-slate-600 mt-0.5 shrink-0" />
+        <div className="text-sm text-slate-600 space-y-1">
           <div>
             <Trans
               t={t}
               i18nKey="page.basedOn"
               count={activeLogs.length}
-              components={{ bold: <span className="text-white font-medium" /> }}
+              components={{ bold: <span className="text-slate-900 font-medium" /> }}
             />{' '}
             {activeLogs.length < 10 && (
-              <span className="text-yellow-400">{t('page.logMoreHint')}</span>
+              <span className="text-amber-700">{t('page.logMoreHint')}</span>
             )}
           </div>
           {localMeta.length > 0 && (
-            <div className="flex items-center gap-1.5 text-amber-400/80">
+            <div className="flex items-center gap-1.5 text-amber-700">
               <MapPin className="w-3 h-3 shrink-0" />
               <span className="text-xs">
                 {t('page.localMetaNotice', { archetypes: localMeta.join(', ') })}
@@ -89,16 +91,16 @@ export function RecommendationsPage() {
 
       {/* Priority summary */}
       {recommendations.length > 0 && (
-        <div className="flex items-center gap-4 text-xs text-gray-500">
+        <div className="flex items-center gap-4 text-xs text-slate-500">
           <span>
-            <span className="text-red-400 font-medium">{highCount}</span> {t('page.summary.high')}
+            <span className="text-red-700 font-medium">{highCount}</span> {t('page.summary.high')}
           </span>
           <span>
-            <span className="text-yellow-400 font-medium">{medCount}</span>{' '}
+            <span className="text-amber-700 font-medium">{medCount}</span>{' '}
             {t('page.summary.medium')}
           </span>
           <span>
-            <span className="text-blue-400 font-medium">{lowCount}</span> {t('page.summary.low')}
+            <span className="text-brand-700 font-medium">{lowCount}</span> {t('page.summary.low')}
           </span>
         </div>
       )}
@@ -107,8 +109,8 @@ export function RecommendationsPage() {
       <RecommendationsPanel recommendations={recommendations} />
 
       {/* Separator */}
-      <div className="border-t border-gray-800 pt-2">
-        <h2 className="text-base font-semibold text-white mb-4">{t('comparison.sectionTitle')}</h2>
+      <div className="border-t border-slate-200 pt-2">
+        <h2 className="text-base font-bold text-slate-900 mb-4">{t('comparison.sectionTitle')}</h2>
         <DeckComparisonPanel />
       </div>
     </div>

@@ -50,12 +50,12 @@ export function LocalMetaPanel() {
             {localMeta.map((arch) => (
               <span
                 key={arch}
-                className="flex items-center gap-1 bg-amber-900/30 border border-amber-700/50 text-amber-300 rounded-full px-2.5 py-0.5 text-xs"
+                className="flex items-center gap-1 bg-amber-100 border border-amber-200 text-amber-800 rounded-full px-2.5 py-0.5 text-xs"
               >
                 {arch}
                 <button
                   onClick={() => remove(arch)}
-                  className="text-amber-500 hover:text-amber-200 ml-0.5"
+                  className="text-amber-600 hover:text-amber-800 ml-0.5"
                   aria-label={t('localMeta.remove', { archetype: arch })}
                 >
                   <X className="w-3 h-3" aria-hidden="true" />
@@ -74,7 +74,7 @@ export function LocalMetaPanel() {
             onKeyDown={(e) => e.key === 'Enter' && add(input)}
             placeholder={t('localMeta.placeholder')}
             list="arch-suggestions"
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-amber-600"
+            className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
           />
           <datalist id="arch-suggestions">
             {allOptions.map((a) => (
@@ -84,7 +84,7 @@ export function LocalMetaPanel() {
           <button
             onClick={() => add(input)}
             disabled={!input.trim()}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-700/30 hover:bg-amber-700/50 text-amber-300 border border-amber-700/40 transition-colors disabled:opacity-40"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-200 transition-colors disabled:opacity-40"
           >
             <Plus className="w-3.5 h-3.5" aria-hidden="true" />
             {t('localMeta.add')}
@@ -94,7 +94,7 @@ export function LocalMetaPanel() {
         {/* Quick-add chips */}
         {localMeta.length < 8 && allOptions.length > 0 && (
           <div className="mt-auto">
-            <p className="text-[11px] uppercase tracking-wider text-gray-600 mb-1.5 font-medium">
+            <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-1.5 font-bold">
               {t('localMeta.suggestions')}
             </p>
             <div className="flex flex-wrap gap-1">
@@ -102,7 +102,7 @@ export function LocalMetaPanel() {
                 <button
                   key={arch}
                   onClick={() => add(arch)}
-                  className="text-xs px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 rounded-full border border-gray-700 transition-colors"
+                  className="text-xs px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 rounded-full border border-slate-200 transition-colors"
                 >
                   + {arch}
                 </button>

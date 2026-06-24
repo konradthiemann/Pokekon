@@ -28,7 +28,7 @@ export function WinRateChart({ stats }: Props) {
   if (withData.length === 0) {
     return (
       <div className="card h-56 flex items-center justify-center">
-        <p className="text-gray-500 text-sm">{t('winRateChart.empty')}</p>
+        <p className="text-slate-500 text-sm font-semibold">{t('winRateChart.empty')}</p>
       </div>
     );
   }
@@ -46,11 +46,11 @@ export function WinRateChart({ stats }: Props) {
       <div className="card-header">{t('winRateChart.title')}</div>
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 40, left: 8, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
           <XAxis
             type="number"
             domain={[0, 100]}
-            tick={{ fill: '#6b7280', fontSize: 11 }}
+            tick={{ fill: '#64748b', fontSize: 11 }}
             tickFormatter={(v) => `${v}%`}
             axisLine={false}
             tickLine={false}
@@ -59,14 +59,21 @@ export function WinRateChart({ stats }: Props) {
             type="category"
             dataKey="name"
             width={130}
-            tick={{ fill: '#d1d5db', fontSize: 11 }}
+            tick={{ fill: '#334155', fontSize: 11 }}
             axisLine={false}
             tickLine={false}
           />
-          <ReferenceLine x={50} stroke="#374151" strokeDasharray="4 2" />
+          <ReferenceLine x={50} stroke="#94a3b8" strokeDasharray="4 2" />
           <Tooltip
-            contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }}
-            labelStyle={{ color: '#f9fafb', fontWeight: 600 }}
+            cursor={{ fill: 'rgba(37,99,235,0.06)' }}
+            contentStyle={{
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: 12,
+              boxShadow: '0 10px 28px -14px rgba(37,99,235,0.25)',
+            }}
+            labelStyle={{ color: '#0f172a', fontWeight: 800 }}
+            itemStyle={{ color: '#334155', fontWeight: 700 }}
             formatter={(value, _name, props) => [
               t('winRateChart.tooltipValue', {
                 value: value ?? 0,
@@ -79,13 +86,13 @@ export function WinRateChart({ stats }: Props) {
             {data.map((entry, i) => (
               <Cell
                 key={i}
-                fill={entry.winRate >= 60 ? '#10b981' : entry.winRate >= 40 ? '#f97316' : '#ef4444'}
+                fill={entry.winRate >= 60 ? '#059669' : entry.winRate >= 40 ? '#d97706' : '#dc2626'}
               />
             ))}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      <p className="text-xs text-gray-600 mt-2">{t('winRateChart.legend')}</p>
+      <p className="text-xs text-slate-500 mt-2 font-semibold">{t('winRateChart.legend')}</p>
     </div>
   );
 }

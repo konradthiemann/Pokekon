@@ -4,43 +4,13 @@ import { resolveArchetypeSprites } from './shared/pokemonSprites';
 const SPRITE_BASE =
   'https://raw.githubusercontent.com/bradley-erickson/pokesprite/master/pokemon/regular';
 
-// Base background per archetype — noticeably tinted, not pitch-black
-const ARCHETYPE_BG: Record<string, string> = {
-  // Existing
-  'n-zoroark': '#1c0838',
-  'dragapult-dusknoir': '#130848',
-  'dragapult-ex': '#130848',
-  'dragapult-blaziken': '#3a0e04',
-  'ogerpon-meganium': '#042b12',
-  'raging-bolt-ogerpon': '#231c00',
-  'starmie-froslass': '#001e38',
-  'grimmsnarl-froslass': '#1c0440',
-  'lucario-hariyama': '#060c36',
-  'mega-absol-box': '#300506',
-  'rocket-mewtwo-ex': '#1e0438',
-  'alakazam-dudunsparce': '#1e0438',
-  // New 2026 meta
-  'cynthias-garchomp': '#041830', // dragon — deep teal-blue
-  'okidogi-barbaracle': '#1a0830', // poison — deep purple
-  'festival-lead': '#032d12', // grass — deep green
-  'rockets-honchkrow': '#0e0820', // dark/flying — near black-purple
-  greninja: '#031520', // water/dark — deep blue
-  'mega-venusaur': '#062010', // grass/poison — deep green
-  'stevens-metagross': '#0c1428', // steel/psychic — steel blue
-  'mega-lucario': '#040b2e', // fighting/steel — deep navy
-  ceruledge: '#250808', // fire/ghost — deep red
-  'mega-starmie': '#001828', // water/psychic — deep blue-purple
-  decidueye: '#072012', // grass/ghost — deep green
-  hydreigon: '#0c0820', // dark/dragon — deep purple
-  'mega-charizard-x': '#2a0a04', // fire/dragon — deep red
-  archaludon: '#0c1830', // steel/dragon — steel blue
-  'hops-zacian': '#1c0830', // fairy/steel — deep rose-purple
-  'ethanss-typhlosion': '#2e0a00', // fire — deep amber-red
-  'tera-box': '#101218', // normal — near neutral dark
-  'marnie-grimmsnarl': '#16052a', // dark/fairy — deep violet
-};
+// The light "playmat" surface every deck sits on. The per-archetype colour
+// comes through as a soft bloom on top (ARCHETYPE_TINT) rather than tinting
+// the whole ground, so white cards always stay legible against it.
+const PLAYMAT = '#eef3fb';
 
-// Radial accent bloom per archetype
+// Radial accent bloom per archetype — the type colour, kept as a gentle pastel
+// wash over the light playmat.
 const ARCHETYPE_TINT: Record<string, string> = {
   // Existing
   'n-zoroark': 'rgba(167,139,250,0.40)',
@@ -76,8 +46,7 @@ const ARCHETYPE_TINT: Record<string, string> = {
   'marnie-grimmsnarl': 'rgba(167,139,250,0.34)',
 };
 
-const DEFAULT_BG = '#0a0d18';
-const DEFAULT_TINT = 'rgba(96,165,250,0.20)';
+const DEFAULT_TINT = 'rgba(96,165,250,0.22)';
 
 export function DeckSpriteBackground() {
   const activeDeck = useDashboardStore((s) => s.activeDeck);
@@ -87,7 +56,6 @@ export function DeckSpriteBackground() {
   const archetype = activeDeck?.archetype ?? '';
 
   const spriteUrl = primarySlug ? `${SPRITE_BASE}/${primarySlug}.png` : null;
-  const bgColor = ARCHETYPE_BG[archetype] ?? DEFAULT_BG;
   const tintColor = ARCHETYPE_TINT[archetype] ?? DEFAULT_TINT;
 
   return (
@@ -99,11 +67,11 @@ export function DeckSpriteBackground() {
         zIndex: 0,
         pointerEvents: 'none',
         overflow: 'hidden',
-        backgroundColor: bgColor,
-        transition: 'background-color 0.5s ease',
+        backgroundColor: PLAYMAT,
       }}
     >
-      {/* Tiled sprite wallpaper — sprite is 40×40px, tiled at 72px steps */}
+      {/* Tiled sprite wallpaper — dark pixel sprites show as a faint pattern on
+          the light playmat. Sprite is 40×40px, tiled at 72px steps. */}
       {spriteUrl && (
         <div
           style={{
@@ -113,26 +81,31 @@ export function DeckSpriteBackground() {
             backgroundRepeat: 'repeat',
             backgroundSize: '72px 72px',
             imageRendering: 'pixelated',
-            opacity: 0.3,
+            opacity: 0.11,
           }}
         />
       )}
-      {/* Type-colour radial bloom */}
+      {/* Type-colour blooms — punchier washes top and bottom in the active
+          deck's type colour, plus a corner of Pokémon energy-yellow for warmth.
+          Vivid, but the light edge-wash below keeps white cards crisp. */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          background: `radial-gradient(ellipse 70% 55% at 50% 38%, ${tintColor} 0%, transparent 100%)`,
+          background: `radial-gradient(ellipse 95% 60% at 50% -5%, ${tintColor} 0%, transparent 72%),
+            radial-gradient(ellipse 70% 45% at 12% 108%, ${tintColor} 0%, transparent 70%),
+            radial-gradient(ellipse 45% 45% at 94% 6%, rgba(255,203,5,0.16) 0%, transparent 70%)`,
           transition: 'background 0.5s ease',
         }}
       />
-      {/* Edge vignette — keeps glass cards readable */}
+      {/* Soft light wash at the edges — keeps the playmat airy and white cards
+          crisp, the bright counterpart to the old dark vignette. */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
           background:
-            'radial-gradient(ellipse 110% 110% at 50% 50%, transparent 35%, rgba(0,0,0,0.70) 100%)',
+            'radial-gradient(ellipse 120% 120% at 50% 45%, transparent 40%, rgba(238,243,251,0.85) 100%)',
         }}
       />
     </div>
