@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LogIn, LogOut } from 'lucide-react';
+import { Brain, LogIn, LogOut } from 'lucide-react';
 import { authClient } from '../../lib/authClient';
 import { AuthModal } from './AuthModal';
+import { AiSettingsModal } from '../settings/AiSettingsModal';
 
 /**
  * Derives up to two initials from a display name (fallback: email) for the
@@ -31,6 +32,7 @@ export function UserMenu() {
   const { t } = useTranslation('auth');
   const { data: session, isPending } = authClient.useSession();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAiSettings, setShowAiSettings] = useState(false);
 
   if (isPending) {
     return (
@@ -78,6 +80,14 @@ export function UserMenu() {
         <p className="text-[10px] text-slate-600 truncate">{user.email}</p>
       </div>
       <button
+        onClick={() => setShowAiSettings(true)}
+        aria-label={t('aiSettings.open')}
+        title={t('aiSettings.open')}
+        className="p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/[0.08] transition-colors shrink-0"
+      >
+        <Brain className="w-3.5 h-3.5" aria-hidden="true" />
+      </button>
+      <button
         onClick={() => void authClient.signOut()}
         aria-label={t('userMenu.signOut')}
         title={t('userMenu.signOut')}
@@ -85,6 +95,7 @@ export function UserMenu() {
       >
         <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
       </button>
+      {showAiSettings && <AiSettingsModal onClose={() => setShowAiSettings(false)} />}
     </div>
   );
 }

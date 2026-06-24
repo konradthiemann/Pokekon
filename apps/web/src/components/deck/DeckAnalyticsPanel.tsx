@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { Deck, OpponentLog, MetaSnapshot, MatchResult } from '../../types';
 import { PokemonIcon } from '../shared/PokemonIcon';
+import { DeckTurnQualityPanel } from './DeckTurnQualityPanel';
 
 interface Props {
   decks: Deck[];
@@ -588,6 +589,9 @@ export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId
           </div>
         </div>
       )}
+
+      {/* Server-side turn-quality analytics (from parsed battle logs) */}
+      {activeDeckId != null && <DeckTurnQualityPanel deckId={activeDeckId} />}
 
       {/* Active variant analytics */}
       {activeStats && (

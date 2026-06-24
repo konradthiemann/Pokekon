@@ -89,12 +89,16 @@
       "settings": "Analyse-Einstellungen",
       "playerNameLabel": "Mein Spielername im Protokoll",
       "playerNamePlaceholder": "z.B. Premiox",
-      "apiKeyLabel": "Anthropic API-Key",
+      "apiKeyLabel": "GitHub Models Token",
       "noLog": "Kein Kampfprotokoll vorhanden — erst im Tab \"Kampfprotokoll\" einfügen.",
       "analyzing": "Analysiere…",
       "reanalyze": "Neu analysieren",
       "start": "Analyse starten",
-      "empty": "Noch keine Analyse vorhanden. Gib deinen Spielernamen und API-Key ein und starte die Analyse."
+      "empty": "Noch keine Analyse vorhanden. Gib deinen Spielernamen und API-Key ein und starte die Analyse.",
+      "apiKeyHint": "Wird serverseitig verschlüsselt gespeichert, nie im Browser.",
+      "apiKeyHintDemo": "Demo-Modus: Der Token bleibt nur in deinem Browser und wird nicht gespeichert.",
+      "apiKeyStored": "•••••••• (gespeichert)",
+      "apiKeyStoredDemo": "•••••••• (nur im Browser)"
     }
   },
   "statsTab": {

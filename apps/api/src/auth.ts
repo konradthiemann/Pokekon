@@ -1,4 +1,5 @@
 import { betterAuth, type BetterAuthOptions } from 'better-auth';
+import { anonymous } from 'better-auth/plugins';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { getDb } from './db/index.js';
 import * as schema from './db/schema.js';
@@ -9,8 +10,21 @@ function createAuth() {
   const env = getEnv();
   const googleEnabled = env.googleClientId !== undefined && env.googleClientSecret !== undefined;
 
+  // Stable placeholder domain for the throwaway emails the anonymous plugin
+  // generates (temp-<id>@<domain>) — derived from the web origin so it never
+  // collides with a real user's email, regardless of deploy environment.
+  let emailDomainName = 'pokekon.local';
+  try {
+    emailDomainName = new URL(env.webOrigin).hostname || emailDomainName;
+  } catch {
+    // keep the fallback when webOrigin isn't a parseable absolute URL
+  }
+
   const options: BetterAuthOptions = {
     database: drizzleAdapter(getDb(), { provider: 'pg', schema }),
+    // Guest/demo accounts: a single click creates a throwaway user (isAnonymous),
+    // which the /api/demo/seed route then fills with sample decks + matches.
+    plugins: [anonymous({ emailDomainName })],
     emailAndPassword: {
       enabled: true,
       sendResetPassword: async ({ user, url }) => {

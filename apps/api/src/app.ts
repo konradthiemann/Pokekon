@@ -7,6 +7,7 @@ import { sessionMiddleware, type ApiEnv, type GetSessionUser } from './middlewar
 import { createAnalysisRoutes } from './routes/analysis.js';
 import { createAnalyticsRoutes } from './routes/analytics.js';
 import { createDecksRoutes } from './routes/decks.js';
+import { createDemoRoutes } from './routes/demo.js';
 import { createLogsRoutes } from './routes/logs.js';
 import { createMetaRoutes } from './routes/meta.js';
 import { createSnapshotsRoutes } from './routes/snapshots.js';
@@ -55,6 +56,7 @@ export function createApp(deps: AppDeps = {}): Hono {
   api.route('/analytics', createAnalyticsRoutes());
   api.route('/analysis', createAnalysisRoutes());
   api.route('/meta', createMetaRoutes());
+  api.route('/demo', createDemoRoutes());
   app.route('/api', api);
 
   return app;

@@ -29,6 +29,13 @@
       "when": 1781703981438,
       "tag": "0003_cold_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782283616338,
+      "tag": "0004_kind_surge",
+      "breakpoints": true
     }
   ]
 }
