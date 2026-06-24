@@ -36,7 +36,7 @@ Data source: Zustand store (`archetypeStats`, `metaSnapshots`). No API calls on 
 
 ## 2. Live Meta Sync
 
-**Triggered from:** Sidebar button "Sync Live Meta"
+**Triggered from:** the "Sync Live Meta" button — in the desktop **Sidebar** and, since the sidebar is hidden on mobile (`md:flex`), also in the **Meta page** header, so it's reachable on every viewport.
 
 Fetches tournament data from the Limitless TCG API and aggregates it into `metaSnapshots`.
 
@@ -52,7 +52,7 @@ Fetches tournament data from the Limitless TCG API and aggregates it into `metaS
 
 **CORS strategy:** Tries the Limitless API directly first. If blocked (browser CORS), falls back to `corsproxy.io`.
 
-**Progress feedback:** The Zustand store exposes `isSyncing` and `syncProgress` strings that the Sidebar renders in real time.
+**Progress feedback:** The Zustand store exposes `isSyncing` and `syncProgress` strings that the Sidebar and the Meta page header render in real time.
 
 ---
 
