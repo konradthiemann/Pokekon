@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { LogIn, Sparkles } from 'lucide-react';
 import { AuthModal } from './AuthModal';
 import { LanguageSwitcher } from '../layout/LanguageSwitcher';
+import { LegalLinks } from '../layout/LegalLinks';
 import { DeckSpriteBackground } from '../DeckSpriteBackground';
 import { PokeballMark } from '../shared/PokeballMark';
 import { authClient } from '../../lib/authClient';
@@ -112,8 +113,9 @@ export function WelcomeScreen() {
             <p className="mt-2 text-xs font-bold text-red-700">{t('welcome.demoError')}</p>
           )}
 
-          <div className="mt-6 flex justify-center border-t border-slate-200 pt-4">
+          <div className="mt-6 flex flex-col items-center gap-3 border-t border-slate-200 pt-4">
             <LanguageSwitcher />
+            <LegalLinks />
           </div>
         </div>
       </div>

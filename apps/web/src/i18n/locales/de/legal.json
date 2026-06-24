@@ -1,0 +1,178 @@
+{
+  "back": "Zurück zur App",
+  "tabImpressum": "Impressum",
+  "tabDatenschutz": "Datenschutz",
+  "authoritativeNote": "Diese Erklärung liegt in deutscher und englischer Sprache vor. Maßgeblich und rechtlich verbindlich ist die deutsche Fassung.",
+  "impressum": {
+    "title": "Impressum",
+    "updated": "Stand: 24. Juni 2026",
+    "sections": [
+      {
+        "heading": "Angaben gemäß § 5 DDG (Digitale-Dienste-Gesetz)",
+        "body": ["Konrad Thiemann\nOlfermannstr. 7\n38102 Braunschweig\nDeutschland"]
+      },
+      {
+        "heading": "Kontakt",
+        "body": ["Telefon: 0161 67325218\nE-Mail: konrad.thiemann@gmail.com"]
+      },
+      {
+        "heading": "Verantwortlich für den Inhalt",
+        "body": ["Konrad Thiemann (Anschrift wie oben)"]
+      },
+      {
+        "heading": "Art des Angebots",
+        "body": [
+          "Pokekon ist ein privates, nicht-kommerzielles Projekt, mit dem eigene Pokémon-Sammelkartenspiel-Partien protokolliert und das Wettbewerbs-Meta analysiert werden. Es werden keine Waren oder Dienstleistungen entgeltlich angeboten."
+        ]
+      },
+      {
+        "heading": "Verbraucherstreitbeilegung",
+        "body": [
+          "Es besteht keine Verpflichtung und keine Bereitschaft zur Teilnahme an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle."
+        ]
+      },
+      {
+        "heading": "Haftung für Inhalte",
+        "body": [
+          "Die Inhalte dieser Anwendung wurden mit größtmöglicher Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte kann jedoch keine Gewähr übernommen werden. Als Diensteanbieter bin ich gemäß § 7 Abs. 1 DDG für eigene Inhalte nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG bin ich als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen."
+        ]
+      },
+      {
+        "heading": "Haftung für Links",
+        "body": [
+          "Diese Anwendung kann Links zu externen Websites Dritter enthalten, auf deren Inhalte ich keinen Einfluss habe. Für diese fremden Inhalte kann keine Gewähr übernommen werden. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten verantwortlich."
+        ]
+      },
+      {
+        "heading": "Urheberrecht",
+        "body": [
+          "Die durch den Betreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen Urheberrecht. Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der Grenzen des Urheberrechts bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers.",
+          "Pokémon sowie die Namen und Abbildungen der Karten sind eingetragene Marken der The Pokémon Company, Nintendo, Game Freak und Creatures Inc. Pokekon ist ein inoffizielles Fan-Projekt und steht in keiner Verbindung zu diesen Unternehmen und wird von ihnen weder unterstützt noch gesponsert."
+        ]
+      }
+    ]
+  },
+  "datenschutz": {
+    "title": "Datenschutzerklärung",
+    "updated": "Stand: 24. Juni 2026",
+    "sections": [
+      {
+        "heading": "1. Verantwortlicher",
+        "body": [
+          "Verantwortlich für die Verarbeitung personenbezogener Daten in dieser Anwendung im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:",
+          "Konrad Thiemann\nOlfermannstr. 7\n38102 Braunschweig\nDeutschland\nTelefon: 0161 67325218\nE-Mail: konrad.thiemann@gmail.com"
+        ]
+      },
+      {
+        "heading": "2. Überblick",
+        "body": [
+          "Pokekon ist eine private Anwendung zum Protokollieren eigener Pokémon-Sammelkartenspiel-Partien und zur Analyse des aktuellen Turnier-Metas. Personenbezogene Daten werden ausschließlich verarbeitet, um den Betrieb der Anwendung, dein Nutzerkonto und die von dir eingegebenen Inhalte bereitzustellen. Deine Daten werden nicht verkauft und nicht zu Werbezwecken an Dritte weitergegeben."
+        ]
+      },
+      {
+        "heading": "3. Hosting und Speicherort",
+        "body": [
+          "Diese Anwendung wird bei Railway gehostet (Railway Corp., USA). Web-App, Programmierschnittstelle (API) und die Datenbank, in der deine Daten gespeichert werden, laufen in der Region Europe West (europe-west4) in den Niederlanden. Deine personenbezogenen Daten werden somit innerhalb der Europäischen Union gespeichert und verarbeitet.",
+          "Railway verarbeitet die anfallenden Daten – insbesondere Server-Logfiles und die in der Datenbank gespeicherten Inhalte – in meinem Auftrag auf Grundlage eines Vertrags über Auftragsverarbeitung gemäß Art. 28 DSGVO. Rechtsgrundlage für den Einsatz ist mein berechtigtes Interesse an einem stabilen und sicheren Betrieb der Anwendung (Art. 6 Abs. 1 lit. f DSGVO).",
+          "Da der Anbieter Railway Corp. ein US-Unternehmen ist, kann ein Zugriff aus den USA nicht vollständig ausgeschlossen werden. Soweit personenbezogene Daten in ein Drittland übermittelt werden, erfolgt dies auf Grundlage der Standardvertragsklauseln der EU-Kommission bzw. eines geeigneten Angemessenheitsbeschlusses (EU-US Data Privacy Framework)."
+        ]
+      },
+      {
+        "heading": "4. Server-Logfiles",
+        "body": [
+          "Beim Aufruf der Anwendung werden automatisch Informationen in sogenannten Server-Logfiles erfasst, die dein Browser übermittelt: Browsertyp und -version, verwendetes Betriebssystem, Referrer-URL, Zeitpunkt der Serveranfrage sowie die IP-Adresse. Diese Daten werden nicht mit anderen Datenquellen zusammengeführt und dienen dem störungsfreien und sicheren Betrieb der Anwendung. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO."
+        ]
+      },
+      {
+        "heading": "5. Cookies und Sitzungen",
+        "body": [
+          "Diese Anwendung verwendet ausschließlich technisch notwendige Cookies. Für die Anmeldung wird über das Authentifizierungssystem (Better Auth) ein Sitzungs-Cookie gesetzt, das deinen Login-Status speichert. Ohne dieses Cookie ist eine Anmeldung nicht möglich; eine Einwilligung ist hierfür nicht erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG). Zur Sitzung werden serverseitig deine IP-Adresse und die Browser-Kennung (User-Agent) gespeichert, um die Sitzung abzusichern. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b und lit. f DSGVO. Cookies zu Analyse- oder Werbezwecken werden nicht eingesetzt."
+        ]
+      },
+      {
+        "heading": "6. Registrierung und Nutzerkonto",
+        "body": [
+          "Zur Nutzung der Anwendung legst du ein Nutzerkonto an. Dabei werden folgende Daten verarbeitet: E-Mail-Adresse, Passwort (ausschließlich verschlüsselt/gehasht gespeichert und im Klartext nicht einsehbar) sowie optional ein Name. Diese Daten sind erforderlich, um dir Zugang zu deinem Konto zu gewähren und die Anwendung bereitzustellen. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Erfüllung des Nutzungsverhältnisses).",
+          "Alternativ kannst du die App über einen Gast-/Demo-Modus mit einem Klick ohne Registrierung ausprobieren. Dabei wird ein anonymes, temporäres Konto mit einer Platzhalter-Adresse angelegt und mit Beispieldaten gefüllt; eine E-Mail-Adresse ist hierfür nicht erforderlich."
+        ]
+      },
+      {
+        "heading": "7. Deine Spieldaten",
+        "body": [
+          "Im Rahmen der Nutzung speicherst du selbst Inhalte in der Anwendung, insbesondere Decks und Deckkarten, Deck-Versionen (Snapshots) sowie Match-Protokolle (Gegner-Archetyp, Turnierart, Datum, Ergebnis, Notizen und Runde). Optional kannst du den Original-Spielprotokoll-Text einer Partie aus „Pokémon TCG Live“ einfügen und speichern; daraus erstellte KI-Analysen werden ebenfalls gespeichert.",
+          "Eingefügte Spielprotokolle können die im Spiel verwendeten Namen der beteiligten Spieler (deinen und den deines Gegners) enthalten. Füge daher nur Protokolle ein, zu deren Speicherung du berechtigt bist.",
+          "Diese Daten werden ausschließlich verarbeitet, um dir die Funktionen der Anwendung bereitzustellen. Sie sind nur für dich in deinem Konto sichtbar, werden nicht an Dritte weitergegeben (Ausnahme: die in Abschnitt 8 beschriebene, von dir ausgelöste KI-Analyse) und nicht zu Profiling- oder Werbezwecken ausgewertet. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO."
+        ]
+      },
+      {
+        "heading": "8. KI-Analyse von Spielprotokollen (GitHub Models)",
+        "body": [
+          "Die Anwendung bietet eine optionale, KI-gestützte Analyse deiner Spielprotokolle. Wenn – und nur wenn – du eine solche Analyse aktiv auslöst, werden der von dir eingefügte Protokoll-Text sowie dein Spielername serverseitig an GitHub Models (GitHub, Inc., ein Unternehmen von Microsoft, USA) übermittelt und dort durch ein Sprachmodell ausgewertet. GitHub Models stellt dabei Modelle verschiedener Anbieter (z. B. OpenAI) über die Microsoft-Azure-Infrastruktur bereit.",
+          "Für die Analyse hinterlegst du einen eigenen GitHub-Models-Zugriffstoken („Bring your own key“). Dieser Token wird mit AES-256-GCM verschlüsselt auf dem Server gespeichert, ausschließlich für die Analyse serverseitig entschlüsselt und niemals im Browser abgelegt oder an Dritte weitergegeben. Die Auswertung erfolgt mit der Einstellung „temperature = 0“ und gibt nur Aussagen zurück, die wörtlich aus dem Protokoll belegt sind.",
+          "Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung der von dir angeforderten Funktion) sowie Art. 6 Abs. 1 lit. f DSGVO. Da die Verarbeitung auf Servern in den USA erfolgen kann, stützt sich eine etwaige Übermittlung auf die Standardvertragsklauseln bzw. das EU-US Data Privacy Framework. Wenn du keine KI-Analyse nutzt, werden keine Protokolldaten an GitHub übermittelt."
+        ]
+      },
+      {
+        "heading": "9. Anmeldung mit Google",
+        "body": [
+          "Du kannst dich optional mit deinem Google-Konto anmelden (Single Sign-on über Google, Anbieter für Nutzer im EWR: Google Ireland Ltd., Gordon House, Barrow Street, Dublin 4, Irland). Wenn du diese Funktion nutzt, verarbeitet Google den Anmeldevorgang; wir erhalten die zu deinem Google-Konto gehörende E-Mail-Adresse, deinen Namen und ggf. dein Profilbild und speichern die zur Sitzung gehörenden Authentifizierungs-Token. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO. Auf die Datenverarbeitung durch Google selbst haben wir keinen Einfluss; es gilt die Datenschutzerklärung von Google."
+        ]
+      },
+      {
+        "heading": "10. E-Mail-Versand (Resend)",
+        "body": [
+          "Zum Versand transaktionaler E-Mails – insbesondere der E-Mail zum Zurücksetzen deines Passworts – nutze ich den Dienst Resend (Resend, Inc., USA). Dabei werden deine E-Mail-Adresse und der Inhalt der jeweiligen E-Mail an Resend übermittelt. Resend verarbeitet diese Daten in meinem Auftrag auf Grundlage eines Vertrags über Auftragsverarbeitung (Art. 28 DSGVO). Rechtsgrundlage ist Art. 6 Abs. 1 lit. b und lit. f DSGVO. Bei einer Übermittlung in die USA gelten die Standardvertragsklauseln bzw. das EU-US Data Privacy Framework."
+        ]
+      },
+      {
+        "heading": "11. Externe Inhalte (Karten- und Pokémon-Grafiken)",
+        "body": [
+          "Zur Darstellung von Pokémon- und Karten-Symbolen lädt die Anwendung Pixelgrafiken aus einem öffentlichen Repository bei GitHub (raw.githubusercontent.com, GitHub, Inc., USA) nach. Dabei wird deine IP-Adresse technisch bedingt an GitHub übermittelt, damit die Grafiken an deinen Browser ausgeliefert werden können. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an einer ansprechenden Darstellung ohne eigene Bild-Hosting-Kosten)."
+        ]
+      },
+      {
+        "heading": "12. Lokale Speicherung im Browser",
+        "body": [
+          "Die Anwendung speichert einige technische Einstellungen lokal in deinem Browser (z. B. die gewählte Sprache und Anzeige-Voreinstellungen über localStorage). Diese Daten verbleiben auf deinem Gerät und werden nicht an den Server übertragen. Aus einer früheren, rein lokalen Version der App können zudem noch Daten in der Browser-Datenbank (IndexedDB) vorhanden sein; diese kannst du auf Wunsch in dein Konto übernehmen, andernfalls verbleiben sie ausschließlich in deinem Browser."
+        ]
+      },
+      {
+        "heading": "13. Empfänger der Daten",
+        "body": [
+          "Empfänger bzw. Kategorien von Empfängern personenbezogener Daten sind: der Hosting- und Datenbank-Anbieter (Railway) als Auftragsverarbeiter, der E-Mail-Dienstleister (Resend) als Auftragsverarbeiter, GitHub (für die von dir ausgelöste KI-Analyse über GitHub Models sowie für das Nachladen der Grafiken) und – sofern du diese Funktion nutzt – Google (für die Anmeldung). Eine darüber hinausgehende Weitergabe an Dritte findet nicht statt, es sei denn, ich bin gesetzlich dazu verpflichtet."
+        ]
+      },
+      {
+        "heading": "14. Speicherdauer",
+        "body": [
+          "Personenbezogene Daten werden nur so lange gespeichert, wie es für die genannten Zwecke erforderlich ist. Die Daten deines Nutzerkontos und die von dir eingegebenen Inhalte werden gespeichert, bis du dein Konto löschst bzw. die Löschung verlangst. Anonyme Demo-Konten und ihre Beispieldaten werden nicht dauerhaft benötigt und können nach Ablauf der Sitzung entfernt werden. Server-Logfiles werden nur für einen kurzen Zeitraum gespeichert und anschließend gelöscht. Gesetzliche Aufbewahrungspflichten bleiben unberührt."
+        ]
+      },
+      {
+        "heading": "15. Deine Rechte",
+        "body": [
+          "Du hast jederzeit das Recht auf Auskunft über die zu deiner Person gespeicherten Daten (Art. 15 DSGVO), Berichtigung unrichtiger Daten (Art. 16 DSGVO), Löschung (Art. 17 DSGVO), Einschränkung der Verarbeitung (Art. 18 DSGVO), Datenübertragbarkeit (Art. 20 DSGVO) sowie Widerspruch gegen die Verarbeitung (Art. 21 DSGVO). Soweit eine Verarbeitung auf einer Einwilligung beruht, kannst du diese jederzeit mit Wirkung für die Zukunft widerrufen (Art. 7 Abs. 3 DSGVO). Zur Ausübung deiner Rechte genügt eine Nachricht an die oben genannte Kontaktadresse."
+        ]
+      },
+      {
+        "heading": "16. Beschwerderecht bei der Aufsichtsbehörde",
+        "body": [
+          "Unbeschadet anderweitiger Rechtsbehelfe steht dir das Recht zu, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren (Art. 77 DSGVO). Die zuständige Aufsichtsbehörde ist:",
+          "Die Landesbeauftragte für den Datenschutz Niedersachsen\nPrinzenstraße 5, 30159 Hannover\nPostfach 221, 30002 Hannover\nTelefon: 0511 120-4500\nE-Mail: poststelle@lfd.niedersachsen.de\nwww.lfd.niedersachsen.de"
+        ]
+      },
+      {
+        "heading": "17. SSL-/TLS-Verschlüsselung",
+        "body": [
+          "Diese Anwendung nutzt aus Sicherheitsgründen eine SSL- bzw. TLS-Verschlüsselung. Eine verschlüsselte Verbindung erkennst du daran, dass die Adresszeile des Browsers mit „https://“ beginnt. Bei aktiver Verschlüsselung können die Daten, die du an die Anwendung übermittelst, nicht von Dritten mitgelesen werden."
+        ]
+      },
+      {
+        "heading": "18. Pflicht zur Bereitstellung",
+        "body": [
+          "Die Bereitstellung von E-Mail-Adresse und Passwort ist für die Erstellung eines Nutzerkontos erforderlich. Ohne diese Angaben kannst du kein Konto anlegen und die Anwendung – abgesehen vom Demo-Modus – nicht nutzen. Die Angabe eines Namens ist freiwillig."
+        ]
+      }
+    ]
+  }
+}

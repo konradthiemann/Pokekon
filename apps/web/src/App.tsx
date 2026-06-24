@@ -11,6 +11,8 @@ import { ResetPasswordView } from './components/auth/ResetPasswordView';
 import { MobileAccountSheet } from './components/auth/MobileAccountSheet';
 import { ImportLocalDataModal } from './components/auth/ImportLocalDataModal';
 import { shouldOfferLocalImport } from './lib/localImport';
+import { LegalPage } from './pages/LegalPage';
+import { legalDocForPath } from './lib/legalRoutes';
 
 // Each page is its own chunk: Recharts-heavy pages no longer block first paint.
 const OverviewPage = lazy(() =>
@@ -84,6 +86,14 @@ function App() {
   // server's SPA fallback serves index.html for /reset-password.
   if (window.location.pathname === '/reset-password') {
     return <ResetPasswordView />;
+  }
+
+  // Legal pages (Impressum / Datenschutz). Also checked before the session gate
+  // so they stay reachable signed-out — a legal requirement — and on reload via
+  // the SPA fallback.
+  const legalDoc = legalDocForPath(window.location.pathname);
+  if (legalDoc) {
+    return <LegalPage doc={legalDoc} />;
   }
 
   if (isPending) {

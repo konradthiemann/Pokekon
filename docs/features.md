@@ -17,6 +17,7 @@
 | Local meta priority | Deck / Recommendations | User configures |
 | Recent tournaments view | Meta | User triggers |
 | Matchup matrix | Meta | Auto from meta data |
+| Legal pages (Impressum / Datenschutz) | `/impressum`, `/datenschutz` | Footer links; reachable signed-out |
 
 ---
 
@@ -252,3 +253,15 @@ This data is **not persisted** — it lives only in Zustand's `recentTournaments
 A cross-table showing personal win rates for each pair of opponent archetypes encountered. Rows represent opponent archetypes; columns represent context or deck variants. Cells are color-coded: green for favorable, red for unfavorable, gray for insufficient data.
 
 Data comes from `archetypeStats` which is derived from `opponentLogs` cross-referenced with `metaSnapshots`.
+
+---
+
+## 14. Legal Pages (Impressum / Datenschutz)
+
+**Routes:** `/impressum` and `/datenschutz` — standalone pages rendered by `LegalPage` (`apps/web/src/pages/LegalPage.tsx`).
+
+Unlike the four dashboard tabs (which are Zustand `activeTab` state, not URLs), these are real paths. `App.tsx` checks `legalDocForPath(window.location.pathname)` **before the login gate** — like `/reset-password` — so the pages are reachable while signed out (a legal requirement) and survive a reload via the API's SPA fallback.
+
+- **Content** lives entirely in the `legal` i18n namespace (`apps/web/src/i18n/locales/{de,en}/legal.json`) as `{ heading, body[] }` sections, so switching DE/EN reflows the whole document. The **German version is the legally binding one** (stated in the page footer).
+- **Links** are rendered by the shared `LegalLinks` component in three places: the `WelcomeScreen` footer (signed-out), the desktop `Sidebar` bottom, and the mobile `MobileAccountSheet`. Plain `<a>` anchors — a full navigation is acceptable for legal pages and keeps the router-less app simple.
+- The privacy policy reflects the **current** server-side architecture: PostgreSQL on Railway (EU, `europe-west4`), Better Auth sessions (storing IP + user-agent), Resend for transactional email, **GitHub Models** for the BYOK battle-log analysis (key stored AES-256-GCM-encrypted server-side), optional Google sign-in, and GitHub-hosted sprite images.

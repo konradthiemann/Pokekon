@@ -10,6 +10,7 @@ import deMeta from './locales/de/meta.json';
 import deOpponents from './locales/de/opponents.json';
 import deRecommendations from './locales/de/recommendations.json';
 import deAuth from './locales/de/auth.json';
+import deLegal from './locales/de/legal.json';
 
 import enCommon from './locales/en/common.json';
 import enLayout from './locales/en/layout.json';
@@ -19,6 +20,7 @@ import enMeta from './locales/en/meta.json';
 import enOpponents from './locales/en/opponents.json';
 import enRecommendations from './locales/en/recommendations.json';
 import enAuth from './locales/en/auth.json';
+import enLegal from './locales/en/legal.json';
 
 export const LANGUAGE_STORAGE_KEY = 'pokekon-lang';
 
@@ -32,6 +34,7 @@ export const resources = {
     opponents: deOpponents,
     recommendations: deRecommendations,
     auth: deAuth,
+    legal: deLegal,
   },
   en: {
     common: enCommon,
@@ -42,6 +45,7 @@ export const resources = {
     opponents: enOpponents,
     recommendations: enRecommendations,
     auth: enAuth,
+    legal: enLegal,
   },
 } as const;
 

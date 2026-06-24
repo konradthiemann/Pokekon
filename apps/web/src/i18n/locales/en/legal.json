@@ -1,0 +1,178 @@
+{
+  "back": "Back to the app",
+  "tabImpressum": "Legal notice",
+  "tabDatenschutz": "Privacy",
+  "authoritativeNote": "This statement is available in German and English. The German version is authoritative and legally binding.",
+  "impressum": {
+    "title": "Legal notice (Impressum)",
+    "updated": "Last updated: 24 June 2026",
+    "sections": [
+      {
+        "heading": "Information pursuant to § 5 DDG (German Digital Services Act)",
+        "body": ["Konrad Thiemann\nOlfermannstr. 7\n38102 Braunschweig\nGermany"]
+      },
+      {
+        "heading": "Contact",
+        "body": ["Phone: 0161 67325218\nEmail: konrad.thiemann@gmail.com"]
+      },
+      {
+        "heading": "Responsible for the content",
+        "body": ["Konrad Thiemann (address as above)"]
+      },
+      {
+        "heading": "Nature of the service",
+        "body": [
+          "Pokekon is a private, non-commercial project for logging your own Pokémon Trading Card Game matches and analysing the competitive meta. No goods or services are offered for payment."
+        ]
+      },
+      {
+        "heading": "Consumer dispute resolution",
+        "body": [
+          "There is no obligation and no willingness to participate in a dispute resolution procedure before a consumer arbitration board."
+        ]
+      },
+      {
+        "heading": "Liability for content",
+        "body": [
+          "The content of this application was created with the greatest possible care. However, no guarantee can be given for the accuracy, completeness and timeliness of the content. As a service provider, I am responsible for my own content on these pages in accordance with § 7 (1) DDG and general law. According to §§ 8 to 10 DDG, however, I am not obliged as a service provider to monitor transmitted or stored third-party information or to investigate circumstances that indicate illegal activity."
+        ]
+      },
+      {
+        "heading": "Liability for links",
+        "body": [
+          "This application may contain links to external third-party websites over whose content I have no influence. No guarantee can be given for this third-party content. The respective provider or operator of the linked pages is always responsible for their content."
+        ]
+      },
+      {
+        "heading": "Copyright",
+        "body": [
+          "The content and works created by the operator on these pages are subject to German copyright law. Duplication, processing, distribution and any kind of use outside the limits of copyright require the written consent of the respective author or creator.",
+          "Pokémon and the names and images of the cards are registered trademarks of The Pokémon Company, Nintendo, Game Freak and Creatures Inc. Pokekon is an unofficial fan project; it is not affiliated with, endorsed or sponsored by these companies."
+        ]
+      }
+    ]
+  },
+  "datenschutz": {
+    "title": "Privacy policy",
+    "updated": "Last updated: 24 June 2026",
+    "sections": [
+      {
+        "heading": "1. Controller",
+        "body": [
+          "The controller responsible for the processing of personal data in this application within the meaning of the General Data Protection Regulation (GDPR) is:",
+          "Konrad Thiemann\nOlfermannstr. 7\n38102 Braunschweig\nGermany\nPhone: 0161 67325218\nEmail: konrad.thiemann@gmail.com"
+        ]
+      },
+      {
+        "heading": "2. Overview",
+        "body": [
+          "Pokekon is a private application for logging your own Pokémon Trading Card Game matches and analysing the current tournament meta. Personal data is processed solely to provide the operation of the application, your user account and the content you enter. Your data is not sold and not passed on to third parties for advertising purposes."
+        ]
+      },
+      {
+        "heading": "3. Hosting and storage location",
+        "body": [
+          "This application is hosted by Railway (Railway Corp., USA). The web app, the application programming interface (API) and the database in which your data is stored run in the Europe West region (europe-west4) in the Netherlands. Your personal data is therefore stored and processed within the European Union.",
+          "Railway processes the resulting data – in particular server log files and the content stored in the database – on my behalf on the basis of a data processing agreement pursuant to Art. 28 GDPR. The legal basis for its use is my legitimate interest in stable and secure operation of the application (Art. 6 (1) (f) GDPR).",
+          "As the provider Railway Corp. is a US company, access from the USA cannot be entirely ruled out. To the extent that personal data is transferred to a third country, this is done on the basis of the EU Commission's standard contractual clauses or an appropriate adequacy decision (EU-US Data Privacy Framework)."
+        ]
+      },
+      {
+        "heading": "4. Server log files",
+        "body": [
+          "When the application is accessed, information is automatically recorded in so-called server log files that your browser transmits: browser type and version, operating system used, referrer URL, time of the server request and the IP address. This data is not merged with other data sources and serves the trouble-free and secure operation of the application. The legal basis is Art. 6 (1) (f) GDPR."
+        ]
+      },
+      {
+        "heading": "5. Cookies and sessions",
+        "body": [
+          "This application uses exclusively technically necessary cookies. For sign-in, the authentication system (Better Auth) sets a session cookie that stores your login status. Without this cookie, signing in is not possible; consent is not required for this (§ 25 (2) no. 2 TDDDG). For the session, your IP address and the browser identifier (user agent) are stored on the server in order to secure the session. The legal basis is Art. 6 (1) (b) and (f) GDPR. Cookies for analytics or advertising purposes are not used."
+        ]
+      },
+      {
+        "heading": "6. Registration and user account",
+        "body": [
+          "To use the application you create a user account. The following data is processed: email address, password (stored exclusively in encrypted/hashed form and not viewable in plain text) and, optionally, a name. This data is required to grant you access to your account and to provide the application. The legal basis is Art. 6 (1) (b) GDPR (performance of the usage relationship).",
+          "Alternatively, you can try the app with a single click via a guest/demo mode without registering. In this case an anonymous, temporary account with a placeholder address is created and filled with sample data; no email address is required for this."
+        ]
+      },
+      {
+        "heading": "7. Your game data",
+        "body": [
+          "As part of your use, you store content in the application yourself, in particular decks and deck cards, deck versions (snapshots) and match logs (opponent archetype, event type, date, result, notes and round). Optionally, you can paste and store the original match-log text of a game from \"Pokémon TCG Live\"; any AI analyses created from it are stored as well.",
+          "Pasted match logs may contain the in-game names of the players involved (yours and your opponent's). Only paste logs that you are entitled to store.",
+          "This data is processed solely to provide you with the application's features. It is only visible to you in your account, is not passed on to third parties (exception: the AI analysis described in section 8, which you trigger yourself) and is not evaluated for profiling or advertising purposes. The legal basis is Art. 6 (1) (b) GDPR."
+        ]
+      },
+      {
+        "heading": "8. AI analysis of match logs (GitHub Models)",
+        "body": [
+          "The application offers an optional, AI-assisted analysis of your match logs. If – and only if – you actively trigger such an analysis, the log text you pasted and your player name are transmitted server-side to GitHub Models (GitHub, Inc., a Microsoft company, USA) and evaluated there by a language model. GitHub Models provides models from various providers (e.g. OpenAI) via Microsoft's Azure infrastructure.",
+          "For the analysis you provide your own GitHub Models access token (\"bring your own key\"). This token is stored on the server encrypted with AES-256-GCM, decrypted server-side solely for the analysis, and is never stored in the browser or passed on to third parties. The evaluation is performed with the setting \"temperature = 0\" and only returns statements that are quoted verbatim from the log.",
+          "The legal basis is Art. 6 (1) (b) GDPR (provision of the feature you requested) and Art. 6 (1) (f) GDPR. As the processing may take place on servers in the USA, any transfer is based on the standard contractual clauses or the EU-US Data Privacy Framework. If you do not use the AI analysis, no log data is transmitted to GitHub."
+        ]
+      },
+      {
+        "heading": "9. Sign-in with Google",
+        "body": [
+          "You can optionally sign in with your Google account (single sign-on via Google; provider for users in the EEA: Google Ireland Ltd., Gordon House, Barrow Street, Dublin 4, Ireland). If you use this feature, Google processes the sign-in; we receive the email address associated with your Google account, your name and, where applicable, your profile picture, and we store the authentication tokens belonging to the session. The legal basis is Art. 6 (1) (b) GDPR. We have no influence over Google's own data processing; Google's privacy policy applies."
+        ]
+      },
+      {
+        "heading": "10. Sending email (Resend)",
+        "body": [
+          "To send transactional emails – in particular the password reset email – I use the service Resend (Resend, Inc., USA). In doing so, your email address and the content of the respective email are transmitted to Resend. Resend processes this data on my behalf on the basis of a data processing agreement (Art. 28 GDPR). The legal basis is Art. 6 (1) (b) and (f) GDPR. For any transfer to the USA, the standard contractual clauses or the EU-US Data Privacy Framework apply."
+        ]
+      },
+      {
+        "heading": "11. External content (card and Pokémon graphics)",
+        "body": [
+          "To display Pokémon and card icons, the application loads pixel graphics from a public repository on GitHub (raw.githubusercontent.com, GitHub, Inc., USA). For technical reasons, your IP address is transmitted to GitHub so that the graphics can be delivered to your browser. The legal basis is Art. 6 (1) (f) GDPR (legitimate interest in an attractive presentation without separate image-hosting costs)."
+        ]
+      },
+      {
+        "heading": "12. Local storage in the browser",
+        "body": [
+          "The application stores some technical settings locally in your browser (e.g. the selected language and display preferences via localStorage). This data remains on your device and is not transmitted to the server. In addition, data may still be present in the browser database (IndexedDB) from an earlier, purely local version of the app; you can import this into your account if you wish, otherwise it remains exclusively in your browser."
+        ]
+      },
+      {
+        "heading": "13. Recipients of the data",
+        "body": [
+          "Recipients or categories of recipients of personal data are: the hosting and database provider (Railway) as a processor, the email service provider (Resend) as a processor, GitHub (for the AI analysis you trigger via GitHub Models and for loading the graphics) and – if you use this feature – Google (for sign-in). No further disclosure to third parties takes place unless I am legally obliged to do so."
+        ]
+      },
+      {
+        "heading": "14. Storage period",
+        "body": [
+          "Personal data is stored only for as long as is necessary for the stated purposes. The data of your user account and the content you have entered is stored until you delete your account or request its deletion. Anonymous demo accounts and their sample data are not needed permanently and may be removed after the session ends. Server log files are stored only for a short period and then deleted. Statutory retention obligations remain unaffected."
+        ]
+      },
+      {
+        "heading": "15. Your rights",
+        "body": [
+          "You have the right at any time to information about the data stored about you (Art. 15 GDPR), to rectification of incorrect data (Art. 16 GDPR), to erasure (Art. 17 GDPR), to restriction of processing (Art. 18 GDPR), to data portability (Art. 20 GDPR) and to object to processing (Art. 21 GDPR). Where processing is based on consent, you can withdraw it at any time with effect for the future (Art. 7 (3) GDPR). A message to the contact address given above is sufficient to exercise your rights."
+        ]
+      },
+      {
+        "heading": "16. Right to lodge a complaint with a supervisory authority",
+        "body": [
+          "Without prejudice to any other legal remedy, you have the right to lodge a complaint with a data protection supervisory authority (Art. 77 GDPR). The competent supervisory authority is:",
+          "Die Landesbeauftragte für den Datenschutz Niedersachsen\nPrinzenstraße 5, 30159 Hannover\nPostfach 221, 30002 Hannover\nPhone: 0511 120-4500\nEmail: poststelle@lfd.niedersachsen.de\nwww.lfd.niedersachsen.de"
+        ]
+      },
+      {
+        "heading": "17. SSL/TLS encryption",
+        "body": [
+          "For security reasons, this application uses SSL or TLS encryption. You can recognise an encrypted connection by the fact that the browser's address bar begins with \"https://\". When encryption is active, the data you transmit to the application cannot be read by third parties."
+        ]
+      },
+      {
+        "heading": "18. Obligation to provide data",
+        "body": [
+          "Providing an email address and password is required to create a user account. Without this information you cannot create an account and – apart from the demo mode – cannot use the application. Providing a name is optional."
+        ]
+      }
+    ]
+  }
+}

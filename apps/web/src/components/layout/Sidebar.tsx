@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { LegalLinks } from './LegalLinks';
 import { UserMenu } from '../auth/UserMenu';
 import { PokeballMark } from '../shared/PokeballMark';
 
@@ -147,6 +148,8 @@ export function Sidebar() {
         <div className="flex justify-center pt-1">
           <LanguageSwitcher />
         </div>
+
+        <LegalLinks className="pt-1" />
       </div>
     </aside>
   );

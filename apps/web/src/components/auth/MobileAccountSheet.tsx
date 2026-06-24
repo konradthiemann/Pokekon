@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Brain, LogOut, X } from 'lucide-react';
 import { authClient } from '../../lib/authClient';
 import { LanguageSwitcher } from '../layout/LanguageSwitcher';
+import { LegalLinks } from '../layout/LegalLinks';
 import { AiSettingsModal } from '../settings/AiSettingsModal';
 
 /**
@@ -122,6 +123,8 @@ export function MobileAccountSheet() {
                   {t('userMenu.signOut')}
                 </button>
               </div>
+
+              <LegalLinks className="mt-4" />
             </div>
           </div>,
           document.body,
