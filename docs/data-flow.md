@@ -71,15 +71,15 @@ After the log is written to IndexedDB, `refresh()` reloads both the raw logs and
 ```mermaid
 sequenceDiagram
     participant User
-    participant Sidebar
+    participant UI as Sidebar / Meta page
     participant Store as dashboardStore
     participant MetaFetch as metaFetch.ts
     participant Limitless as play.limitlesstcg.com
     participant CORSProxy as corsproxy.io
     participant DB as Dexie / IndexedDB
 
-    User->>Sidebar: Click "Sync Live Meta"
-    Sidebar->>Store: syncMeta()
+    User->>UI: Click "Sync Live Meta" (sidebar on desktop, Meta header on mobile)
+    UI->>Store: syncMeta()
     Store->>MetaFetch: syncLiveMeta(onProgress)
     MetaFetch->>Limitless: GET /api/tournaments?game=PTCG&completed=true&limit=50&format=standard
     alt Direct fetch succeeds
@@ -99,8 +99,8 @@ sequenceDiagram
     MetaFetch->>DB: upsertMetaSnapshot() for each archetype
     MetaFetch-->>Store: MetaSyncResult {archetypes, tournaments, totalPlayers, period}
     Store->>Store: refresh()
-    Store-->>Sidebar: isSyncing = false, lastSynced = now
-    Sidebar-->>User: Show result toast
+    Store-->>UI: isSyncing = false, lastSynced = now
+    UI-->>User: Show result toast
 ```
 
 The sync always clears all existing meta snapshots before writing new ones. The period label is the current ISO week (e.g., `"2026-W15"`), so re-syncing in the same week replaces the same-period rows via the compound index upsert.

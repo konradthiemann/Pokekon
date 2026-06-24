@@ -270,6 +270,10 @@ The main content area is capped at `max-w-screen-2xl` with `p-3 md:p-4` padding,
 on the light **"playmat"** surface (`#eef3fb`, see [design-system.md](./design-system.md))
 using Tailwind utilities throughout.
 
+The desktop `Sidebar` is `hidden md:flex`, so any global action it hosts must also
+be reachable on mobile. **Sync Live Meta** therefore lives both in the sidebar and
+in the **Meta page** header, so a phone user can always load tournament data.
+
 ## Visual design
 
 The UI is a light, playful, WCAG-AA theme — white "cards" on a deck-tinted light

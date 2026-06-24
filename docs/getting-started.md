@@ -131,7 +131,7 @@ site deploys separately to GitHub Pages via `.github/workflows/docs.yml`.
 1. Sign in / create an account (top-right or sidebar). A fresh account starts empty.
 2. **Deck** → create a deck, then "Import" your list (paste your PTCG export).
 3. Set the archetype + Limitless slug (e.g. `n-zoroark`) in Deck Settings.
-4. **Sync Live Meta** (sidebar) to fetch current tournament data (server-side sync).
+4. **Sync Live Meta** (sidebar on desktop, or the button in the Meta page header on mobile) to fetch current tournament data (server-side sync).
 5. Log matches in the **Match Log** section; paste battle logs for turn-quality
    analytics and (optional) LLM analysis.
 
@@ -201,7 +201,7 @@ tcg/                      # repo root (npm workspaces)
 
 ## Troubleshooting
 
-**"No meta data yet":** click **Sync Live Meta** — the server fetches Limitless (needs the API + an internet connection).
+**"No meta data yet":** click **Sync Live Meta** (in the sidebar, or in the Meta page header on mobile) — the server fetches Limitless (needs the API + an internet connection).
 
 **Battle-log parsing shows the wrong player:** set your TCG Live username so the parser pins "you" correctly:
 ```javascript
