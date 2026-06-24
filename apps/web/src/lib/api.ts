@@ -367,15 +367,40 @@ export async function updateAiSettings(body: {
   });
 }
 
-/** Run the server-side LLM analysis on a battle log (key stays on the server). */
+/**
+ * Run the server-side LLM analysis on a battle log.
+ *
+ * By default the caller's stored, encrypted key is used. Pass `opts.apiKey` to
+ * supply an ephemeral key for this request only — it is used once and never
+ * stored server-side (the demo flow uses this so a guest can try their own token
+ * without persisting it for anyone else).
+ */
 export async function analyzeBattleLogViaApi(
   battleLog: string,
   playerName: string,
+  opts?: { apiKey?: string; provider?: string; model?: string | null },
 ): Promise<BattleAnalysis> {
   return request<BattleAnalysis>('/api/analysis/log', {
     method: 'POST',
-    body: JSON.stringify({ battleLog, playerName }),
+    body: JSON.stringify({
+      battleLog,
+      playerName,
+      ...(opts?.apiKey ? { apiKey: opts.apiKey } : {}),
+      ...(opts?.provider ? { provider: opts.provider } : {}),
+      ...(opts?.model !== undefined ? { model: opts.model } : {}),
+    }),
   });
+}
+
+// ─── Demo (guest accounts) ────────────────────────────────────────────────────
+
+/**
+ * Seed the current (anonymous) account with sample decks + documented matches.
+ * Server-side this is restricted to guest accounts and is idempotent, so calling
+ * it more than once is safe. Returns whether data was actually written.
+ */
+export async function seedDemo(): Promise<{ seeded: boolean }> {
+  return request<{ seeded: boolean }>('/api/demo/seed', { method: 'POST' });
 }
 
 // ─── Meta snapshots (global, server-side) ─────────────────────────────────────

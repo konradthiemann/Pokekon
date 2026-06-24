@@ -5,6 +5,8 @@ import type { Db } from '../db/index.js';
 /** The slice of the Better Auth user the domain routes need. */
 export interface SessionUser {
   id: string;
+  /** True for throwaway guest accounts created by the `anonymous` plugin. */
+  isAnonymous: boolean;
 }
 
 /** Resolves the authenticated user from request headers, or null when unauthenticated. */
@@ -20,7 +22,11 @@ export interface ApiEnv {
 
 const defaultGetSessionUser: GetSessionUser = async (headers) => {
   const session = await getAuth().api.getSession({ headers });
-  return session === null ? null : { id: session.user.id };
+  if (session === null) return null;
+  // `isAnonymous` is contributed by the anonymous plugin; default to false for
+  // ordinary accounts (and older sessions issued before the column existed).
+  const isAnonymous = (session.user as { isAnonymous?: boolean | null }).isAnonymous ?? false;
+  return { id: session.user.id, isAnonymous };
 };
 
 /**

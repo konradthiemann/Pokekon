@@ -103,8 +103,18 @@ export const aiSettingsPutSchema = z
   })
   .refine((b) => Object.keys(b).length > 0, { message: 'At least one field is required' });
 
-/** Body for POST /api/analysis/log — the raw battle log and the local player's name. */
+/**
+ * Body for POST /api/analysis/log — the raw battle log and the local player's name.
+ *
+ * Optional ephemeral BYOK fields (`apiKey`/`provider`/`model`): when `apiKey` is
+ * present it is used for THIS request only and never stored — this powers the demo
+ * flow where a guest may try their own token without it being persisted for anyone.
+ * When omitted, the server falls back to the caller's stored, encrypted key.
+ */
 export const analyzeLogSchema = z.object({
   battleLog: z.string().min(1),
   playerName: z.string().min(1).max(100),
+  apiKey: z.string().max(400).optional(),
+  provider: z.enum(aiProviderValues).optional(),
+  model: z.string().max(100).nullish(),
 });

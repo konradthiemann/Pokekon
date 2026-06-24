@@ -51,7 +51,7 @@ beforeAll(async () => {
     db,
     getSessionUser: async (headers) => {
       const id = headers.get('x-test-user');
-      return id === null ? null : { id };
+      return id === null ? null : { id, isAnonymous: false };
     },
   });
 });
