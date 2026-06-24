@@ -83,7 +83,7 @@ export function UserMenu() {
         onClick={() => setShowAiSettings(true)}
         aria-label={t('aiSettings.open')}
         title={t('aiSettings.open')}
-        className="p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/[0.08] transition-colors shrink-0"
+        className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
       >
         <Brain className="w-3.5 h-3.5" aria-hidden="true" />
       </button>
