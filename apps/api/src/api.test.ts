@@ -750,6 +750,13 @@ describe('meta (/api/meta)', () => {
           { deck: { id: 'gard', name: 'Gardevoir' }, record: { wins: 3, losses: 4, ties: 0 } },
         ]);
       }
+      if (url.includes('/api/tournaments/T1/details')) {
+        return jsonResponse({
+          isOnline: true,
+          platform: 'PTCGL',
+          phases: [{ type: 'SWISS', mode: 'BO1' }],
+        });
+      }
       // tournament list
       return jsonResponse([{ id: 'T1', name: 'Online Weekly', players: 64, date: today }]);
     });
@@ -796,8 +803,18 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
     date: Date,
     players: number,
     standings: (typeof schema.tournamentStandings.$inferInsert)[],
+    scope: { isOnline?: boolean; swissMode?: 'BO1' | 'BO3' | 'OTHER' | null } = {},
   ): Promise<void> {
-    await db.insert(schema.tournaments).values({ id, name: `Event ${id}`, date, players });
+    // Seed as an online Bo1 event by default — that is what the meta reads
+    // filter to; pass `scope` to seed an in-person / Bo3 event for filter tests.
+    await db.insert(schema.tournaments).values({
+      id,
+      name: `Event ${id}`,
+      date,
+      players,
+      isOnline: scope.isOnline ?? true,
+      swissMode: scope.swissMode ?? 'BO1',
+    });
     await db
       .insert(schema.tournamentStandings)
       .values(standings.map((s) => ({ ...s, tournamentId: id })));
@@ -849,6 +866,13 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
             // no decklist submitted
           },
         ]);
+      }
+      if (url.includes('/api/tournaments/T9/details')) {
+        return jsonResponse({
+          isOnline: true,
+          platform: 'PTCGL',
+          phases: [{ type: 'SWISS', mode: 'BO1' }],
+        });
       }
       return jsonResponse([{ id: 'T9', name: 'Weekly Online', players: 40, date: today }]);
     });
@@ -902,6 +926,13 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
             },
           ]);
         }
+        if (url.includes('/api/tournaments/T9/details')) {
+          return jsonResponse({
+            isOnline: true,
+            platform: 'PTCGL',
+            phases: [{ type: 'SWISS', mode: 'BO1' }],
+          });
+        }
         return jsonResponse([{ id: 'T9', name: 'Weekly Online', players: 40, date: today }]);
       });
 
@@ -934,14 +965,14 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
       standing('zoro', { placing: 1, playerName: 'TooOld', decklist: sampleDecklist }),
     ]);
 
-    const page1 = await request('/api/meta/archetypes/zoro/lists?weeks=4&limit=2&offset=0', {
+    const page1 = await request('/api/meta/archetypes/zoro/lists?days=30&limit=2&offset=0', {
       user: USER_A,
     });
     const body1 = (await page1.json()) as { total: number; lists: { playerName: string }[] };
     expect(body1.total).toBe(3); // TooOld outside window, NoList has no decklist
     expect(body1.lists.map((l) => l.playerName)).toEqual(['Big2', 'Small1']);
 
-    const page2 = await request('/api/meta/archetypes/zoro/lists?weeks=4&limit=2&offset=2', {
+    const page2 = await request('/api/meta/archetypes/zoro/lists?days=30&limit=2&offset=2', {
       user: USER_A,
     });
     const body2 = (await page2.json()) as { lists: { playerName: string }[] };
@@ -962,7 +993,7 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
       { deck1: 'bb', deck2: 'aa', winRate: 40 },
     ]);
 
-    const res = await request('/api/meta/field-analysis?weeks=1', { user: USER_A });
+    const res = await request('/api/meta/field-analysis?days=7', { user: USER_A });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       matchupImportedAt: string | null;
@@ -974,6 +1005,37 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
     expect(body.archetypes[0]?.fieldWinRatePct).toBe(55);
     expect(body.archetypes[1]?.fieldWinRatePct).toBe(45);
     expect(body.archetypes[0]?.coveragePct).toBe(100);
+  });
+
+  it('restricts the field to online Bo1 events by default; includes all when asked', async () => {
+    await clearTournamentData();
+    await seedTournament('online-bo1', daysAgo(1), 20, [standing('aa'), standing('aa')]);
+    await seedTournament('irl-bo3', daysAgo(1), 20, [standing('bb'), standing('bb')], {
+      isOnline: false,
+      swissMode: 'BO3',
+    });
+
+    // Default (online + bo1): only the online Bo1 event's players are counted.
+    const def = await request('/api/meta/field-analysis?days=7', { user: USER_A });
+    const defBody = (await def.json()) as {
+      totalPlayers: number;
+      tournamentCount: number;
+      archetypes: { archetypeId: string }[];
+    };
+    expect(defBody.totalPlayers).toBe(2);
+    expect(defBody.tournamentCount).toBe(1);
+    expect(defBody.archetypes.map((a) => a.archetypeId)).toEqual(['aa']);
+
+    // Scope widened: both the online Bo1 and the in-person Bo3 event are counted.
+    const all = await request('/api/meta/field-analysis?days=7&online=false&bo1=false', {
+      user: USER_A,
+    });
+    const allBody = (await all.json()) as {
+      totalPlayers: number;
+      archetypes: { archetypeId: string }[];
+    };
+    expect(allBody.totalPlayers).toBe(4);
+    expect(allBody.archetypes.map((a) => a.archetypeId).sort()).toEqual(['aa', 'bb']);
   });
 
   it('serves one archetype analysis with threats, rank and trend', async () => {
@@ -1013,7 +1075,7 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
       },
     ]);
 
-    const res = await request('/api/meta/archetypes/aa/analysis?weeks=1', { user: USER_A });
+    const res = await request('/api/meta/archetypes/aa/analysis?days=7', { user: USER_A });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       archetype: { sharePct: number; playerCount: number };

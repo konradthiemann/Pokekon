@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Crosshair } from 'lucide-react';
-import type { ArchetypeAnalysis } from '../../lib/api';
+import type { FieldScore } from '@pokekon/shared';
 import { winRateColorClass } from './winRateColor';
 
 /** Below this coverage the score rests on too little matchup data to trust. */
@@ -9,10 +9,19 @@ const LOW_COVERAGE_PCT = 40;
 /**
  * The meta-weighted field performance (plan §3.4): big score, rank, coverage
  * bar with a low-data warning, mirror probability and the data source note.
+ * Takes primitives so both the archetype drilldown and the local-meta
+ * prediction render it identically.
  */
-export function FieldScorePanel({ analysis }: { analysis: ArchetypeAnalysis }) {
+export function FieldScorePanel({
+  fieldScore,
+  totalRanked,
+  matchupImportedAt,
+}: {
+  fieldScore: FieldScore;
+  totalRanked: number;
+  matchupImportedAt: string | null;
+}) {
   const { t } = useTranslation('meta');
-  const { fieldScore, totalRanked, matchupImportedAt } = analysis;
   const score = fieldScore.fieldWinRatePct;
 
   return (

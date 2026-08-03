@@ -15,11 +15,19 @@ import {
   Grid3X3,
   Globe,
   AlertCircle,
+  FlaskConical,
 } from 'lucide-react';
-import { OTHER_ARCHETYPE_ID } from '@pokekon/shared';
-import type { MetaSnapshot, RecentTournament } from '../types';
-import { getFieldAnalysis, type FieldAnalysisArchetype } from '../lib/api';
+import type { RecentTournament } from '../types';
+import {
+  getFieldAnalysis,
+  type FieldAnalysis,
+  type FieldAnalysisArchetype,
+  type MetaWindow,
+} from '../lib/api';
 import { ArchetypeDetail } from '../components/meta/ArchetypeDetail';
+import { MetaWindowControl } from '../components/meta/MetaWindowControl';
+import { META_DEFAULT_DAYS } from '../components/meta/metaWindow';
+import { PredictionPanel } from '../components/meta/PredictionPanel';
 import { MatchupMatrix } from '../components/meta/MatchupMatrix';
 import { WinRateBadge } from '../components/meta/WinRateBadge';
 import { CollapsibleSection } from '../components/layout/CollapsibleSection';
@@ -27,7 +35,7 @@ import { PokemonIcon } from '../components/shared/PokemonIcon';
 
 // ─── Meta table ───────────────────────────────────────────────────────────────
 
-type SortKey = 'frequencyPct' | 'winRatePct' | 'playerCount' | 'fieldScore';
+type SortKey = 'sharePct' | 'winRatePct' | 'playerCount' | 'fieldScore';
 
 /** A selected archetype (drilldown target) — requires the Limitless slug. */
 export interface ArchetypeSelection {
@@ -89,16 +97,14 @@ function TH({
 const PAGE_SIZE = 10;
 
 function MetaTable({
-  snapshots,
-  fieldScores,
+  archetypes,
   onSelect,
 }: {
-  snapshots: MetaSnapshot[];
-  fieldScores: Map<string, FieldAnalysisArchetype>;
+  archetypes: FieldAnalysisArchetype[];
   onSelect: (selection: ArchetypeSelection) => void;
 }) {
   const { t } = useTranslation('meta');
-  const [sortKey, setSortKey] = useState<SortKey>('frequencyPct');
+  const [sortKey, setSortKey] = useState<SortKey>('sharePct');
   const [asc, setAsc] = useState(false);
   const [namesOpen, setNamesOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -111,13 +117,13 @@ function MetaTable({
     }
   };
 
-  const scoreOf = (snap: MetaSnapshot): number | null =>
-    snap.archetypeId != null ? (fieldScores.get(snap.archetypeId)?.fieldWinRatePct ?? null) : null;
+  const valueOf = (a: FieldAnalysisArchetype): number | null =>
+    sortKey === 'fieldScore' ? a.fieldWinRatePct : a[sortKey];
 
-  const sorted = [...snapshots].sort((a, b) => {
-    // Missing values (no slug / no matchup data) sort to the end, not as 0.
-    const va = sortKey === 'fieldScore' ? scoreOf(a) : a[sortKey];
-    const vb = sortKey === 'fieldScore' ? scoreOf(b) : b[sortKey];
+  const sorted = [...archetypes].sort((a, b) => {
+    // Missing values (no matchup data / no decided games) sort to the end, not as 0.
+    const va = valueOf(a);
+    const vb = valueOf(b);
     if (va == null && vb == null) return 0;
     if (va == null) return 1;
     if (vb == null) return -1;
@@ -126,7 +132,7 @@ function MetaTable({
 
   const visible = expanded ? sorted : sorted.slice(0, PAGE_SIZE);
   const hasMore = sorted.length > PAGE_SIZE;
-  const maxFreq = Math.max(...snapshots.map((s) => s.frequencyPct), 1);
+  const maxShare = Math.max(...archetypes.map((a) => a.sharePct), 1);
 
   // ICON_BOX: fixed px width for the icon area so every row aligns regardless
   // of whether the archetype has 1 or 2 sprites (24px each + 2px gap = 50px, pad to 54).
@@ -178,7 +184,7 @@ function MetaTable({
                     </th>
                     <TH
                       label={t('metaTable.headers.share')}
-                      sortK="frequencyPct"
+                      sortK="sharePct"
                       right={false}
                       sortKey={sortKey}
                       asc={asc}
@@ -214,82 +220,59 @@ function MetaTable({
                   </tr>
                 </thead>
                 <tbody>
-                  {visible.map((snap, i) => {
-                    // 'other' is the bucket for unidentified decks — it exists in
-                    // the share data but has no drilldown (never ranked/listed).
-                    const archetypeId =
-                      snap.archetypeId !== OTHER_ARCHETYPE_ID ? snap.archetypeId : null;
-                    const score = scoreOf(snap);
-                    const rank =
-                      snap.archetypeId != null
-                        ? fieldScores.get(snap.archetypeId)?.rank
-                        : undefined;
-                    return (
-                      <tr
-                        key={snap.archetype}
-                        className={`border-b border-slate-200 hover:bg-slate-50 transition-colors ${archetypeId != null ? 'cursor-pointer' : ''}`}
-                        onClick={
-                          archetypeId != null
-                            ? () => onSelect({ archetypeId, archetypeName: snap.archetype })
-                            : undefined
-                        }
-                        title={
-                          archetypeId != null
-                            ? t('metaTable.clickHint')
-                            : snap.archetypeId == null
-                              ? t('metaTable.noSlugHint') // legacy row — next sync adds the slug
-                              : undefined // 'other': structurally no drilldown
-                        }
-                      >
-                        <td className="px-3 py-2 text-slate-400 text-xs tabular-nums">{i + 1}</td>
-                        <td className="py-2 px-2 overflow-hidden">
-                          <div className="flex items-center gap-1.5">
-                            <div className="shrink-0 flex items-center" style={{ width: ICON_BOX }}>
-                              <PokemonIcon
-                                archetype={snap.archetype}
-                                size="sm"
-                                dual
-                                reserveSecondary
-                              />
-                            </div>
-                            {namesOpen && (
-                              <span className="text-xs font-medium text-slate-800 truncate leading-tight min-w-0">
-                                {snap.archetype}
-                              </span>
-                            )}
+                  {visible.map((a, i) => (
+                    <tr
+                      key={a.archetypeId}
+                      className="border-b border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
+                      onClick={() =>
+                        onSelect({ archetypeId: a.archetypeId, archetypeName: a.archetypeName })
+                      }
+                      title={t('metaTable.clickHint')}
+                    >
+                      <td className="px-3 py-2 text-slate-400 text-xs tabular-nums">{i + 1}</td>
+                      <td className="py-2 px-2 overflow-hidden">
+                        <div className="flex items-center gap-1.5">
+                          <div className="shrink-0 flex items-center" style={{ width: ICON_BOX }}>
+                            <PokemonIcon
+                              archetype={a.archetypeName}
+                              size="sm"
+                              dual
+                              reserveSecondary
+                            />
                           </div>
-                        </td>
-                        <td className="px-3 py-2">
-                          <ShareBar pct={snap.frequencyPct} max={maxFreq} />
-                        </td>
-                        <td className="px-3 py-2 text-right text-slate-600 tabular-nums text-xs">
-                          {snap.playerCount ?? '—'}
-                        </td>
-                        <td className="px-3 py-2 text-right text-slate-500 font-mono text-xs">
-                          {snap.wins != null && snap.losses != null
-                            ? `${snap.wins}-${snap.losses}`
-                            : '—'}
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <WinRateBadge pct={snap.winRatePct} />
-                        </td>
-                        <td className="px-3 py-2 text-right whitespace-nowrap">
-                          {score !== null ? (
-                            <>
-                              <WinRateBadge pct={Math.round(score * 10) / 10} />
-                              {rank !== undefined && (
-                                <span className="text-[10px] font-bold text-brand-700 ml-1">
-                                  #{rank}
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-slate-400 font-mono">—</span>
+                          {namesOpen && (
+                            <span className="text-xs font-medium text-slate-800 truncate leading-tight min-w-0">
+                              {a.archetypeName}
+                            </span>
                           )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <ShareBar pct={a.sharePct} max={maxShare} />
+                      </td>
+                      <td className="px-3 py-2 text-right text-slate-600 tabular-nums text-xs">
+                        {a.playerCount}
+                      </td>
+                      <td className="px-3 py-2 text-right text-slate-500 font-mono text-xs">
+                        {a.wins}-{a.losses}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <WinRateBadge pct={a.winRatePct} />
+                      </td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                        {a.fieldWinRatePct !== null ? (
+                          <>
+                            <WinRateBadge pct={Math.round(a.fieldWinRatePct * 10) / 10} />
+                            <span className="text-[10px] font-bold text-brand-700 ml-1">
+                              #{a.rank}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-slate-400 font-mono">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -490,30 +473,43 @@ function RecentTournaments() {
 
 export function MetaPage() {
   const { t } = useTranslation('meta');
-  const { metaSnapshots, syncMeta, isSyncing, syncProgress, syncError, lastSynced } =
-    useDashboardStore();
-  const sourceNote = metaSnapshots[0]?.sourceNote;
+  const { syncMeta, isSyncing, syncProgress, syncError, lastSynced } = useDashboardStore();
   const [selected, setSelected] = useState<ArchetypeSelection | null>(null);
-  const [fieldScores, setFieldScores] = useState<Map<string, FieldAnalysisArchetype>>(new Map());
 
-  // Field scores for the overview column use the widest window (4 weeks) for
-  // the broadest sample; the drilldown has its own 1–4 week selector. Loaded
-  // after every snapshot refresh (i.e. also after each sync). Failures leave
-  // the column empty ("—") rather than blocking the page.
+  // Meta window (days back + online Bo1-Swiss scope). Drives BOTH the overview
+  // field analysis and the drilldown, so the whole tab reflects one window. The
+  // online + bo1 flags move together — the local-Bo1 proxy is the whole point.
+  const [days, setDays] = useState<number>(META_DEFAULT_DAYS);
+  const [onlineBo1, setOnlineBo1] = useState(true);
+  const metaWindow: MetaWindow = { days, online: onlineBo1, bo1: onlineBo1 };
+
+  // The overview table IS the day-window field analysis (share, win rate, record
+  // and meta-weighted field score per archetype), so the day/online controls
+  // genuinely drive the metashare. The result is tagged with the request key it
+  // answers (window + last sync) so switching windows shows a loading state
+  // rather than stale data — and no setState runs synchronously in the effect.
+  const [loaded, setLoaded] = useState<{ key: string; data: FieldAnalysis } | null>(null);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
-    getFieldAnalysis(4)
+    const key = `${days}|${onlineBo1}|${lastSynced?.getTime() ?? 0}`;
+    getFieldAnalysis({ days, online: onlineBo1, bo1: onlineBo1 })
       .then((res) => {
-        if (cancelled) return;
-        setFieldScores(new Map(res.archetypes.map((a) => [a.archetypeId, a])));
+        if (!cancelled) setLoaded({ key, data: res });
       })
       .catch(() => {
-        if (!cancelled) setFieldScores(new Map());
+        if (!cancelled) setFailedKey(key);
       });
     return () => {
       cancelled = true;
     };
-  }, [metaSnapshots]);
+  }, [days, onlineBo1, lastSynced]);
+
+  const requestKey = `${days}|${onlineBo1}|${lastSynced?.getTime() ?? 0}`;
+  const fieldAnalysis = loaded?.key === requestKey ? loaded.data : null;
+  const fieldError = failedKey === requestKey;
+  const isLoadingField = fieldAnalysis === null && !fieldError;
 
   // The "Sync Live Meta" action also lives in the desktop sidebar, but that is
   // hidden on mobile (`md:flex`) — so the meta page carries its own copy,
@@ -532,10 +528,15 @@ export function MetaPage() {
       <ArchetypeDetail
         archetypeId={selected.archetypeId}
         archetypeName={selected.archetypeName}
+        window={metaWindow}
+        onDaysChange={setDays}
+        onOnlineBo1Change={setOnlineBo1}
         onBack={() => setSelected(null)}
       />
     );
   }
+
+  const archetypes = fieldAnalysis?.archetypes ?? [];
 
   return (
     <div className="space-y-6">
@@ -580,6 +581,29 @@ export function MetaPage() {
         </div>
       )}
 
+      {/* Window control (days + online-Bo1 scope) + sample-size readout */}
+      <div className="card flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-3">
+        <MetaWindowControl
+          window={metaWindow}
+          onDaysChange={setDays}
+          onOnlineBo1Change={setOnlineBo1}
+        />
+        <span className="flex items-center gap-1.5 text-xs text-slate-500">
+          {isLoadingField && <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />}
+          {fieldAnalysis
+            ? t('window.sample', {
+                tournaments: fieldAnalysis.tournamentCount,
+                players: fieldAnalysis.totalPlayers,
+              })
+            : isLoadingField
+              ? t('window.loading')
+              : t('window.noData')}
+        </span>
+      </div>
+      <p className="-mt-4 text-[11px] leading-snug text-slate-400">
+        {onlineBo1 ? t('window.scopeOnline') : t('window.scopeAll')}
+      </p>
+
       <div className="space-y-3">
         <CollapsibleSection
           title={t('page.matchupMatrix')}
@@ -591,15 +615,33 @@ export function MetaPage() {
 
         <CollapsibleSection
           title={
-            metaSnapshots.length > 0
-              ? t('page.tournamentMetaCount', { count: metaSnapshots.length })
+            archetypes.length > 0
+              ? t('page.tournamentMetaCount', { count: archetypes.length })
               : t('page.tournamentMeta')
           }
           icon={<TrendingUp className="w-4 h-4 text-brand-700" />}
-          rightSlot={sourceNote && <span className="text-xs text-slate-500">{sourceNote}</span>}
           defaultOpen
         >
-          <MetaTable snapshots={metaSnapshots} fieldScores={fieldScores} onSelect={setSelected} />
+          {fieldError ? (
+            <div className="-m-4 py-16 text-center text-sm text-slate-500">
+              {t('metaTable.loadError')}
+            </div>
+          ) : isLoadingField && archetypes.length === 0 ? (
+            <div className="-m-4 flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
+              <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
+              {t('metaTable.loading')}
+            </div>
+          ) : (
+            <MetaTable archetypes={archetypes} onSelect={setSelected} />
+          )}
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title={t('prediction.title')}
+          icon={<FlaskConical className="w-4 h-4 text-brand-700" />}
+          defaultOpen
+        >
+          <PredictionPanel archetypes={archetypes} />
         </CollapsibleSection>
       </div>
 

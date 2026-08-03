@@ -14,12 +14,12 @@ import { metaSnapshots, tournamentStandings, tournaments } from '../db/schema.js
 import { runMetaSync } from '../jobs/syncMeta.js';
 import { ensureMatchups } from '../lib/matchupData.js';
 import { rateLimit } from '../lib/rateLimit.js';
-import { windowStart } from '../lib/timeWindow.js';
+import { windowStartDays } from '../lib/timeWindow.js';
 import type { ApiEnv } from '../middleware/session.js';
 import {
-  analyticsQuerySchema,
   archetypeIdParamSchema,
   archetypeListsQuerySchema,
+  metaWindowQuerySchema,
 } from '../validation.js';
 
 interface WindowAggregates {
@@ -37,13 +37,33 @@ interface WindowAggregates {
   }[];
 }
 
+/** Window + scope shared by every meta read: a day range plus the online /
+ *  Bo1-Swiss filters that make the sample a local-Bo1 proxy. */
+export interface MetaWindow {
+  days: number;
+  online: boolean;
+  bo1: boolean;
+}
+
+/** Conditions for the tournaments join: date range + optional online/Bo1 scope.
+ *  With online+bo1 on (the default), only ground-truth online Bo1-Swiss events
+ *  count — the metashare and win rate then mirror local Challenge/Cup play.
+ *  The date condition is unconditional, so the array is never empty and
+ *  `and(...windowConditions(w))` can never collapse to an unfiltered query. */
+function windowConditions({ days, online, bo1 }: MetaWindow) {
+  const conds = [gte(tournaments.date, windowStartDays(days))];
+  if (online) conds.push(eq(tournaments.isOnline, true));
+  if (bo1) conds.push(eq(tournaments.swissMode, 'BO1'));
+  return conds;
+}
+
 /**
- * Aggregate the persisted standings of the last `weeks` weeks into per-archetype
- * shares and records. Reuses the shared meta engine: the share of an archetype
- * is its pilot count over all counted players, regardless of which tournament
- * the pilots sat in — so no per-tournament grouping is needed here.
+ * Aggregate the persisted standings within the window into per-archetype shares
+ * and records. Reuses the shared meta engine: the share of an archetype is its
+ * pilot count over all counted players, regardless of which tournament the
+ * pilots sat in — so no per-tournament grouping is needed here.
  */
-async function loadWindowAggregates(db: Db, weeks: number): Promise<WindowAggregates> {
+async function loadWindowAggregates(db: Db, window: MetaWindow): Promise<WindowAggregates> {
   const rows = await db
     .select({
       tournamentId: tournamentStandings.tournamentId,
@@ -54,7 +74,7 @@ async function loadWindowAggregates(db: Db, weeks: number): Promise<WindowAggreg
     })
     .from(tournamentStandings)
     .innerJoin(tournaments, eq(tournamentStandings.tournamentId, tournaments.id))
-    .where(gte(tournaments.date, windowStart(weeks)));
+    .where(and(...windowConditions(window)));
 
   const standings: StandingLite[] = rows.map((r) => ({
     deck: { id: r.archetypeId, name: r.archetypeName },
@@ -85,13 +105,13 @@ async function loadWindowAggregates(db: Db, weeks: number): Promise<WindowAggreg
  *  opponent but is never ranked as a subject — it is not a playable deck). */
 async function loadFieldScores(
   db: Db,
-  weeks: number,
+  window: MetaWindow,
 ): Promise<{ window: WindowAggregates; scores: FieldScore[]; matchupImportedAt: Date | null }> {
-  const [window, matchups] = await Promise.all([
-    loadWindowAggregates(db, weeks),
+  const [aggregates, matchups] = await Promise.all([
+    loadWindowAggregates(db, window),
     ensureMatchups(db),
   ]);
-  const shares: ArchetypeShare[] = window.archetypes.map((a) => ({
+  const shares: ArchetypeShare[] = aggregates.archetypes.map((a) => ({
     archetypeId: a.archetypeId,
     archetypeName: a.archetypeName,
     sharePct: a.sharePct,
@@ -103,7 +123,7 @@ async function loadFieldScores(
   scores.forEach((s, i) => {
     s.rank = i + 1;
   });
-  return { window, scores, matchupImportedAt: matchups.importedAt };
+  return { window: aggregates, scores, matchupImportedAt: matchups.importedAt };
 }
 
 /**
@@ -145,20 +165,26 @@ export function createMetaRoutes(): Hono<ApiEnv> {
     }
   });
 
-  // GET /api/meta/field-analysis?weeks=1..4 — every archetype's meta-weighted
+  // GET /api/meta/field-analysis?days&online&bo1 — every archetype's meta-weighted
   // field win rate (plan §3.4) over the window, rank 1 = best positioned.
   routes.get('/field-analysis', async (c) => {
-    const parsedQuery = analyticsQuerySchema.safeParse(c.req.query());
+    const parsedQuery = metaWindowQuerySchema.safeParse(c.req.query());
     if (!parsedQuery.success) {
       return c.json({ error: 'Invalid query parameters', issues: parsedQuery.error.issues }, 400);
     }
-    const { weeks } = parsedQuery.data;
+    const { days, online, bo1 } = parsedQuery.data;
 
-    const { window, scores, matchupImportedAt } = await loadFieldScores(c.get('db'), weeks);
+    const { window, scores, matchupImportedAt } = await loadFieldScores(c.get('db'), {
+      days,
+      online,
+      bo1,
+    });
     const statsById = new Map(window.archetypes.map((a) => [a.archetypeId, a]));
 
     return c.json({
-      weeks,
+      days,
+      online,
+      bo1,
       tournamentCount: window.tournamentCount,
       totalPlayers: window.totalPlayers,
       matchupImportedAt: matchupImportedAt?.toISOString() ?? null,
@@ -180,8 +206,8 @@ export function createMetaRoutes(): Hono<ApiEnv> {
     });
   });
 
-  // GET /api/meta/archetypes/:archetypeId/lists?weeks&limit&offset — the most
-  // successful published decklists of one archetype within the window.
+  // GET /api/meta/archetypes/:archetypeId/lists?days&online&bo1&limit&offset — the
+  // most successful published decklists of one archetype within the window.
   routes.get('/archetypes/:archetypeId/lists', async (c) => {
     const archetypeId = archetypeIdParamSchema.safeParse(c.req.param('archetypeId'));
     if (!archetypeId.success) return c.json({ error: 'Invalid archetype id' }, 400);
@@ -189,13 +215,13 @@ export function createMetaRoutes(): Hono<ApiEnv> {
     if (!parsedQuery.success) {
       return c.json({ error: 'Invalid query parameters', issues: parsedQuery.error.issues }, 400);
     }
-    const { weeks, limit, offset } = parsedQuery.data;
+    const { days, online, bo1, limit, offset } = parsedQuery.data;
     const db = c.get('db');
 
     const filter = and(
       eq(tournamentStandings.archetypeId, archetypeId.data),
       isNotNull(tournamentStandings.decklist),
-      gte(tournaments.date, windowStart(weeks)),
+      ...windowConditions({ days, online, bo1 }),
     );
 
     const [totalRow, rows] = await Promise.all([
@@ -252,19 +278,19 @@ export function createMetaRoutes(): Hono<ApiEnv> {
     });
   });
 
-  // GET /api/meta/archetypes/:archetypeId/analysis?weeks — one archetype's
-  // field position: score, rank, weighted threats/free wins, weekly trend.
+  // GET /api/meta/archetypes/:archetypeId/analysis?days&online&bo1 — one
+  // archetype's field position: score, rank, weighted threats/free wins, trend.
   routes.get('/archetypes/:archetypeId/analysis', async (c) => {
     const archetypeId = archetypeIdParamSchema.safeParse(c.req.param('archetypeId'));
     if (!archetypeId.success) return c.json({ error: 'Invalid archetype id' }, 400);
-    const parsedQuery = analyticsQuerySchema.safeParse(c.req.query());
+    const parsedQuery = metaWindowQuerySchema.safeParse(c.req.query());
     if (!parsedQuery.success) {
       return c.json({ error: 'Invalid query parameters', issues: parsedQuery.error.issues }, 400);
     }
-    const { weeks } = parsedQuery.data;
+    const { days, online, bo1 } = parsedQuery.data;
     const db = c.get('db');
 
-    const { window, scores, matchupImportedAt } = await loadFieldScores(db, weeks);
+    const { window, scores, matchupImportedAt } = await loadFieldScores(db, { days, online, bo1 });
     const score = scores.find((s) => s.archetypeId === archetypeId.data);
     const stats = window.archetypes.find((a) => a.archetypeId === archetypeId.data);
     if (!score || !stats) {
@@ -280,11 +306,12 @@ export function createMetaRoutes(): Hono<ApiEnv> {
           and(
             eq(tournamentStandings.archetypeId, archetypeId.data),
             isNotNull(tournamentStandings.decklist),
-            gte(tournaments.date, windowStart(weeks)),
+            ...windowConditions({ days, online, bo1 }),
           ),
         ),
-      // Weekly share/WR trend from the snapshots. Legacy rows (synced before the
-      // archetype_id column existed) are matched by display name as a fallback.
+      // Weekly share/WR trend from the snapshots — always all-history since
+      // rotation, deliberately NOT filtered by the day window (it is a time
+      // series). Legacy rows (synced before archetype_id existed) match by name.
       db
         .select({
           period: metaSnapshots.period,
@@ -308,7 +335,9 @@ export function createMetaRoutes(): Hono<ApiEnv> {
     ]);
 
     return c.json({
-      weeks,
+      days,
+      online,
+      bo1,
       tournamentCount: window.tournamentCount,
       totalPlayers: window.totalPlayers,
       matchupImportedAt: matchupImportedAt?.toISOString() ?? null,

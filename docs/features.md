@@ -43,8 +43,8 @@ Data source: Zustand store (`archetypeStats`, `metaSnapshots`). No API calls on 
 Runs **server-side** (`POST /api/meta/sync` → `apps/api/src/jobs/syncMeta.ts`, also runnable as a Railway cron): the server fetches the Limitless TCG API directly (no CORS proxy needed) and aggregates into the global `meta_snapshots` table.
 
 **Process:**
-1. Fetches up to 50 recent completed Standard tournaments
-2. Selects the top 6 by player count (minimum 30 players each, post-rotation, last 7 days)
+1. Fetches up to 100 recent completed Standard tournaments (last 30 days, post-rotation, ≥16 players)
+2. Classifies each candidate via the Limitless `/details` endpoint (`isOnline`, `platform`, Swiss-phase `mode`) and keeps only **online Bo1-Swiss** events — the proxy for local Bo1 Challenges/Cups — up to ~20 (the name heuristic is only a `/details` fallback)
 3. Fetches standings for each selected tournament
 4. **Persists the raw data** (plan §5.2): upserts `tournaments`, replaces the event's `tournament_standings` rows — including player name, placing and the **pruned decklist** jsonb — so the archetype drilldown and time-window analyses read from the database instead of re-fetching
 5. Aggregates win/loss records per archetype across all tournaments (`computeMetaSnapshots` in `@pokekon/shared`)
@@ -279,13 +279,23 @@ Unlike the four dashboard tabs (which are Zustand `activeTab` state, not URLs), 
 
 **Page:** `MetaPage` — click any row of the Tournament Meta table (`ArchetypeDetail` component)
 
-Every archetype row with a Limitless slug (`archetypeId`) is clickable and opens an in-tab drilldown with a 1–4 week window selector:
+Every archetype row is clickable and opens an in-tab drilldown. The whole Meta tab shares one **window control** — a day range (7/14/30/60) plus an **online-Bo1 toggle** (default on: only ground-truth online Bo1-Swiss events, the local-Bo1 proxy) — that drives both the overview and the drilldown:
 
 - **KPI header:** meta share, tournament win rate, pilot count, field score + rank, weekly share/WR trend chips.
 - **Field performance (the core metric, plan §3.4):** `FieldWR(A) = Σ share(B) × MatchupWR(A vs B)` over all opponents with usable matchup data (≥10 games per pair), the mirror counting as 50 %. Normalised by the covered share; the **coverage %** is always shown (low coverage < 40 % gets a warning) so a shiny score on thin data is impossible to miss. Computed in `packages/shared/src/fieldWinRate.ts`, served by `GET /api/meta/archetypes/:id/analysis`.
 - **Preparation panel:** opponents weighted by *frequency × matchup weakness* — common **and** bad-for-you decks rank first ("Darauf musst du vorbereitet sein"), plus the mirror probability and the good matchups (free wins).
 - **Most successful decklists:** published lists from the persisted standings, ordered by relative finish (placing ÷ field size, ties → bigger event, then more recent), 4 per page with a load-more button (`GET /api/meta/archetypes/:id/lists`). Each card shows placing, record, player, event and the full list grouped Pokémon/Trainer/Energy, linking to the Limitless standings.
 
-The overview Meta Table gains a sortable **Feld-Score** column (4-week window, `GET /api/meta/field-analysis`) so the best-positioned deck — not merely the most-played one — is visible at a glance. Rows synced before the slug column existed show "—" until the next sync backfills `archetype_id`.
+The overview Meta Table **is** the day-window field analysis itself (`GET /api/meta/field-analysis?days&online&bo1`): share, win rate, record **and** a sortable **Feld-Score** column per archetype, so the best-positioned deck — not merely the most-played one — is visible at a glance, and the day/online controls genuinely drive the metashare (not just the score).
 
-**Cold start:** before the first server sync there are no persisted standings — the drilldown and score column show explicit empty states pointing to "Sync Live Meta".
+**Cold start:** before the first server sync there are no persisted standings — the drilldown and the overview table show explicit empty states pointing to "Sync Live Meta".
+
+---
+
+## 16. Local-Meta Prediction
+
+**Page:** `MetaPage` → "Prediction" section (`PredictionPanel` component)
+
+Answers "what should I play at *my* local event?". The user builds the field they expect at their local Bo1 tournament — **seedable in one click from the current online meta** (the whole premise: online Bo1 ≈ local Bo1), then editable (add/remove archetypes, adjust weights). Weights are normalised to shares and fed into the **same** `computeFieldScores` engine (`@pokekon/shared`) as the online field analysis, so every deck in the field gets an expected win rate **against that custom field** (share × matchup WR, mirror 50 %, coverage shown). Decks are ranked best-first; selecting one shows its field-score and weighted threats/free-wins panels.
+
+Runs **entirely client-side** over the fetched matchup matrix (`GET /api/matchups`) — no server round-trip, no new table — and the field persists in `localStorage` (`tcg-local-meta-field-v1`). The matchup matrix is external TrainerHill data (mixed Bo1/Bo3), flagged as approximate in the field-score source note.

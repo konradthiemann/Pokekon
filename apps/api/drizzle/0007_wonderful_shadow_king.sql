@@ -1,0 +1,1 @@
+ALTER TABLE "tournaments" ADD CONSTRAINT "tournaments_swiss_mode_chk" CHECK ("tournaments"."swiss_mode" in ('BO1', 'BO3', 'OTHER'));

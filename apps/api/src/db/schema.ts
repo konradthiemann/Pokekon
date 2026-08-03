@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
   pgTable,
   text,
@@ -11,7 +11,9 @@ import {
   real,
   jsonb,
   date,
+  check,
 } from 'drizzle-orm/pg-core';
+import { SWISS_MODE_VALUES } from '@pokekon/shared';
 import type { ParsedTurn, PrizePoint, TournamentDecklist } from '@pokekon/shared';
 
 export const user = pgTable('user', {
@@ -269,12 +271,25 @@ export const tournaments = pgTable(
     date: timestamp('date', { withTimezone: true }).notNull(),
     players: integer('players').notNull(),
     format: text('format').notNull().default('standard'),
-    // Written by the sync (name heuristic) but not consumed by the drilldown
-    // routes yet — reserved for a future online/offline field filter.
+    // Ground-truth classification from the Limitless `/details` endpoint. `isOnline`
+    // keeps a non-null default for legacy rows and the name-heuristic fallback (when a
+    // `/details` fetch fails); `platform`/`swissMode` are nullable = unknown. The
+    // online-Bo1 meta reads filter on `isOnline = true AND swissMode = 'BO1'`.
     isOnline: boolean('is_online').notNull().default(false),
+    platform: text('platform'), // e.g. "PTCGL"; null when unknown
+    swissMode: text('swiss_mode', { enum: SWISS_MODE_VALUES }), // BO1/BO3/OTHER; null when unknown
     fetchedAt: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index('tournaments_date_idx').on(table.date)],
+  (table) => [
+    index('tournaments_date_idx').on(table.date),
+    // Supports the online-Bo1 window filter. Date is heap-filtered on top; a
+    // covering (is_online, swiss_mode, date) index would only matter at a much
+    // larger scale than this dataset.
+    index('tournaments_online_bo1_idx').on(table.isOnline, table.swissMode),
+    // Defence-in-depth: classifyTournamentDetails already constrains swiss_mode,
+    // but the DB enforces the enum too (NULL passes — the column is nullable).
+    check('tournaments_swiss_mode_chk', sql`${table.swissMode} in ('BO1', 'BO3', 'OTHER')`),
+  ],
 );
 
 export const tournamentStandings = pgTable(

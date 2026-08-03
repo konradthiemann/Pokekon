@@ -325,7 +325,7 @@ Parallel zum Daten-/Backend-Umbau wird die **AI-System-Umgebung** des Repos form
 
 ## 10. Offene Entscheidungen (für dich)
 - **Cron-Frequenz** des Meta-Syncs (täglich reicht meist; Turniere finden v.a. am Wochenende statt).
-- **Matchup-Daten**: TrainerHill hat kein offenes API — bleibt es bei manuellem CSV-Import, oder willst du aus den eigenen `tournament_standings` eine eigene Matchup-Matrix aufbauen (unabhängig von TrainerHill, dafür kleinere Stichprobe)?
+- ~~**Matchup-Daten**: TrainerHill-CSV vs. eigene Matrix aus `tournament_standings`.~~ → **Entschieden (2026-08): bei TrainerHill bleiben** (dichte Matrix). Der Online/Bo1-Fokus greift stattdessen auf der Metashare-/Standings-Seite via Ground-Truth-Klassifikation (Limitless `/details`: `isOnline` + Swiss-`mode`); die Matrix bleibt extern und gemischtes Bo1/Bo3-Format, im UI als Näherung gekennzeichnet.
 - ~~**Doku-Viewer-Tool**: Starlight vs. VitePress.~~ → **Entschieden: Astro Starlight auf GitHub Pages** (Abschnitt 8).
 - **Frontend-Migration**: IndexedDB ganz aufgeben (reines Server-Modell) oder als Offline-Cache behalten (local-first bleibt erhalten, Server ist Sync-Ziel)?
 - **Zug-Qualität (Abschnitt 3.7)**: Wie tief soll die Board-State-Rekonstruktion gehen — reicht Hand-/Bank-/Aktiv-Ebene, oder willst du auch Energie-Zuordnung pro Pokémon (aufwändiger zu parsen)?

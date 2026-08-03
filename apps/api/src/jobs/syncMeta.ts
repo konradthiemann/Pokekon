@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { eq } from 'drizzle-orm';
 import {
+  classifyTournamentDetails,
   computeMetaSnapshots,
   isLikelyOnlineName,
   isPostRotation,
@@ -9,6 +10,7 @@ import {
   pruneDecklist,
   type MetaSyncResult,
   type StandingLite,
+  type TournamentClassification,
 } from '@pokekon/shared';
 import { closeDb, getDb, type Db } from '../db/index.js';
 import { metaSnapshots, tournamentStandings, tournaments } from '../db/schema.js';
@@ -58,6 +60,7 @@ async function persistTournament(
   db: Db,
   t: LimitlessTournament,
   standings: LimitlessStanding[],
+  classification: TournamentClassification,
 ): Promise<void> {
   const id = t.id.slice(0, 100);
   const name = t.name.slice(0, 200);
@@ -66,7 +69,9 @@ async function persistTournament(
     date: new Date(t.date),
     players: t.players,
     format: (t.format ?? 'standard').slice(0, 40),
-    isOnline: isLikelyOnlineName(name),
+    isOnline: classification.isOnline,
+    platform: classification.platform,
+    swissMode: classification.swissMode,
     fetchedAt: new Date(),
   };
   const rows = standings.slice(0, MAX_STANDINGS_PER_TOURNAMENT).map((p) => ({
@@ -98,30 +103,76 @@ async function persistTournament(
 
 export async function runMetaSync(
   db: Db,
-  opts: { days?: number; minPlayers?: number; maxTournaments?: number } = {},
+  opts: {
+    days?: number;
+    minPlayers?: number;
+    maxTournaments?: number;
+    maxProbes?: number;
+    onlineOnly?: boolean;
+    bo1Only?: boolean;
+  } = {},
 ): Promise<MetaSyncResult> {
-  const { days = 7, minPlayers = 30, maxTournaments = 6 } = opts;
+  // Defaults target the local-Bo1 use case: recent ONLINE Bo1-Swiss events, a
+  // wider window and higher cap than the old "6 biggest events" (which skewed
+  // toward large in-person Bo3 majors). Persist is idempotent, so repeated syncs
+  // accumulate history for the day-window reads.
+  const {
+    days = 30,
+    minPlayers = 16,
+    maxTournaments = 20,
+    maxProbes = 40,
+    onlineOnly = true,
+    bo1Only = true,
+  } = opts;
 
   const list = await limitlessJson<LimitlessTournament[]>(
-    '/api/tournaments?game=PTCG&completed=true&limit=50&format=standard',
+    '/api/tournaments?game=PTCG&completed=true&limit=100&format=standard',
   );
 
   const cutoff = new Date();
   cutoff.setUTCDate(cutoff.getUTCDate() - days);
 
-  const eligible = list
+  // In-season events above the size floor, most recent first (the online
+  // platform posts Bo1 events frequently and we want the current meta).
+  const candidates = list
     .filter((t) => t.players >= minPlayers && new Date(t.date) >= cutoff && isPostRotation(t.date))
-    .sort((a, b) => b.players - a.players)
-    .slice(0, maxTournaments);
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // The list endpoint lacks isOnline/phases, so classify each candidate via its
+  // /details payload and keep the online Bo1-Swiss ones. `maxProbes` bounds the
+  // extra requests; `maxTournaments` bounds how many events we ingest.
+  // NOTE: requests are sequential with no inter-request delay. If Limitless ever
+  // rate-limits by IP, a failed probe/standings fetch just falls through to the
+  // catch (fewer events, never a crash) — add a delay / Retry-After handling if
+  // that becomes an issue in practice.
+  const selected: { t: LimitlessTournament; classification: TournamentClassification }[] = [];
+  let probes = 0;
+  for (const t of candidates) {
+    if (selected.length >= maxTournaments || probes >= maxProbes) break;
+    probes += 1;
+    let classification: TournamentClassification;
+    try {
+      const details = await limitlessJson<unknown>(`/api/tournaments/${t.id}/details`);
+      classification = classifyTournamentDetails(details);
+    } catch (err) {
+      // /details unavailable → fall back to the lossy name heuristic and leave
+      // the Swiss mode unknown, so the conservative bo1Only filter drops it.
+      console.warn(`[syncMeta] details fetch failed for ${t.id}:`, err);
+      classification = { isOnline: isLikelyOnlineName(t.name), platform: null, swissMode: null };
+    }
+    if (onlineOnly && !classification.isOnline) continue;
+    if (bo1Only && classification.swissMode !== 'BO1') continue;
+    selected.push({ t, classification });
+  }
 
   const perTournament: StandingLite[][] = [];
-  for (const t of eligible) {
+  for (const { t, classification } of selected) {
     try {
       const standings = await limitlessJson<LimitlessStanding[]>(
         `/api/tournaments/${t.id}/standings`,
       );
       if (!Array.isArray(standings) || standings.length === 0) continue;
-      await persistTournament(db, t, standings);
+      await persistTournament(db, t, standings, classification);
       perTournament.push(standings);
     } catch (err) {
       console.warn(`[syncMeta] skipped ${t.id}:`, err);
@@ -130,7 +181,8 @@ export async function runMetaSync(
 
   const period = isoWeekLabel(new Date());
   const agg = computeMetaSnapshots(perTournament, period, '');
-  const sourceNote = `Limitless TCG · ${agg.tournamentCount} tournaments · ${agg.totalPlayers} players`;
+  const scope = onlineOnly && bo1Only ? 'online Bo1' : onlineOnly ? 'online' : 'all events';
+  const sourceNote = `Limitless TCG · ${scope} · ${agg.tournamentCount} tournaments · ${agg.totalPlayers} players`;
 
   for (const s of agg.snapshots) {
     await db

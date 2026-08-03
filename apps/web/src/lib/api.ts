@@ -455,6 +455,17 @@ export async function syncMeta(): Promise<MetaSyncResult> {
 
 // ─── Tournament drilldown (field analysis, decklists, matchups) ──────────────
 
+/** Window + scope for the tournament-meta reads (mirrors metaWindowQuerySchema):
+ *  `days` back from today; `online`/`bo1` restrict to online Bo1-Swiss events. */
+export interface MetaWindow {
+  days: number;
+  online: boolean;
+  bo1: boolean;
+}
+
+const metaWindowParams = (w: MetaWindow): URLSearchParams =>
+  new URLSearchParams({ days: String(w.days), online: String(w.online), bo1: String(w.bo1) });
+
 /** One archetype's window stats + meta-weighted field score (rank 1 = best). */
 export interface FieldAnalysisArchetype {
   archetypeId: string;
@@ -469,8 +480,7 @@ export interface FieldAnalysisArchetype {
   rank: number;
 }
 
-export interface FieldAnalysis {
-  weeks: number;
+export interface FieldAnalysis extends MetaWindow {
   tournamentCount: number;
   totalPlayers: number;
   matchupImportedAt: string | null;
@@ -497,8 +507,7 @@ export interface ArchetypeLists {
   lists: ArchetypeListEntry[];
 }
 
-export interface ArchetypeAnalysis {
-  weeks: number;
+export interface ArchetypeAnalysis extends MetaWindow {
   tournamentCount: number;
   totalPlayers: number;
   matchupImportedAt: string | null;
@@ -518,20 +527,18 @@ export interface ArchetypeAnalysis {
 }
 
 /** Every archetype's meta-weighted field win rate over the window (plan §3.4). */
-export async function getFieldAnalysis(weeks: number): Promise<FieldAnalysis> {
-  return request<FieldAnalysis>(`/api/meta/field-analysis?weeks=${weeks}`);
+export async function getFieldAnalysis(window: MetaWindow): Promise<FieldAnalysis> {
+  return request<FieldAnalysis>(`/api/meta/field-analysis?${metaWindowParams(window)}`);
 }
 
 /** The most successful published decklists of one archetype, paginated. */
 export async function getArchetypeLists(
   archetypeId: string,
-  opts: { weeks: number; limit: number; offset: number },
+  opts: MetaWindow & { limit: number; offset: number },
 ): Promise<ArchetypeLists> {
-  const params = new URLSearchParams({
-    weeks: String(opts.weeks),
-    limit: String(opts.limit),
-    offset: String(opts.offset),
-  });
+  const params = metaWindowParams(opts);
+  params.set('limit', String(opts.limit));
+  params.set('offset', String(opts.offset));
   return request<ArchetypeLists>(
     `/api/meta/archetypes/${encodeURIComponent(archetypeId)}/lists?${params}`,
   );
@@ -540,10 +547,10 @@ export async function getArchetypeLists(
 /** One archetype's field position: score, rank, threats, free wins, trend. */
 export async function getArchetypeAnalysis(
   archetypeId: string,
-  weeks: number,
+  window: MetaWindow,
 ): Promise<ArchetypeAnalysis> {
   return request<ArchetypeAnalysis>(
-    `/api/meta/archetypes/${encodeURIComponent(archetypeId)}/analysis?weeks=${weeks}`,
+    `/api/meta/archetypes/${encodeURIComponent(archetypeId)}/analysis?${metaWindowParams(window)}`,
   );
 }
 
