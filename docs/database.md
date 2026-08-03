@@ -4,7 +4,7 @@
 
 The app uses **Dexie 4** as a typed wrapper around the browser's **IndexedDB** API. The database is named `TCGMetaDashboard` and defined in `src/db/database.ts`. All database operations are centralized in `src/db/queries.ts`.
 
-There is no server, no SQLite file, and no sync — the data lives entirely in the user's browser profile.
+This document covers the browser's local-first Dexie store. The app is **not** serverless — a Hono + PostgreSQL backend (`apps/api`) mirrors these domain tables and adds server-only ones (see the **Server-side schema** section below). The migration "IndexedDB → API as the source of truth" is in progress, so the local store and the server store coexist today.
 
 ---
 
@@ -96,7 +96,7 @@ One row per match played. The core personal-data table.
 | `round` | number? | no | Round number within the event (optional) |
 | `deckSnapshotId` | number? | yes | Which deck snapshot was active (optional) |
 | `battleLog` | string? | no | Raw German battle protocol text from TCG Live (optional) |
-| `analysis` | string? | no | `JSON.stringify(BattleAnalysis)` — Claude AI analysis (optional) |
+| `analysis` | string? | no | `JSON.stringify(BattleAnalysis)` — server-side LLM battle-log analysis (optional) |
 
 **Dexie index string:** `++id, deckId, archetype, eventType, eventDate, result, deckSnapshotId`
 

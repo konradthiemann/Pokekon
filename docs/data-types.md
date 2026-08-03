@@ -114,7 +114,7 @@ One row per match played. This is the primary personal-data table. Key fields:
 - `archetype`: The opponent's deck archetype. This is entered manually and must match the names used in `metaSnapshots` for win-rate correlation to work.
 - `deckSnapshotId`: Optional. When set, it links this match to the deck version that was played. This is what powers the "version comparison" recommendations.
 - `battleLog`: The raw text copied from TCG Live's battle protocol (in German). Optional — only present when the user pastes it in.
-- `analysis`: `JSON.stringify(BattleAnalysis)` — the result of Claude AI analyzing the battle log. Only present after the user triggers analysis.
+- `analysis`: `JSON.stringify(BattleAnalysis)` — the result of the server-side LLM analyzing the battle log. Only present after the user triggers analysis.
 
 ---
 
@@ -171,7 +171,7 @@ The top-level aggregation result. The `prizeEfficiency` object measures how clos
 
 ## Battle Log Analysis Types
 
-These types represent the structured output from Claude AI's battle log analysis in `src/lib/battleLogAnalysis.ts`.
+These types represent the structured output from the server-side LLM battle-log analysis. They are defined in `@pokekon/shared` (shared by the API's analysis route and the web client).
 
 ### `BattleAnalysisPlay`
 ```typescript

@@ -11,7 +11,7 @@
 | Deck variant management | Deck | User creates/duplicates |
 | Match log (add, view, delete) | Deck / Opponents | User actions |
 | Battle log parsing (visual stats) | Deck → Match detail | Automatic on log open |
-| Battle log analysis (Claude AI) | Deck → Match detail | User triggers + API key |
+| Battle log analysis (server-side LLM, BYOK) | Deck → Match detail | User triggers + API key |
 | Deck comparison vs. tournament lists | Recommendations | User triggers |
 | Data-driven recommendations | Recommendations | Auto on data change |
 | Local meta priority | Deck / Recommendations | User configures |
@@ -51,7 +51,7 @@ Fetches tournament data from the Limitless TCG API and aggregates it into `metaS
 7. Writes results to `metaSnapshots` for the current ISO week period
 8. Clears old data first — the week's period replaces previous data for that week
 
-**CORS strategy:** Tries the Limitless API directly first. If blocked (browser CORS), falls back to `corsproxy.io`.
+**CORS strategy:** This meta sync still runs **browser-side** (legacy path): it tries the Limitless API directly first and falls back to `corsproxy.io` on CORS/HTTP failure. Moving it to a server-side cron (no CORS proxy needed) is the next migration step — see [architecture.md](./architecture.md) and [backend-evolution-plan.md](./backend-evolution-plan.md) §6.2.
 
 **Progress feedback:** The Zustand store exposes `isSyncing` and `syncProgress` strings that the Sidebar and the Meta page header render in real time.
 
@@ -143,11 +143,16 @@ The parser relies on the `tcg-player-name` localStorage key to identify which pl
 
 ---
 
-## 8. Battle Log Analysis (Claude AI)
+## 8. Battle Log Analysis (server-side LLM · BYOK)
 
 **Page:** Match detail modal, "Analyze" button
 
-Sends the raw battle log to the Anthropic Claude API (model: `claude-opus-4-6`, temperature: 0) for structured AI analysis.
+The analysis runs **server-side**: the web client calls `POST /api/analysis/log`
+([apps/api/src/routes/analysis.ts](../apps/api/src/routes/analysis.ts)), which runs
+the battle log through a **provider-agnostic** adapter. The default (and currently
+only) provider is **GitHub Models** (OpenAI-compatible, default model
+`openai/gpt-4.1`); the abstraction in [apps/api/src/ai/](../apps/api/src/ai/) lets
+other providers plug in without touching callers.
 
 **What is analyzed:**
 - Key turning-point moments with exact evidence quotes
@@ -155,15 +160,19 @@ Sends the raw battle log to the Anthropic Claude API (model: `claude-opus-4-6`, 
 - Card-level performance observations
 - Deck change recommendations (add/remove/increase/decrease specific cards)
 
-**Anti-hallucination measures:**
-1. The full raw log is included in the prompt — Claude cannot invent events
+**Anti-hallucination measures** (enforced in the shared engine `@pokekon/shared`, so every provider is grounded):
+1. The full raw log is included in the prompt — the model cannot invent events
 2. Every analysis item must include an `evidence` field that is a verbatim quote from the log
-3. After parsing the JSON response, the app validates each `evidence` field: if the quote cannot be found in the raw log, the item is silently removed
-4. `temperature: 0` for deterministic output
-5. The system prompt instructs Claude to only reference cards that appear explicitly in the log (via bullet-point card listings)
-6. Deck suggestions are restricted to cards already visible in the log
+3. After parsing the JSON response, `validateAnalysis()` drops any item whose `evidence` cannot be found in the raw log
+4. `temperature: 0` and JSON-only output for deterministic, parseable results
+5. The prompt restricts references — and deck suggestions — to cards that appear explicitly in the log
 
-**Requirements:** User must supply their own Anthropic API key. The key is sent directly from the browser — it is never stored in IndexedDB or localStorage.
+**BYOK key handling:** The user supplies their own provider API key. It is stored
+**AES-256-GCM-encrypted** in PostgreSQL (`user_ai_settings`, key derived from the
+server's `ENCRYPTION_KEY`) and decrypted **only server-side** for the call — it is
+never returned to the browser or written to IndexedDB/localStorage. The guest/demo
+flow may pass an ephemeral key that is used once and never stored (see
+[demo-mode.md](./demo-mode.md)).
 
 ---
 
