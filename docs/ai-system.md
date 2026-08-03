@@ -254,7 +254,7 @@ flowchart TB
 
 ## 10. Bekannte Drift / Pflege-Hinweise
 
-- **`architecture.md` ist veraltet:** beschreibt die App noch als „zero-backend SPA", während ein Hono+Postgres-Backend existiert und wächst (siehe [`backend-evolution-plan.md`](./backend-evolution-plan.md) Abschnitt 1). Korrektur ist Pflicht-Erstaufgabe beim Doku-Viewer-Aufbau.
+- **`architecture.md` — Drift behoben (2026-08):** Die frühere „zero-backend SPA"-Beschreibung ist korrigiert; die Datei beschreibt jetzt die reale Hono+Postgres-Architektur mit serverseitiger, provider-agnostischer LLM-Analyse (siehe [`backend-evolution-plan.md`](./backend-evolution-plan.md) Abschnitt 1).
 - **Agent-Definitionen vs. Realität:** Einige Agent-Files (z. B. `tcg-meta-project-head`) beschreiben den Stack noch rein Dexie-zentriert. Beim nächsten `agent-quality-controller`-Lauf an die Backend-Realität angleichen.
 - **Pflege:** Bei neuen Agents/Commands dieses Dokument und [`agents.md`](./agents.md) mitführen (`/docs-sync`).
 
@@ -265,5 +265,5 @@ flowchart TB
 - [`../CLAUDE.md`](../CLAUDE.md) — Verfassung / Hard-Rules
 - [`agents.md`](./agents.md) — Agent-Referenz & Flows
 - [`backend-evolution-plan.md`](./backend-evolution-plan.md) — Roadmap inkl. Battle-Log-Zugqualität & Doku-Viewer
-- [`architecture.md`](./architecture.md) — App-Architektur *(Korrektur ausstehend)*
+- [`architecture.md`](./architecture.md) — App-Architektur
 - [`../.claude/commands/`](../.claude/commands/) — Prompt-Bausteine

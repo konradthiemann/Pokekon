@@ -28,7 +28,7 @@ Der entscheidende Punkt: Es gibt bereits ein lauffähiges Backend. Was fehlt, is
 
 Zusätzlich gibt es eine **Datendoppelung**: Das Web nutzt eine eigene IndexedDB (`apps/web/src/db`) *und* es existiert ein typisierter API-Client (`apps/web/src/lib/api.ts`), der gegen `apps/api` spricht. Die Migration „IndexedDB → API als Quelle der Wahrheit" ist also schon begonnen, aber nicht abgeschlossen. Das Backend-Schema (`apps/api/src/db/schema.ts`) spiegelt die Domänen-Tabellen bereits in Postgres (decks, deck_cards, deck_snapshots, opponent_logs) — `metaSnapshots` existiert serverseitig aber noch **nicht**.
 
-> ⚠️ `docs/architecture.md` beschreibt das System noch als „zero-backend SPA". Das ist veraltet und sollte im Zuge dieser Arbeit korrigiert werden.
+> ✅ *Erledigt (2026-08):* `docs/architecture.md` wurde von der früheren „zero-backend SPA"-Beschreibung auf die reale Hono+Postgres-Architektur (mit serverseitiger, provider-agnostischer LLM-Analyse) umgeschrieben. Der datierte Snapshot dieses Abschnitts (Stand 2026-06-16) bleibt als Ausgangslage stehen.
 
 ---
 
@@ -244,6 +244,7 @@ Heute triggert der User den Meta-Sync im Browser. Serverseitig wird das ein **Cr
 
 ### 6.3 KI-Roadmap (gestuft)
 1. **Phase A — LLM-Analyse serverseitig (kurzfristig):** `battleLogAnalysis` ins Backend, API-Key als Railway-Secret. Anti-Halluzinations-Maßnahmen aus dem bestehenden Code (Evidence-Quotes, temperature=0) beibehalten.
+   ✅ *Umgesetzt (2026-08):* `POST /api/analysis/log` nutzt einen **provider-agnostischen** Adapter (`apps/api/src/ai/`, Default GitHub Models `openai/gpt-4.1`). Statt eines globalen Railway-Keys wird ein **per-User-BYOK-Key** AES-256-GCM-verschlüsselt in `user_ai_settings` gespeichert und nur serverseitig entschlüsselt; die Anti-Halluzination (Evidence-Quotes, `temperature=0`, JSON-only) liegt in der geteilten Engine `@pokekon/shared`.
 2. **Phase B — Aggregierte KI-Insights:** LLM bekommt nicht einen Log, sondern die aggregierten Kennzahlen aus Abschnitt 3 und formuliert konkrete Listen-/Spielempfehlungen („gegen das aktuelle Feld -1 Karte X, +1 Y, weil…").
 3. **Phase C — eigenes ML (optional, Portfolio):** Hier wäre ein **Python-Service** sinnvoll (Matchup-Vorhersage, Win-Rate-Regression über Listenfeatures). Konsumiert dieselbe Postgres-DB, kein Eingriff ins TS-Backend.
 
@@ -256,7 +257,7 @@ Heute triggert der User den Meta-Sync im Browser. Serverseitig wird das ein **Cr
 - **PostgreSQL-Plugin** auf Railway (managed) als `DATABASE_URL`-Service. (Vermutlich schon vorhanden, sonst ergänzen.)
 - **API-Service**: bestehendes Deploy. `railway.json` ergänzen um **Pre-Deploy-Command** für Migrationen: `npm run db:migrate -w @pokekon/api`.
 - **Cron**: Railway unterstützt Scheduled Services / Cron — den Meta-Sync-Job als eigenen Cron-Service (`startCommand: node dist/jobs/syncMeta.js`) mit Schedule (z.B. `0 6 * * *`).
-- **Secrets**: `ANTHROPIC_API_KEY`, `DATABASE_URL`, better-auth-Secrets als Railway-Variablen — nicht mehr im Browser.
+- **Secrets**: `DATABASE_URL`, better-auth-Secrets und `ENCRYPTION_KEY` (verschlüsselt die per-User-LLM-Keys) als Railway-Variablen — nicht im Browser. Die LLM-Analyse nutzt inzwischen **per-User-BYOK-Keys** statt eines globalen Provider-Keys (kein globaler `ANTHROPIC_API_KEY` mehr).
 - Hilfreiche Tools: **Drizzle Studio** (`drizzle-kit studio`) für DB-Inspektion lokal; Railway-Metrics für Query-Last; ggf. **pg_stat_statements** aktivieren, um langsame Queries zu finden, bevor du Indizes/MVs optimierst.
 
 ---
@@ -275,7 +276,7 @@ Konkrete Umsetzung (Details im Implementierungs-Prompt, `docs/prompts/`):
 - **Mermaid-Diagramme** (in `architecture.md`, `agents.md`, neu `ai-system.md`) via `astro-mermaid` o. ä. rendern.
 - **CI-Deploy bei Push auf `main`**: separater Workflow `.github/workflows/docs.yml` (getrennt von `ci.yml`), Trigger `on: push: branches: [main], paths: ['docs/**','apps/docs/**']`. Baut Starlight und deployt mit `actions/deploy-pages`. Damit ist die Doku **automatisch beim Merge aktuell** — genau dein Wunsch.
 - **Auto-Aktualität für die API**: API-Routen mit Zod-Schemas → **OpenAPI-Spec** generieren (`@hono/zod-openapi`) und im Viewer einbetten. So kann die API-Doku nicht veralten, weil sie aus dem Code kommt.
-- **Pflicht-Erstaufgabe**: `docs/architecture.md` von „zero-backend SPA" auf die neue Hono+Postgres-Realität umschreiben (siehe Drift-Hinweis in Abschnitt 1) und `docs/ai-system.md` (neu, siehe Abschnitt 8a) in die Sidebar aufnehmen.
+- **Pflicht-Erstaufgabe**: `docs/architecture.md` von „zero-backend SPA" auf die Hono+Postgres-Realität umschreiben ✅ *erledigt (2026-08)*; `docs/ai-system.md` (neu, siehe Abschnitt 8a) in die Sidebar aufnehmen.
 
 ---
 

@@ -78,15 +78,17 @@ src/
   components/      UI components grouped by domain (deck/, meta/, opponent/, recommendations/, layout/)
   store/           dashboardStore.ts — single Zustand store, all app state
   db/              database.ts (Dexie schema v3), queries.ts (all DB operations)
-  lib/             Pure logic modules:
-                     metaFetch.ts        — Limitless API integration
+  lib/             Logic + typed API client:
+                     api.ts              — typed REST client for apps/api
+                     metaFetch.ts        — Limitless meta fetch (browser-side, legacy → server cron)
                      deckComparison.ts   — Tournament list diff
-                     battleLogParser.ts  — German TCG Live protocol parser
-                     battleLogAnalysis.ts — Claude AI analysis
                      deckImport.ts       — Card type/role inference
                      deckPerformanceStats.ts — Card performance aggregation
                      preferences.ts      — localStorage wrapper
+                   (Battle-log parsing lives in @pokekon/shared; LLM analysis is
+                    server-side in apps/api — see docs/architecture.md.)
   hooks/           useRecommendations.ts — recommendation engine (useMemo)
+  i18n/            i18next resources (DE/EN)
   types/           index.ts — all shared TypeScript interfaces
 ```
 

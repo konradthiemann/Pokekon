@@ -26,10 +26,10 @@ Die Richtung steht in [`docs/backend-evolution-plan.md`](./docs/backend-evolutio
 
 1. **Erst lesen, dann behaupten.** Keine Aussage über bestehenden Code ohne die Datei tatsächlich gelesen zu haben. Keine erfundenen Pfade, Funktionen oder Flags.
 2. **Kostenlos bleiben.** Keine kostenpflichtigen APIs, Hosting-Posten oder Dependencies ohne ausdrückliche Freigabe des Users. Free-Tier ist Designziel, kein Zufall.
-3. **Secrets gehören serverseitig.** `ANTHROPIC_API_KEY`, `DATABASE_URL`, Auth-Secrets sind Railway-Variablen — niemals im Browser-Bundle, niemals im Git. (Heutiger Browser-seitiger `analyzeBattleLog`-Call ist Alt-Schuld → wandert ins Backend, Plan Abschnitt 6.3.)
+3. **Secrets gehören serverseitig.** `DATABASE_URL`, Auth-Secrets und `ENCRYPTION_KEY` (verschlüsselt die per-User-LLM-Keys) sind Railway-Variablen — niemals im Browser-Bundle, niemals im Git. Die früher browser-seitige `analyzeBattleLog`-Analyse läuft inzwischen serverseitig (`POST /api/analysis/log`, provider-agnostisch, per-User-BYOK-Key AES-256-GCM-verschlüsselt at rest, Plan Abschnitt 6.3).
 4. **Eine Quelle der Wahrheit.** Die Migration IndexedDB → API ist im Gange. Keine neue Datendoppelung einführen; bei Konflikt die im Plan beschlossene Zielrichtung wählen.
 5. **Tests & Lint grün = „fertig".** Eine Aufgabe gilt erst als erledigt, wenn `npm run typecheck`, `npm run lint` und `npm run test` durchlaufen. Teilimplementierungen werden als solche markiert.
-6. **Anti-Halluzination bei KI-Analyse beibehalten.** Jede LLM-Aussage über ein Spiel braucht einen wörtlichen Evidence-Quote aus dem Log; `temperature=0`; keine Karten vorschlagen, die nicht im Log sichtbar waren. Diese Maßnahmen aus `battleLogAnalysis.ts` dürfen nicht aufgeweicht werden.
+6. **Anti-Halluzination bei KI-Analyse beibehalten.** Jede LLM-Aussage über ein Spiel braucht einen wörtlichen Evidence-Quote aus dem Log; `temperature=0`; keine Karten vorschlagen, die nicht im Log sichtbar waren. Diese Maßnahmen leben in der geteilten Engine (`@pokekon/shared`, serverseitig aufgerufen über `apps/api/src/ai/`) und dürfen nicht aufgeweicht werden.
 7. **Doku folgt dem Code.** Strukturändernde Arbeit aktualisiert die betroffene Doku in `docs/` im selben Zug. Veraltete Doku ist schlechter als keine.
 
 ---
@@ -74,7 +74,7 @@ Aufgabe verstehen → (nicht-trivial?) plan-agent → implementieren → code-re
 - Kein Rewrite des funktionierenden TS-Backends in eine andere Sprache (Entscheidung im Plan, Abschnitt 2). Ein optionaler Python-Service für ML kommt frühestens in Phase 4 als *separater* Konsument derselben DB.
 - Keine neuen schweren Aggregationen in der App-Schicht, die in PostgreSQL (Materialized Views) gehören.
 - Keine `.md`-Doku erfinden, die der User nicht will (z. B. ungefragte READMEs) — aber bestehende Doku aktuell halten.
-- Keine Architektur-Aussagen aus `docs/architecture.md` übernehmen, ohne zu prüfen: Diese Datei ist als „zero-backend" noch **veraltet** (Plan Abschnitt 1) und wird im Zuge der Arbeit korrigiert.
+- Nicht die alte „zero-backend"-Beschreibung wiederbeleben: `docs/architecture.md` wurde auf die reale Hono+Postgres-Architektur (mit serverseitiger, provider-agnostischer LLM-Analyse) korrigiert und ist die maßgebliche Architektur-Referenz.
 
 ---
 

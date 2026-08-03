@@ -78,7 +78,7 @@ flowchart TD
     subgraph Server["Railway — apps/api (Hono)"]
         Health["/health (DB-free)"]
         AuthH["/api/auth/* (Better Auth)"]
-        ApiRoutes["/api/decks · /api/snapshots · /api/logs<br/>/api/analytics · /api/analysis<br/>(session-guarded)"]
+        ApiRoutes["/api/decks · /api/snapshots · /api/logs<br/>/api/analytics · /api/analysis<br/>/api/meta · /api/demo (session-guarded)"]
         AiLayer["ai/ provider abstraction<br/>(GitHub Models adapter)"]
         Static["Static serving of built SPA<br/>(single-origin)"]
         Drizzle["Drizzle ORM"]
@@ -131,7 +131,8 @@ Registration order matters:
    so sign-in works without an existing session.
 4. **Guarded `/api` sub-app** — a `sessionMiddleware` runs first, then `db` is
    injected into the context, then the domain routes mount:
-   `/api/decks`, `/api/snapshots`, `/api/logs`, `/api/analytics`, `/api/analysis`.
+   `/api/decks`, `/api/snapshots`, `/api/logs`, `/api/analytics`, `/api/analysis`,
+   `/api/meta` (server meta snapshots), `/api/demo` (guest/demo mode).
 
 **Battle-log pipeline & analytics** — `POST /api/logs` parses the log server-side
 once on write into `match_log_parsed` (plan §4); `GET /api/analytics/deck/:id?weeks=`

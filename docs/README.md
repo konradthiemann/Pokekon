@@ -38,14 +38,17 @@ apps/
       components/      UI by domain (deck/, meta/, opponent/, recommendations/, layout/)
       store/           dashboardStore.ts — single Zustand store
       db/              database.ts (Dexie schema), queries.ts (all DB operations)
-      lib/             Logic: metaFetch, deckComparison, battleLogParser,
-                       battleLogAnalysis, deckImport, deckPerformanceStats, api.ts
+      lib/             Logic + API client: api.ts, metaFetch, deckComparison,
+                       deckImport, deckPerformanceStats (battle-log parsing lives in
+                       @pokekon/shared; LLM analysis is server-side in apps/api)
       hooks/           useRecommendations — the recommendation engine hook
       types/           index.ts — shared TypeScript types
   api/                 Hono + Drizzle + PostgreSQL backend (Better Auth)
     src/
-      app.ts           Hono app factory; routes: /health, /api/auth/*,
-                       /api/decks, /api/snapshots, /api/logs
+      app.ts           Hono app factory; routes: /health, /api/auth/*, /api/decks,
+                       /api/snapshots, /api/logs, /api/analytics, /api/analysis,
+                       /api/meta, /api/demo
+      ai/              provider-agnostic LLM analysis (GitHub Models adapter)
       auth.ts          Better Auth (email/password + optional Google)
       db/schema.ts     Drizzle schema (Postgres tables)
       static.ts        single-origin serving of the built web app

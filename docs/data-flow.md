@@ -68,6 +68,8 @@ After the log is written to IndexedDB, `refresh()` reloads both the raw logs and
 
 ## Meta Sync (Limitless API)
 
+> **Legacy browser path.** This sync currently runs in the browser (with the `corsproxy.io` fallback shown below). It is slated to move to a server-side cron job — no CORS proxy needed — writing the shared server-side `meta_snapshots` table (see [architecture.md](./architecture.md) → *External API Integration* and [backend-evolution-plan.md](./backend-evolution-plan.md) §6.2).
+
 ```mermaid
 sequenceDiagram
     participant User

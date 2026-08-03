@@ -96,7 +96,7 @@ flowchart LR
 - New external API calls
 - Dependency version updates
 
-**Key concern for this project:** The `analyzeBattleLog` function sends user data and an API key directly to the Anthropic API from the browser. The security agent should review any changes to that flow.
+**Key concern for this project:** Battle-log LLM analysis runs **server-side** (`POST /api/analysis/log`, provider-agnostic adapter in `apps/api/src/ai/`). The per-user API key (BYOK) is stored AES-256-GCM-encrypted and decrypted only server-side — it is never sent to the browser. The security agent should review any change to that key handling or the analysis route, plus any new user-input processing (deck import, battle-log paste).
 
 ---
 
