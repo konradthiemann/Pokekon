@@ -91,14 +91,41 @@ export const analyticsQuerySchema = z.object({
 
 // ─── Tournament meta (archetype drilldown) ────────────────────────────────────
 
+/** Meta analysis window bounds (days). Wider than personal analytics because a
+ *  Bo1-online sample needs several weeks of events to be statistically stable. */
+export const META_WINDOW_MIN_DAYS = 1;
+export const META_WINDOW_MAX_DAYS = 180;
+export const META_WINDOW_DEFAULT_DAYS = 30;
+
+/** Query-string boolean: absent → `def`; "false"/"0" → false; anything else →
+ *  true. `z.coerce.boolean()` is unusable here — Boolean("false") === true. */
+const queryBool = (def: boolean) =>
+  z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined ? def : v !== 'false' && v !== '0'));
+
+/** Window + scope for the tournament-meta reads. `days` generalises the old 1–4
+ *  weeks selector; `online`/`bo1` default true (the local-Bo1 use case: only
+ *  ground-truth online Bo1-Swiss events, which mirror local Challenge/Cup Swiss). */
+export const metaWindowQuerySchema = z.object({
+  days: z.coerce
+    .number()
+    .int()
+    .min(META_WINDOW_MIN_DAYS)
+    .max(META_WINDOW_MAX_DAYS)
+    .default(META_WINDOW_DEFAULT_DAYS),
+  online: queryBool(true),
+  bo1: queryBool(true),
+});
+
 /** Limitless deck ids are kebab-case slugs (e.g. "n-zoroark", "dragapult-dusknoir"). */
 export const archetypeIdParamSchema = z
   .string()
   .regex(ARCHETYPE_SLUG_PATTERN, 'Expected a Limitless deck slug');
 
-/** Query for the paginated archetype decklists (weeks window + load-more). */
-export const archetypeListsQuerySchema = z.object({
-  weeks: z.coerce.number().int().min(1).max(4).default(4),
+/** Query for the paginated archetype decklists (meta window + load-more). */
+export const archetypeListsQuerySchema = metaWindowQuerySchema.extend({
   limit: z.coerce.number().int().min(1).max(20).default(4),
   offset: z.coerce.number().int().min(0).max(1000).default(0),
 });

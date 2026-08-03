@@ -6,8 +6,18 @@
     "tournamentMeta": "Turnier-Meta",
     "tournamentMetaCount": "Turnier-Meta ({{count}})"
   },
+  "window": {
+    "lastDays": "Letzte Tage:",
+    "onlineBo1": "Nur Online-Bo1",
+    "onlineBo1Hint": "Nur Online-Turniere im Bo1-Swiss-Format (Ground-Truth aus Limitless: isOnline + Swiss-Modus) — der beste Proxy für lokale Bo1-Challenges & -Cups. Ausschalten zeigt alle erfassten Turniere (Online + Präsenz, gemischtes Format).",
+    "sample": "{{tournaments}} Turniere · {{players}} Spieler im Fenster",
+    "noData": "Noch keine Daten — \"Sync Live Meta\" ausführen.",
+    "scopeOnline": "Basis: reine Online-Bo1-Turniere, Ground-Truth-klassifiziert (isOnline + Swiss-Modus) — Bo1-Swiss wie in lokalen Challenges/Cups. Strukturell begründet, empirisch nicht bewiesen.",
+    "scopeAll": "Basis: alle erfassten Turniere (Online + Präsenz, gemischtes Bo1/Bo3-Format)."
+  },
   "metaTable": {
     "empty": "Noch keine Meta-Daten. Klicke in der Sidebar auf \"Sync Live Meta\".",
+    "loadError": "Meta-Analyse konnte nicht geladen werden.",
     "showNames": "Namen anzeigen",
     "hideNames": "Namen ausblenden",
     "names": "Namen",
@@ -19,7 +29,7 @@
       "winPct": "Win %",
       "fieldScore": "Feld-Score"
     },
-    "fieldScoreHint": "Erwartete Win-Rate gegen das aktuelle Feld (Meta-Anteil × Matchup-Winrate, 4-Wochen-Fenster)",
+    "fieldScoreHint": "Erwartete Win-Rate gegen das aktuelle Feld (Meta-Anteil × Matchup-Winrate im gewählten Fenster)",
     "clickHint": "Klicken für Decklisten & Feld-Analyse",
     "noSlugHint": "Details nach dem nächsten \"Sync Live Meta\" verfügbar",
     "showTop": "Top {{count}} anzeigen",

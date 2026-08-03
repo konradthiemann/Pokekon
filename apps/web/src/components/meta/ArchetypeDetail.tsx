@@ -7,15 +7,16 @@ import {
   getArchetypeLists,
   type ArchetypeAnalysis,
   type ArchetypeListEntry,
+  type MetaWindow,
 } from '../../lib/api';
 import { PokemonIcon } from '../shared/PokemonIcon';
 import { DecklistCard } from './DecklistCard';
 import { FieldScorePanel } from './FieldScorePanel';
+import { MetaWindowControl } from './MetaWindowControl';
 import { ThreatsPanel } from './ThreatsPanel';
 import { WinRateBadge } from './WinRateBadge';
 import { winRateColorClass } from './winRateColor';
 
-const WEEK_OPTIONS = [1, 2, 3, 4] as const;
 const LISTS_PAGE_SIZE = 4;
 
 // ─── Weekly trend chips ───────────────────────────────────────────────────────
@@ -51,6 +52,9 @@ function TrendChips({ analysis }: { analysis: ArchetypeAnalysis }) {
 interface ArchetypeDetailProps {
   archetypeId: string;
   archetypeName: string;
+  window: MetaWindow;
+  onDaysChange: (days: number) => void;
+  onOnlineBo1Change: (onlineBo1: boolean) => void;
   onBack: () => void;
 }
 
@@ -72,15 +76,23 @@ interface FailedDetail {
 /**
  * Drilldown for one tournament archetype: KPI header, meta-weighted field
  * performance (plan §3.4), weighted threats, and the most successful published
- * decklists (paginated). All data respects the 1–4 week window selector.
+ * decklists (paginated). All data respects the shared meta window (days +
+ * online/Bo1 scope), lifted to MetaPage so the overview and drilldown agree.
  *
  * Loading state is derived by comparing the current request key against the
  * key stored with the last result — no synchronous state resets in effects.
  */
-export function ArchetypeDetail({ archetypeId, archetypeName, onBack }: ArchetypeDetailProps) {
+export function ArchetypeDetail({
+  archetypeId,
+  archetypeName,
+  window,
+  onDaysChange,
+  onOnlineBo1Change,
+  onBack,
+}: ArchetypeDetailProps) {
   const { t } = useTranslation('meta');
-  const [weeks, setWeeks] = useState<number>(4);
-  const requestKey = `${archetypeId}|${weeks}`;
+  const { days, online, bo1 } = window;
+  const requestKey = `${archetypeId}|${days}|${online}|${bo1}`;
   const [loaded, setLoaded] = useState<LoadedDetail | null>(null);
   const [failed, setFailed] = useState<FailedDetail | null>(null);
   const [isLoadingLists, setIsLoadingLists] = useState(false);
@@ -88,11 +100,11 @@ export function ArchetypeDetail({ archetypeId, archetypeName, onBack }: Archetyp
 
   useEffect(() => {
     let cancelled = false;
-    const key = `${archetypeId}|${weeks}`;
+    const key = `${archetypeId}|${days}|${online}|${bo1}`;
 
     Promise.all([
-      getArchetypeAnalysis(archetypeId, weeks),
-      getArchetypeLists(archetypeId, { weeks, limit: LISTS_PAGE_SIZE, offset: 0 }),
+      getArchetypeAnalysis(archetypeId, { days, online, bo1 }),
+      getArchetypeLists(archetypeId, { days, online, bo1, limit: LISTS_PAGE_SIZE, offset: 0 }),
     ])
       .then(([analysisRes, listsRes]) => {
         if (cancelled) return;
@@ -115,7 +127,7 @@ export function ArchetypeDetail({ archetypeId, archetypeName, onBack }: Archetyp
     return () => {
       cancelled = true;
     };
-  }, [archetypeId, weeks]);
+  }, [archetypeId, days, online, bo1]);
 
   const current = loaded?.key === requestKey ? loaded : null;
   const failure = failed?.key === requestKey ? failed : null;
@@ -130,7 +142,13 @@ export function ArchetypeDetail({ archetypeId, archetypeName, onBack }: Archetyp
     if (current === null) return;
     setIsLoadingLists(true);
     setLoadMoreFailed(false);
-    getArchetypeLists(archetypeId, { weeks, limit: LISTS_PAGE_SIZE, offset: current.lists.length })
+    getArchetypeLists(archetypeId, {
+      days,
+      online,
+      bo1,
+      limit: LISTS_PAGE_SIZE,
+      offset: current.lists.length,
+    })
       .then((res) => {
         setLoaded((prev) =>
           prev !== null && prev.key === requestKey
@@ -144,7 +162,7 @@ export function ArchetypeDetail({ archetypeId, archetypeName, onBack }: Archetyp
         setLoadMoreFailed(true);
       })
       .finally(() => setIsLoadingLists(false));
-  }, [archetypeId, weeks, current, requestKey]);
+  }, [archetypeId, days, online, bo1, current, requestKey]);
 
   return (
     <div className="space-y-4">
@@ -154,23 +172,11 @@ export function ArchetypeDetail({ archetypeId, archetypeName, onBack }: Archetyp
           <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
           {t('archetypeDetail.back')}
         </button>
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-500" htmlFor="archetype-window">
-            {t('archetypeDetail.windowLabel')}
-          </label>
-          <select
-            id="archetype-window"
-            value={weeks}
-            onChange={(e) => setWeeks(Number(e.target.value))}
-            className="input px-3 py-1.5 text-sm"
-          >
-            {WEEK_OPTIONS.map((w) => (
-              <option key={w} value={w}>
-                {t('archetypeDetail.windowWeeks', { count: w })}
-              </option>
-            ))}
-          </select>
-        </div>
+        <MetaWindowControl
+          window={window}
+          onDaysChange={onDaysChange}
+          onOnlineBo1Change={onOnlineBo1Change}
+        />
       </div>
 
       <div className="flex items-center gap-3">
