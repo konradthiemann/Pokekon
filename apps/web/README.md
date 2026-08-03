@@ -1,6 +1,6 @@
 # Pokemon TCG Meta Dashboard
 
-A local-first, zero-backend single-page app for competitive Pokemon TCG players. Track the current tournament meta, manage your personal deck, log match results, and receive data-driven recommendations — all without a server or account.
+The local-first frontend of [Pokékon](../../README.md), for competitive Pokémon TCG players. Track the current tournament meta, manage your decks, log match results, and get data-driven recommendations. It keeps a local IndexedDB store and talks to the Hono + PostgreSQL API (Better Auth) for sync, meta data, and AI analysis — with a guest/demo mode that needs no account.
 
 Full documentation: [`/docs/`](../docs/)
 
@@ -15,7 +15,7 @@ Full documentation: [`/docs/`](../docs/)
 - **Match log** — record opponent archetypes, event type (LC / LCup / Regional / Worlds), and result
 - **Deck versioning** — snapshot your deck at any point; match logs can be tagged to a specific version
 - **Battle log parsing** — paste a TCG Live battle protocol (German) and get visual turn-by-turn breakdowns
-- **Claude AI analysis** — AI-powered battle log analysis with key moments, play mistakes, and deck suggestions (requires your own Anthropic API key)
+- **AI battle log analysis** — server-side, provider-agnostic, bring-your-own-key analysis with key moments, play mistakes, and deck suggestions (your key is encrypted at rest)
 - **Deck comparison** — compare your list against public tournament decklists from the same archetype
 - **Recommendations engine** — 14 data-driven rules generate prioritized deck adjustment suggestions based on your match history, meta data, and battle log performance
 - **Local meta** — tag archetypes common at your local store for priority-boosted recommendations
@@ -42,10 +42,9 @@ Full documentation: [`/docs/`](../docs/)
 
 ## Quick Start
 
-**Prerequisites:** Node.js 18+, npm 9+
+**Prerequisites:** Node.js 22+, npm
 
 ```bash
-cd tcg-dashboard
 npm install
 npm run dev
 ```
@@ -91,7 +90,7 @@ src/
   types/           index.ts — all shared TypeScript interfaces
 ```
 
-All data lives in IndexedDB (via Dexie). The app has no backend — all API calls go directly from the browser to Limitless TCG (with corsproxy.io as CORS fallback) or to the Anthropic API.
+The frontend keeps a local-first store in IndexedDB (via Dexie) and talks to the Hono + PostgreSQL API for authentication, meta sync, and CRUD (decks, logs, snapshots). Meta sync and AI battle-log analysis run server-side; migrating the source of truth from IndexedDB to the API is in progress (see [../../docs/backend-evolution-plan.md](../../docs/backend-evolution-plan.md)).
 
 ---
 
