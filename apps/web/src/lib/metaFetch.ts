@@ -1,3 +1,4 @@
+import { isLikelyOnlineName } from '@pokekon/shared';
 import type { RecentTournament } from '../types';
 import { isPostRotation } from '../constants/season';
 import i18n from '../i18n';
@@ -44,22 +45,12 @@ async function limitlessFetch(path: string): Promise<Response> {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Heuristic: determine if a tournament is likely online-only by inspecting its name.
- * The Limitless API has no platform field, so this checks for terms like "online",
- * "ptcgl", "weekly", and "webcam". It will mis-classify edge cases (e.g. "Online
- * Qualifier" for an in-person event), so treat results as approximate filtering only.
+ * Heuristic: determine if a tournament is likely online-only by inspecting its
+ * name. The check itself lives in @pokekon/shared (the server-side sync job
+ * classifies persisted tournaments with the same rule).
  */
 export function isLikelyOnline(t: LimitlessTournament): boolean {
-  const n = t.name.toLowerCase();
-  return (
-    n.includes('online') ||
-    n.includes(' live') ||
-    n.includes('ptcgl') ||
-    n.includes('ptcgo') ||
-    n.includes('code') || // prize codes = online
-    n.includes('weekly') ||
-    n.includes('webcam')
-  );
+  return isLikelyOnlineName(t.name);
 }
 
 // ─── Standings summary ─────────────────────────────────────────────────────────

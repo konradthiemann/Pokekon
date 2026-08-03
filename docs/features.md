@@ -17,6 +17,7 @@
 | Local meta priority | Deck / Recommendations | User configures |
 | Recent tournaments view | Meta | User triggers |
 | Matchup matrix | Meta | Auto from meta data |
+| Archetype drilldown (decklists + field score) | Meta | User clicks a meta-table row |
 | Legal pages (Impressum / Datenschutz) | `/impressum`, `/datenschutz` | Footer links; reachable signed-out |
 
 ---
@@ -39,19 +40,16 @@ Data source: Zustand store (`archetypeStats`, `metaSnapshots`). No API calls on 
 
 **Triggered from:** the "Sync Live Meta" button — in the desktop **Sidebar** and, since the sidebar is hidden on mobile (`md:flex`), also in the **Meta page** header, so it's reachable on every viewport.
 
-Fetches tournament data from the Limitless TCG API and aggregates it into `metaSnapshots`.
+Runs **server-side** (`POST /api/meta/sync` → `apps/api/src/jobs/syncMeta.ts`, also runnable as a Railway cron): the server fetches the Limitless TCG API directly (no CORS proxy needed) and aggregates into the global `meta_snapshots` table.
 
 **Process:**
 1. Fetches up to 50 recent completed Standard tournaments
-2. Selects the top 6 by player count (minimum 30 players each)
+2. Selects the top 6 by player count (minimum 30 players each, post-rotation, last 7 days)
 3. Fetches standings for each selected tournament
-4. Aggregates win/loss records per archetype across all tournaments
-5. Filters out archetypes with fewer than 2 total players
-6. Computes `frequencyPct` (players / total players) and `winRatePct`
-7. Writes results to `metaSnapshots` for the current ISO week period
-8. Clears old data first — the week's period replaces previous data for that week
-
-**CORS strategy:** This meta sync still runs **browser-side** (legacy path): it tries the Limitless API directly first and falls back to `corsproxy.io` on CORS/HTTP failure. Moving it to a server-side cron (no CORS proxy needed) is the next migration step — see [architecture.md](./architecture.md) and [backend-evolution-plan.md](./backend-evolution-plan.md) §6.2.
+4. **Persists the raw data** (plan §5.2): upserts `tournaments`, replaces the event's `tournament_standings` rows — including player name, placing and the **pruned decklist** jsonb — so the archetype drilldown and time-window analyses read from the database instead of re-fetching
+5. Aggregates win/loss records per archetype across all tournaments (`computeMetaSnapshots` in `@pokekon/shared`)
+6. Filters out archetypes with fewer than 2 total players
+7. Computes `frequencyPct` (players / total players) and `winRatePct`, and upserts `meta_snapshots` (keyed `period` + `archetype`, now also carrying the Limitless slug in `archetype_id`) for the current ISO week
 
 **Progress feedback:** The Zustand store exposes `isSyncing` and `syncProgress` strings that the Sidebar and the Meta page header render in real time.
 
@@ -257,11 +255,11 @@ This data is **not persisted** — it lives only in Zustand's `recentTournaments
 
 ## 13. Matchup Matrix
 
-**Page:** `MetaPage` (collapsible) and `DeckPage` — Analytics section
+**Page:** `MetaPage` (collapsible section) — `MatchupMatrix` component
 
-A cross-table showing personal win rates for each pair of opponent archetypes encountered. Rows represent opponent archetypes; columns represent context or deck variants. Cells are color-coded: green for favorable, red for unfavorable, gray for insufficient data.
+A head-to-head win-rate cross-table for the current Standard meta (TrainerHill data). Cells are color-coded (green favorable, red unfavorable, gray below the min-games threshold) and show the win rate from the row deck's perspective.
 
-Data comes from `archetypeStats` which is derived from `opponentLogs` cross-referenced with `metaSnapshots`.
+Data comes from **`GET /api/matchups`** — the latest imported batch of the `matchup_matrix` table. The server lazily seeds the table from the CSV bundled at `apps/api/data/matchup-matrix.csv` on first read; a fresh TrainerHill export can be imported via `POST /api/matchups/import` (raw CSV body) or the `importMatchups` job. The matrix is also the data source for the field-score computation (feature 15).
 
 ---
 
@@ -274,3 +272,20 @@ Unlike the four dashboard tabs (which are Zustand `activeTab` state, not URLs), 
 - **Content** lives entirely in the `legal` i18n namespace (`apps/web/src/i18n/locales/{de,en}/legal.json`) as `{ heading, body[] }` sections, so switching DE/EN reflows the whole document. The **German version is the legally binding one** (stated in the page footer).
 - **Links** are rendered by the shared `LegalLinks` component in three places: the `WelcomeScreen` footer (signed-out), the desktop `Sidebar` bottom, and the mobile `MobileAccountSheet`. Plain `<a>` anchors — a full navigation is acceptable for legal pages and keeps the router-less app simple.
 - The privacy policy reflects the **current** server-side architecture: PostgreSQL on Railway (EU, `europe-west4`), Better Auth sessions (storing IP + user-agent), Resend for transactional email, **GitHub Models** for the BYOK battle-log analysis (key stored AES-256-GCM-encrypted server-side), optional Google sign-in, and GitHub-hosted sprite images.
+
+---
+
+## 15. Archetype Drilldown (Tournament Decklists & Field Score)
+
+**Page:** `MetaPage` — click any row of the Tournament Meta table (`ArchetypeDetail` component)
+
+Every archetype row with a Limitless slug (`archetypeId`) is clickable and opens an in-tab drilldown with a 1–4 week window selector:
+
+- **KPI header:** meta share, tournament win rate, pilot count, field score + rank, weekly share/WR trend chips.
+- **Field performance (the core metric, plan §3.4):** `FieldWR(A) = Σ share(B) × MatchupWR(A vs B)` over all opponents with usable matchup data (≥10 games per pair), the mirror counting as 50 %. Normalised by the covered share; the **coverage %** is always shown (low coverage < 40 % gets a warning) so a shiny score on thin data is impossible to miss. Computed in `packages/shared/src/fieldWinRate.ts`, served by `GET /api/meta/archetypes/:id/analysis`.
+- **Preparation panel:** opponents weighted by *frequency × matchup weakness* — common **and** bad-for-you decks rank first ("Darauf musst du vorbereitet sein"), plus the mirror probability and the good matchups (free wins).
+- **Most successful decklists:** published lists from the persisted standings, ordered by relative finish (placing ÷ field size, ties → bigger event, then more recent), 4 per page with a load-more button (`GET /api/meta/archetypes/:id/lists`). Each card shows placing, record, player, event and the full list grouped Pokémon/Trainer/Energy, linking to the Limitless standings.
+
+The overview Meta Table gains a sortable **Feld-Score** column (4-week window, `GET /api/meta/field-analysis`) so the best-positioned deck — not merely the most-played one — is visible at a glance. Rows synced before the slug column existed show "—" until the next sync backfills `archetype_id`.
+
+**Cold start:** before the first server sync there are no persisted standings — the drilldown and score column show explicit empty states pointing to "Sync Live Meta".

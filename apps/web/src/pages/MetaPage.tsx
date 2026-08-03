@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDashboardStore } from '../store/dashboardStore';
 import {
@@ -16,26 +16,23 @@ import {
   Globe,
   AlertCircle,
 } from 'lucide-react';
+import { OTHER_ARCHETYPE_ID } from '@pokekon/shared';
 import type { MetaSnapshot, RecentTournament } from '../types';
+import { getFieldAnalysis, type FieldAnalysisArchetype } from '../lib/api';
+import { ArchetypeDetail } from '../components/meta/ArchetypeDetail';
 import { MatchupMatrix } from '../components/meta/MatchupMatrix';
+import { WinRateBadge } from '../components/meta/WinRateBadge';
 import { CollapsibleSection } from '../components/layout/CollapsibleSection';
 import { PokemonIcon } from '../components/shared/PokemonIcon';
 
 // ─── Meta table ───────────────────────────────────────────────────────────────
 
-type SortKey = 'frequencyPct' | 'winRatePct' | 'playerCount';
+type SortKey = 'frequencyPct' | 'winRatePct' | 'playerCount' | 'fieldScore';
 
-function WinRateBadge({ pct }: { pct: number | null }) {
-  if (pct === null) return <span className="text-slate-400 font-mono">—</span>;
-  const color =
-    pct >= 55
-      ? 'text-emerald-700'
-      : pct >= 50
-        ? 'text-emerald-700'
-        : pct >= 45
-          ? 'text-amber-700'
-          : 'text-red-700';
-  return <span className={`font-mono font-semibold ${color}`}>{pct}%</span>;
+/** A selected archetype (drilldown target) — requires the Limitless slug. */
+export interface ArchetypeSelection {
+  archetypeId: string;
+  archetypeName: string;
 }
 
 function ShareBar({ pct, max }: { pct: number; max: number }) {
@@ -91,7 +88,15 @@ function TH({
 
 const PAGE_SIZE = 10;
 
-function MetaTable({ snapshots }: { snapshots: MetaSnapshot[] }) {
+function MetaTable({
+  snapshots,
+  fieldScores,
+  onSelect,
+}: {
+  snapshots: MetaSnapshot[];
+  fieldScores: Map<string, FieldAnalysisArchetype>;
+  onSelect: (selection: ArchetypeSelection) => void;
+}) {
   const { t } = useTranslation('meta');
   const [sortKey, setSortKey] = useState<SortKey>('frequencyPct');
   const [asc, setAsc] = useState(false);
@@ -106,9 +111,16 @@ function MetaTable({ snapshots }: { snapshots: MetaSnapshot[] }) {
     }
   };
 
+  const scoreOf = (snap: MetaSnapshot): number | null =>
+    snap.archetypeId != null ? (fieldScores.get(snap.archetypeId)?.fieldWinRatePct ?? null) : null;
+
   const sorted = [...snapshots].sort((a, b) => {
-    const va = a[sortKey] ?? 0;
-    const vb = b[sortKey] ?? 0;
+    // Missing values (no slug / no matchup data) sort to the end, not as 0.
+    const va = sortKey === 'fieldScore' ? scoreOf(a) : a[sortKey];
+    const vb = sortKey === 'fieldScore' ? scoreOf(b) : b[sortKey];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
     return asc ? va - vb : vb - va;
   });
 
@@ -142,6 +154,7 @@ function MetaTable({ snapshots }: { snapshots: MetaSnapshot[] }) {
                   <col style={{ width: 72 }} />
                   <col style={{ width: 64 }} />
                   <col style={{ width: 68 }} />
+                  <col style={{ width: 88 }} />
                 </colgroup>
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-100">
@@ -188,48 +201,95 @@ function MetaTable({ snapshots }: { snapshots: MetaSnapshot[] }) {
                       asc={asc}
                       onSort={handleSort}
                     />
+                    <th
+                      className="px-3 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider text-right whitespace-nowrap cursor-pointer hover:text-slate-900 select-none"
+                      onClick={() => handleSort('fieldScore')}
+                      title={t('metaTable.fieldScoreHint')}
+                    >
+                      <span className="flex items-center gap-1 justify-end">
+                        {t('metaTable.headers.fieldScore')}
+                        <SortIcon active={sortKey === 'fieldScore'} asc={asc} />
+                      </span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {visible.map((snap, i) => (
-                    <tr
-                      key={snap.archetype}
-                      className="border-b border-slate-200 hover:bg-slate-50 transition-colors"
-                    >
-                      <td className="px-3 py-2 text-slate-400 text-xs tabular-nums">{i + 1}</td>
-                      <td className="py-2 px-2 overflow-hidden">
-                        <div className="flex items-center gap-1.5">
-                          <div className="shrink-0 flex items-center" style={{ width: ICON_BOX }}>
-                            <PokemonIcon
-                              archetype={snap.archetype}
-                              size="sm"
-                              dual
-                              reserveSecondary
-                            />
+                  {visible.map((snap, i) => {
+                    // 'other' is the bucket for unidentified decks — it exists in
+                    // the share data but has no drilldown (never ranked/listed).
+                    const archetypeId =
+                      snap.archetypeId !== OTHER_ARCHETYPE_ID ? snap.archetypeId : null;
+                    const score = scoreOf(snap);
+                    const rank =
+                      snap.archetypeId != null
+                        ? fieldScores.get(snap.archetypeId)?.rank
+                        : undefined;
+                    return (
+                      <tr
+                        key={snap.archetype}
+                        className={`border-b border-slate-200 hover:bg-slate-50 transition-colors ${archetypeId != null ? 'cursor-pointer' : ''}`}
+                        onClick={
+                          archetypeId != null
+                            ? () => onSelect({ archetypeId, archetypeName: snap.archetype })
+                            : undefined
+                        }
+                        title={
+                          archetypeId != null
+                            ? t('metaTable.clickHint')
+                            : snap.archetypeId == null
+                              ? t('metaTable.noSlugHint') // legacy row — next sync adds the slug
+                              : undefined // 'other': structurally no drilldown
+                        }
+                      >
+                        <td className="px-3 py-2 text-slate-400 text-xs tabular-nums">{i + 1}</td>
+                        <td className="py-2 px-2 overflow-hidden">
+                          <div className="flex items-center gap-1.5">
+                            <div className="shrink-0 flex items-center" style={{ width: ICON_BOX }}>
+                              <PokemonIcon
+                                archetype={snap.archetype}
+                                size="sm"
+                                dual
+                                reserveSecondary
+                              />
+                            </div>
+                            {namesOpen && (
+                              <span className="text-xs font-medium text-slate-800 truncate leading-tight min-w-0">
+                                {snap.archetype}
+                              </span>
+                            )}
                           </div>
-                          {namesOpen && (
-                            <span className="text-xs font-medium text-slate-800 truncate leading-tight min-w-0">
-                              {snap.archetype}
-                            </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <ShareBar pct={snap.frequencyPct} max={maxFreq} />
+                        </td>
+                        <td className="px-3 py-2 text-right text-slate-600 tabular-nums text-xs">
+                          {snap.playerCount ?? '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right text-slate-500 font-mono text-xs">
+                          {snap.wins != null && snap.losses != null
+                            ? `${snap.wins}-${snap.losses}`
+                            : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <WinRateBadge pct={snap.winRatePct} />
+                        </td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                          {score !== null ? (
+                            <>
+                              <WinRateBadge pct={Math.round(score * 10) / 10} />
+                              {rank !== undefined && (
+                                <span className="text-[10px] font-bold text-brand-700 ml-1">
+                                  #{rank}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-slate-400 font-mono">—</span>
                           )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <ShareBar pct={snap.frequencyPct} max={maxFreq} />
-                      </td>
-                      <td className="px-3 py-2 text-right text-slate-600 tabular-nums text-xs">
-                        {snap.playerCount ?? '—'}
-                      </td>
-                      <td className="px-3 py-2 text-right text-slate-500 font-mono text-xs">
-                        {snap.wins != null && snap.losses != null
-                          ? `${snap.wins}-${snap.losses}`
-                          : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <WinRateBadge pct={snap.winRatePct} />
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -433,6 +493,27 @@ export function MetaPage() {
   const { metaSnapshots, syncMeta, isSyncing, syncProgress, syncError, lastSynced } =
     useDashboardStore();
   const sourceNote = metaSnapshots[0]?.sourceNote;
+  const [selected, setSelected] = useState<ArchetypeSelection | null>(null);
+  const [fieldScores, setFieldScores] = useState<Map<string, FieldAnalysisArchetype>>(new Map());
+
+  // Field scores for the overview column use the widest window (4 weeks) for
+  // the broadest sample; the drilldown has its own 1–4 week selector. Loaded
+  // after every snapshot refresh (i.e. also after each sync). Failures leave
+  // the column empty ("—") rather than blocking the page.
+  useEffect(() => {
+    let cancelled = false;
+    getFieldAnalysis(4)
+      .then((res) => {
+        if (cancelled) return;
+        setFieldScores(new Map(res.archetypes.map((a) => [a.archetypeId, a])));
+      })
+      .catch(() => {
+        if (!cancelled) setFieldScores(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [metaSnapshots]);
 
   // The "Sync Live Meta" action also lives in the desktop sidebar, but that is
   // hidden on mobile (`md:flex`) — so the meta page carries its own copy,
@@ -445,6 +526,16 @@ export function MetaPage() {
       /* error is shown via the store's syncError */
     }
   };
+
+  if (selected) {
+    return (
+      <ArchetypeDetail
+        archetypeId={selected.archetypeId}
+        archetypeName={selected.archetypeName}
+        onBack={() => setSelected(null)}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -508,7 +599,7 @@ export function MetaPage() {
           rightSlot={sourceNote && <span className="text-xs text-slate-500">{sourceNote}</span>}
           defaultOpen
         >
-          <MetaTable snapshots={metaSnapshots} />
+          <MetaTable snapshots={metaSnapshots} fieldScores={fieldScores} onSelect={setSelected} />
         </CollapsibleSection>
       </div>
 

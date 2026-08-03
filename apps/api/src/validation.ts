@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ARCHETYPE_SLUG_PATTERN } from '@pokekon/shared';
 import {
   aiProviderValues,
   cardTypeValues,
@@ -86,6 +87,20 @@ export const logsQuerySchema = z.object({
 /** Time window for deck analytics — 1/2/3/4 weeks (plan §5.4), default 4. */
 export const analyticsQuerySchema = z.object({
   weeks: z.coerce.number().int().min(1).max(4).default(4),
+});
+
+// ─── Tournament meta (archetype drilldown) ────────────────────────────────────
+
+/** Limitless deck ids are kebab-case slugs (e.g. "n-zoroark", "dragapult-dusknoir"). */
+export const archetypeIdParamSchema = z
+  .string()
+  .regex(ARCHETYPE_SLUG_PATTERN, 'Expected a Limitless deck slug');
+
+/** Query for the paginated archetype decklists (weeks window + load-more). */
+export const archetypeListsQuerySchema = z.object({
+  weeks: z.coerce.number().int().min(1).max(4).default(4),
+  limit: z.coerce.number().int().min(1).max(20).default(4),
+  offset: z.coerce.number().int().min(0).max(1000).default(0),
 });
 
 // ─── LLM analysis (B6) ────────────────────────────────────────────────────────

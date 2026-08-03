@@ -242,6 +242,7 @@ describe('meta client', () => {
         {
           id: 1,
           archetype: 'Charizard',
+          archetypeId: 'charizard',
           frequencyPct: 20,
           winRatePct: 55,
           wins: 11,

@@ -196,8 +196,18 @@ export const metaSnapshots = pgTable('meta_snapshots', {
 - `tournaments`: `id` (Limitless-ID, PK als text), `name`, `date`, `players`, `format`, `isOnline`, `fetchedAt`.
 - `tournament_standings`: `tournamentId` (FK), `archetypeId`, `archetypeName`, `placing`, `wins`, `losses`, `ties`, `decklist` (jsonb, optional). Index auf `(tournamentId, archetypeId)`.
 
+> ✅ **Umgesetzt (2026-07-08, Migration `0005_*`):** beide Tabellen existieren, der Sync-Job
+> persistiert sie (inkl. `playerName` und via `pruneDecklist` bereinigter Decklisten);
+> `meta_snapshots` hat zusätzlich `archetype_id` (Limitless-Slug) als Drilldown-Join-Key.
+> Konsumiert vom Archetyp-Drilldown im Meta-Tab (Decklisten + Feld-Score, siehe
+> `docs/features.md` §15).
+
 **`matchup_matrix`** — TrainerHill-CSV strukturiert statt statisch im Frontend:
 - `deck1`, `deck2`, `wins`, `losses`, `ties`, `total`, `winRate`, `importedAt`. PK `(deck1, deck2, importedAt)` für Historie.
+
+> ✅ **Umgesetzt (2026-07-08):** Tabelle + `jobs/importMatchups.ts` + `GET/POST /api/matchups`;
+> Batch-Modell über `importedAt`, Lazy-Seed aus `apps/api/data/matchup-matrix.csv`. Die
+> Frontend-Matrix liest jetzt die API statt der statischen CSV in `/public`.
 
 **`archetype_card_stats`** (optional, als Cache) — Ergebnis von `deckComparison` pro Archetyp+Zeitraum, damit Limitless nicht bei jedem Aufruf befragt wird. TTL über `computedAt`.
 
@@ -222,9 +232,12 @@ apps/api/src/
   routes/
     decks.ts, logs.ts, snapshots.ts        (bestehend)
     meta.ts          → GET /api/meta?weeks=4           (liest meta_snapshots / MV)
+                       ✅ zusätzlich: GET /api/meta/field-analysis?weeks=1..4,
+                       GET /api/meta/archetypes/:id/lists, GET /api/meta/archetypes/:id/analysis
     analytics.ts     → GET /api/analytics/deck/:id?weeks=4   (Performance, Field-WR)
     comparison.ts    → GET /api/comparison/:archetype       (Kernkarten, Add/Remove)
     matchups.ts      → GET /api/matchups                    (Matrix + gewichtetes Feld)
+                       ✅ umgesetzt inkl. POST /api/matchups/import (TrainerHill-CSV)
   jobs/
     syncMeta.ts      → portiert metaFetch.ts (Limitless → tournaments/standings/meta_snapshots)
     importMatchups.ts→ TrainerHill-CSV einlesen
@@ -233,6 +246,8 @@ apps/api/src/
     deckComparison.ts    (portiert)
     deckPerformanceStats.ts (portiert)
     fieldWinRate.ts      (neu: Meta × Matchup-Gewichtung, Abschnitt 3.4)
+                         ✅ umgesetzt als packages/shared/src/fieldWinRate.ts
+                         (Web rendert dieselben Typen; API-Route rechnet serverseitig)
   ai/
     analyzeBattleLog.ts  (portiert, API-Key serverseitig)
 ```
@@ -314,3 +329,4 @@ Parallel zum Daten-/Backend-Umbau wird die **AI-System-Umgebung** des Repos form
 - ~~**Doku-Viewer-Tool**: Starlight vs. VitePress.~~ → **Entschieden: Astro Starlight auf GitHub Pages** (Abschnitt 8).
 - **Frontend-Migration**: IndexedDB ganz aufgeben (reines Server-Modell) oder als Offline-Cache behalten (local-first bleibt erhalten, Server ist Sync-Ziel)?
 - **Zug-Qualität (Abschnitt 3.7)**: Wie tief soll die Board-State-Rekonstruktion gehen — reicht Hand-/Bank-/Aktiv-Ebene, oder willst du auch Energie-Zuordnung pro Pokémon (aufwändiger zu parsen)?
+- ~~**LLM-Anbieter der App-Analyse**~~ → **Entschieden: provider-agnostisch, GitHub Models als Default, in der App umstellbar** (Abschnitt 6.3 Phase A). Offen bleibt nur, welche *weiteren* Adapter (OpenAI/Anthropic/lokal) zuerst kommen.

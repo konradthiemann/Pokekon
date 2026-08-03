@@ -12,7 +12,7 @@ import {
   jsonb,
   date,
 } from 'drizzle-orm/pg-core';
-import type { ParsedTurn, PrizePoint } from '@pokekon/shared';
+import type { ParsedTurn, PrizePoint, TournamentDecklist } from '@pokekon/shared';
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
@@ -237,6 +237,10 @@ export const metaSnapshots = pgTable(
   {
     id: serial('id').primaryKey(),
     archetype: text('archetype').notNull(),
+    // Limitless deck id (slug) — the join key to tournament_standings and the
+    // matchup matrix. Nullable because rows synced before this column existed
+    // carry no slug; the sync upsert backfills it on the next run.
+    archetypeId: text('archetype_id'),
     frequencyPct: real('frequency_pct').notNull(),
     winRatePct: integer('win_rate_pct'), // nullable: no decided games yet
     wins: integer('wins').notNull(),
@@ -249,6 +253,74 @@ export const metaSnapshots = pgTable(
   (table) => [
     uniqueIndex('meta_period_archetype_uq').on(table.period, table.archetype),
     index('meta_archetype_idx').on(table.archetype),
+  ],
+);
+
+// ─── Raw tournament data (plan §5.2) ─────────────────────────────────────────
+// The sync job persists what Limitless served instead of only aggregating, so
+// later analyses (decklists per archetype, time windows, own matchup matrix)
+// never need to re-fetch. Not user-scoped: public tournament reference data.
+
+export const tournaments = pgTable(
+  'tournaments',
+  {
+    id: text('id').primaryKey(), // Limitless tournament id
+    name: text('name').notNull(),
+    date: timestamp('date', { withTimezone: true }).notNull(),
+    players: integer('players').notNull(),
+    format: text('format').notNull().default('standard'),
+    // Written by the sync (name heuristic) but not consumed by the drilldown
+    // routes yet — reserved for a future online/offline field filter.
+    isOnline: boolean('is_online').notNull().default(false),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('tournaments_date_idx').on(table.date)],
+);
+
+export const tournamentStandings = pgTable(
+  'tournament_standings',
+  {
+    id: serial('id').primaryKey(),
+    tournamentId: text('tournament_id')
+      .notNull()
+      .references(() => tournaments.id, { onDelete: 'cascade' }),
+    archetypeId: text('archetype_id').notNull(), // Limitless deck id, 'other' when unknown
+    archetypeName: text('archetype_name').notNull(),
+    playerName: text('player_name'),
+    placing: integer('placing'), // nullable: Limitless omits it for drops
+    wins: integer('wins').notNull().default(0),
+    losses: integer('losses').notNull().default(0),
+    ties: integer('ties').notNull().default(0),
+    // Published 60-card list (pruned to known fields on ingest); null when the
+    // player did not submit one.
+    decklist: jsonb('decklist').$type<TournamentDecklist>(),
+  },
+  (table) => [
+    index('tournament_standings_tournamentId_idx').on(table.tournamentId),
+    index('tournament_standings_archetypeId_idx').on(table.archetypeId),
+  ],
+);
+
+// ─── Matchup matrix (plan §5.2, TrainerHill import) ──────────────────────────
+// Rows sharing one `importedAt` form a batch; reads use the latest batch. The
+// win rate is directional: from deck1's perspective.
+
+export const matchupMatrix = pgTable(
+  'matchup_matrix',
+  {
+    id: serial('id').primaryKey(),
+    deck1: text('deck1').notNull(),
+    deck2: text('deck2').notNull(),
+    wins: integer('wins').notNull(),
+    losses: integer('losses').notNull(),
+    ties: integer('ties').notNull(),
+    total: integer('total').notNull(),
+    winRate: real('win_rate').notNull(), // 0–100, deck1 vs deck2
+    importedAt: timestamp('imported_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index('matchup_matrix_decks_idx').on(table.deck1, table.deck2),
+    index('matchup_matrix_importedAt_idx').on(table.importedAt),
   ],
 );
 
@@ -312,6 +384,17 @@ export const matchLogParsedRelations = relations(matchLogParsed, ({ one }) => ({
   opponentLog: one(opponentLogs, {
     fields: [matchLogParsed.opponentLogId],
     references: [opponentLogs.id],
+  }),
+}));
+
+export const tournamentsRelations = relations(tournaments, ({ many }) => ({
+  standings: many(tournamentStandings),
+}));
+
+export const tournamentStandingsRelations = relations(tournamentStandings, ({ one }) => ({
+  tournament: one(tournaments, {
+    fields: [tournamentStandings.tournamentId],
+    references: [tournaments.id],
   }),
 }));
 
