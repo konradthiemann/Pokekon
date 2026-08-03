@@ -283,7 +283,9 @@ re-fetch. Both are global reference data.
 |--------|------|-------|
 | `id` | text PK | Limitless tournament id |
 | `name` / `date` / `players` / `format` | text / timestamptz / int / text | |
-| `is_online` | boolean | name-based heuristic (`isLikelyOnlineName`) |
+| `is_online` | boolean | ground-truth from Limitless `/details` (`classifyTournamentDetails`); name heuristic only as a fallback |
+| `platform` | text (nullable) | e.g. `"PTCGL"`, from `/details` |
+| `swiss_mode` | text (nullable) | Swiss-phase format `BO1`/`BO3`/`OTHER` from `/details`; the online-Bo1 meta reads filter `is_online AND swiss_mode = 'BO1'` (migration 0006) |
 | `fetched_at` | timestamptz | |
 
 | `tournament_standings` column | Type | Notes |
