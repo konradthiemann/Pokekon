@@ -23,7 +23,7 @@
     "prepare": "husky || true"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,css,json}": "prettier --write"
+    "*.{ts,tsx,js,jsx,mjs,cjs,css,json}": "prettier --write"
   },
   "devDependencies": {
     "eslint-config-prettier": "^10.1.8",

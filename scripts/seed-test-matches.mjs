@@ -192,7 +192,9 @@ async function main() {
     body: { archetype: 'dragapult-ex', archetypeName: 'Dragapult ex', variant: 'Test' },
   });
   if (!deckRes.ok) {
-    console.error(`Create deck failed (${deckRes.status}): ${await deckRes.text().catch(() => '')}`);
+    console.error(
+      `Create deck failed (${deckRes.status}): ${await deckRes.text().catch(() => '')}`,
+    );
     process.exit(1);
   }
   const deck = await deckRes.json();
@@ -219,10 +221,14 @@ async function main() {
       ok += 1;
       console.log(`  + match #${log.id} vs ${m.archetype} (${m.result})`);
     } else {
-      console.warn(`  ! failed vs ${m.archetype} (${res.status}): ${await res.text().catch(() => '')}`);
+      console.warn(
+        `  ! failed vs ${m.archetype} (${res.status}): ${await res.text().catch(() => '')}`,
+      );
     }
   }
-  console.log(`Done: ${ok}/${MATCHES.length} matches created. Open them in the Match Log → Analyse tab.`);
+  console.log(
+    `Done: ${ok}/${MATCHES.length} matches created. Open them in the Match Log → Analyse tab.`,
+  );
 }
 
 main().catch((err) => {
