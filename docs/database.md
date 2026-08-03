@@ -269,7 +269,40 @@ The server-side counterpart of the IndexedDB `metaSnapshots` table — **global*
 Columns mirror the client shape (`archetype`, `frequency_pct`, `win_rate_pct`
 nullable, `wins`, `losses`, `player_count`, `period`, `source_note`,
 `created_at`) with a unique index on `(period, archetype)` and an `archetype`
-index.
+index. `archetype_id` (nullable) holds the Limitless deck slug — the join key
+for the archetype drilldown; rows synced before the column existed carry null
+until the next sync backfills them.
+
+### Tables: `tournaments` + `tournament_standings` (raw Limitless data, plan §5.2)
+
+The meta sync persists what Limitless served instead of only aggregating, so
+decklists, time-window analyses and (later) an own matchup matrix never need a
+re-fetch. Both are global reference data.
+
+| `tournaments` column | Type | Notes |
+|--------|------|-------|
+| `id` | text PK | Limitless tournament id |
+| `name` / `date` / `players` / `format` | text / timestamptz / int / text | |
+| `is_online` | boolean | name-based heuristic (`isLikelyOnlineName`) |
+| `fetched_at` | timestamptz | |
+
+| `tournament_standings` column | Type | Notes |
+|--------|------|-------|
+| `id` | serial PK | |
+| `tournament_id` | text FK → `tournaments.id` | `onDelete: cascade`, indexed |
+| `archetype_id` / `archetype_name` | text | Limitless deck slug (`'other'` when unknown) + display name; slug indexed |
+| `player_name` | text (nullable) | capped at 100 chars on ingest |
+| `placing` | int (nullable) | null for drops |
+| `wins` / `losses` / `ties` | int | |
+| `decklist` | jsonb (nullable) | `TournamentDecklist`, **pruned on ingest** (`pruneDecklist`: field whitelist, length caps, count clamps) |
+
+### Table: `matchup_matrix`
+
+The TrainerHill head-to-head export, structured (plan §5.2). Rows sharing one
+`imported_at` form a batch; reads always use the latest batch (older imports
+remain as history). Seeded lazily from the CSV bundled at `apps/api/data/`
+when the table is empty; updated via `POST /api/matchups/import` or the
+`importMatchups` job. `win_rate` is directional (deck1's perspective).
 
 ### Indexes for time-window analytics
 
@@ -295,5 +328,6 @@ is only decrypted server-side for the analysis call — never returned to client
 
 Generated with `npm run db:generate -w @pokekon/api`: `0002_*` adds
 `match_log_parsed` + `meta_snapshots` + the `event_date` index; `0003_*` adds
-`user_ai_settings`. The PGlite test harness applies the real migration SQL, so the
-generated schema is exercised in CI.
+`user_ai_settings`; `0005_*` adds `tournaments`, `tournament_standings`,
+`matchup_matrix` and `meta_snapshots.archetype_id`. The PGlite test harness
+applies the real migration SQL, so the generated schema is exercised in CI.
