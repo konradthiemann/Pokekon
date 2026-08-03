@@ -1,4 +1,12 @@
-import type { AiSettings, BattleAnalysis, DeckAnalytics, MetaSyncResult } from '@pokekon/shared';
+import type {
+  AiSettings,
+  BattleAnalysis,
+  DeckAnalytics,
+  FieldScore,
+  MatchupRow,
+  MetaSyncResult,
+  TournamentDecklist,
+} from '@pokekon/shared';
 import type {
   CardRole,
   CardType,
@@ -408,6 +416,7 @@ export async function seedDemo(): Promise<{ seeded: boolean }> {
 interface MetaSnapshotRow {
   id: number;
   archetype: string;
+  archetypeId: string | null;
   frequencyPct: number;
   winRatePct: number | null;
   wins: number;
@@ -422,6 +431,7 @@ function toMetaSnapshot(row: MetaSnapshotRow): MetaSnapshot {
   return {
     id: row.id,
     archetype: row.archetype,
+    archetypeId: row.archetypeId ?? null,
     frequencyPct: row.frequencyPct,
     winRatePct: row.winRatePct,
     wins: row.wins,
@@ -441,4 +451,108 @@ export async function getMeta(): Promise<MetaSnapshot[]> {
 /** Trigger the server-side meta sync (fetches Limitless, upserts snapshots). */
 export async function syncMeta(): Promise<MetaSyncResult> {
   return request<MetaSyncResult>('/api/meta/sync', { method: 'POST' });
+}
+
+// ─── Tournament drilldown (field analysis, decklists, matchups) ──────────────
+
+/** One archetype's window stats + meta-weighted field score (rank 1 = best). */
+export interface FieldAnalysisArchetype {
+  archetypeId: string;
+  archetypeName: string;
+  sharePct: number;
+  winRatePct: number | null;
+  wins: number;
+  losses: number;
+  playerCount: number;
+  fieldWinRatePct: number | null;
+  coveragePct: number;
+  rank: number;
+}
+
+export interface FieldAnalysis {
+  weeks: number;
+  tournamentCount: number;
+  totalPlayers: number;
+  matchupImportedAt: string | null;
+  archetypes: FieldAnalysisArchetype[];
+}
+
+/** One published tournament decklist with its finish and event context. */
+export interface ArchetypeListEntry {
+  id: number;
+  playerName: string | null;
+  placing: number | null;
+  wins: number;
+  losses: number;
+  ties: number;
+  /** Non-null by invariant, not by schema: the lists route filters
+   *  `decklist IS NOT NULL` — standings without a published list never
+   *  reach this endpoint. */
+  decklist: TournamentDecklist;
+  tournament: { id: string; name: string; date: string; players: number };
+}
+
+export interface ArchetypeLists {
+  total: number;
+  lists: ArchetypeListEntry[];
+}
+
+export interface ArchetypeAnalysis {
+  weeks: number;
+  tournamentCount: number;
+  totalPlayers: number;
+  matchupImportedAt: string | null;
+  archetype: {
+    archetypeId: string;
+    archetypeName: string;
+    sharePct: number;
+    winRatePct: number | null;
+    wins: number;
+    losses: number;
+    playerCount: number;
+  };
+  fieldScore: FieldScore;
+  totalRanked: number;
+  listsAvailable: number;
+  trend: { period: string; frequencyPct: number; winRatePct: number | null }[];
+}
+
+/** Every archetype's meta-weighted field win rate over the window (plan §3.4). */
+export async function getFieldAnalysis(weeks: number): Promise<FieldAnalysis> {
+  return request<FieldAnalysis>(`/api/meta/field-analysis?weeks=${weeks}`);
+}
+
+/** The most successful published decklists of one archetype, paginated. */
+export async function getArchetypeLists(
+  archetypeId: string,
+  opts: { weeks: number; limit: number; offset: number },
+): Promise<ArchetypeLists> {
+  const params = new URLSearchParams({
+    weeks: String(opts.weeks),
+    limit: String(opts.limit),
+    offset: String(opts.offset),
+  });
+  return request<ArchetypeLists>(
+    `/api/meta/archetypes/${encodeURIComponent(archetypeId)}/lists?${params}`,
+  );
+}
+
+/** One archetype's field position: score, rank, threats, free wins, trend. */
+export async function getArchetypeAnalysis(
+  archetypeId: string,
+  weeks: number,
+): Promise<ArchetypeAnalysis> {
+  return request<ArchetypeAnalysis>(
+    `/api/meta/archetypes/${encodeURIComponent(archetypeId)}/analysis?weeks=${weeks}`,
+  );
+}
+
+/** The latest head-to-head matchup batch (seeded server-side when empty). */
+export interface MatchupData {
+  importedAt: string | null;
+  rows: MatchupRow[];
+}
+
+export async function getMatchups(): Promise<MatchupData> {
+  return request<MatchupData>('/api/matchups');
 }

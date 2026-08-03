@@ -769,6 +769,352 @@ describe('meta (/api/meta)', () => {
   });
 });
 
+describe('tournament drilldown (field-analysis, archetype lists, matchups)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** Clear the global (non-user-scoped) tournament reference tables. */
+  async function clearTournamentData(): Promise<void> {
+    await db.delete(schema.tournaments); // standings cascade
+    await db.delete(schema.matchupMatrix);
+    await db.delete(schema.metaSnapshots);
+  }
+
+  function daysAgo(days: number): Date {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - days);
+    return d;
+  }
+
+  const sampleDecklist = {
+    pokemon: [{ name: "N's Zoroark ex", count: 3 }],
+    trainer: [{ name: 'Ultra Ball', count: 4 }],
+    energy: [{ name: 'Basic Darkness Energy', count: 8 }],
+  };
+
+  async function seedTournament(
+    id: string,
+    date: Date,
+    players: number,
+    standings: (typeof schema.tournamentStandings.$inferInsert)[],
+  ): Promise<void> {
+    await db.insert(schema.tournaments).values({ id, name: `Event ${id}`, date, players });
+    await db
+      .insert(schema.tournamentStandings)
+      .values(standings.map((s) => ({ ...s, tournamentId: id })));
+  }
+
+  const standing = (
+    archetypeId: string,
+    over: Partial<typeof schema.tournamentStandings.$inferInsert> = {},
+  ): typeof schema.tournamentStandings.$inferInsert => ({
+    tournamentId: '',
+    archetypeId,
+    archetypeName: archetypeId.toUpperCase(),
+    wins: 3,
+    losses: 2,
+    ties: 0,
+    ...over,
+  });
+
+  async function seedMatchups(rows: { deck1: string; deck2: string; winRate: number }[]) {
+    const importedAt = new Date();
+    await db
+      .insert(schema.matchupMatrix)
+      .values(rows.map((r) => ({ ...r, wins: 0, losses: 0, ties: 0, total: 50, importedAt })));
+  }
+
+  it('persists tournaments, standings and pruned decklists during sync', async () => {
+    await clearTournamentData();
+    const today = new Date().toISOString();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/api/tournaments/T9/standings')) {
+        return jsonResponse([
+          {
+            name: 'Alice',
+            placing: 1,
+            deck: { id: 'char', name: 'Charizard' },
+            record: { wins: 6, losses: 1, ties: 0 },
+            decklist: {
+              pokemon: [{ name: 'Charizard ex', count: 3, junk: 'dropped' }],
+              trainer: [{ name: 'Rare Candy', count: 4 }],
+              energy: [{ name: 'Fire Energy', count: 10 }],
+              extraField: 'dropped',
+            },
+          },
+          {
+            name: 'Bob',
+            placing: 2,
+            deck: { id: 'char', name: 'Charizard' },
+            record: { wins: 5, losses: 2, ties: 0 },
+            // no decklist submitted
+          },
+        ]);
+      }
+      return jsonResponse([{ id: 'T9', name: 'Weekly Online', players: 40, date: today }]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const sync = await request('/api/meta/sync', { user: USER_A, method: 'POST' });
+    expect(sync.status).toBe(200);
+
+    // Snapshots now carry the slug (join key for the drilldown).
+    const meta = await request('/api/meta', { user: USER_A });
+    const rows = (await meta.json()) as { archetype: string; archetypeId: string | null }[];
+    expect(rows.find((r) => r.archetype === 'Charizard')?.archetypeId).toBe('char');
+
+    // Only the standing WITH a decklist is served, unknown fields are pruned.
+    const lists = await request('/api/meta/archetypes/char/lists', { user: USER_A });
+    expect(lists.status).toBe(200);
+    const body = (await lists.json()) as {
+      total: number;
+      lists: {
+        playerName: string;
+        placing: number;
+        decklist: { pokemon: { name: string; count: number }[] };
+        tournament: { id: string; players: number };
+      }[];
+    };
+    expect(body.total).toBe(1);
+    expect(body.lists[0]).toMatchObject({
+      playerName: 'Alice',
+      placing: 1,
+      tournament: { id: 'T9', players: 40 },
+    });
+    expect(body.lists[0]?.decklist.pokemon[0]).toEqual({ name: 'Charizard ex', count: 3 });
+  });
+
+  it("replaces (not duplicates) a tournament's standings on re-sync", async () => {
+    await clearTournamentData();
+    const today = new Date().toISOString();
+    const makeFetch = (deckId: string) =>
+      vi.fn(async (url: string) => {
+        if (url.includes('/api/tournaments/T9/standings')) {
+          return jsonResponse([
+            {
+              placing: 1,
+              deck: { id: deckId, name: deckId.toUpperCase() },
+              record: { wins: 6, losses: 1, ties: 0 },
+            },
+            {
+              placing: 2,
+              deck: { id: deckId, name: deckId.toUpperCase() },
+              record: { wins: 5, losses: 2, ties: 0 },
+            },
+          ]);
+        }
+        return jsonResponse([{ id: 'T9', name: 'Weekly Online', players: 40, date: today }]);
+      });
+
+    vi.stubGlobal('fetch', makeFetch('first-deck'));
+    expect((await request('/api/meta/sync', { user: USER_A, method: 'POST' })).status).toBe(200);
+
+    vi.stubGlobal('fetch', makeFetch('second-deck'));
+    expect((await request('/api/meta/sync', { user: USER_A, method: 'POST' })).status).toBe(200);
+
+    const rows = await db
+      .select({ archetypeId: schema.tournamentStandings.archetypeId })
+      .from(schema.tournamentStandings);
+    // The second sync fully replaced the first run's standings (2 rows, not 4).
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.archetypeId === 'second-deck')).toBe(true);
+  });
+
+  it('orders lists by relative placing, respects the window, and paginates', async () => {
+    await clearTournamentData();
+    // Placing 2 of 64 (3.1 %) beats placing 1 of 8 (12.5 %).
+    await seedTournament('big', daysAgo(2), 64, [
+      standing('zoro', { placing: 2, playerName: 'Big2', decklist: sampleDecklist }),
+      standing('zoro', { placing: 30, playerName: 'Big30', decklist: sampleDecklist }),
+      standing('zoro', { placing: 5, playerName: 'NoList' }), // no decklist → excluded
+    ]);
+    await seedTournament('small', daysAgo(3), 8, [
+      standing('zoro', { placing: 1, playerName: 'Small1', decklist: sampleDecklist }),
+    ]);
+    await seedTournament('stale', daysAgo(35), 64, [
+      standing('zoro', { placing: 1, playerName: 'TooOld', decklist: sampleDecklist }),
+    ]);
+
+    const page1 = await request('/api/meta/archetypes/zoro/lists?weeks=4&limit=2&offset=0', {
+      user: USER_A,
+    });
+    const body1 = (await page1.json()) as { total: number; lists: { playerName: string }[] };
+    expect(body1.total).toBe(3); // TooOld outside window, NoList has no decklist
+    expect(body1.lists.map((l) => l.playerName)).toEqual(['Big2', 'Small1']);
+
+    const page2 = await request('/api/meta/archetypes/zoro/lists?weeks=4&limit=2&offset=2', {
+      user: USER_A,
+    });
+    const body2 = (await page2.json()) as { lists: { playerName: string }[] };
+    expect(body2.lists.map((l) => l.playerName)).toEqual(['Big30']);
+  });
+
+  it('computes meta-weighted field scores and ranks archetypes by them', async () => {
+    await clearTournamentData();
+    // 2 pilots each → 50 % share for both archetypes.
+    await seedTournament('t-field', daysAgo(1), 4, [
+      standing('aa', { placing: 1 }),
+      standing('aa', { placing: 2 }),
+      standing('bb', { placing: 3 }),
+      standing('bb', { placing: 4 }),
+    ]);
+    await seedMatchups([
+      { deck1: 'aa', deck2: 'bb', winRate: 60 },
+      { deck1: 'bb', deck2: 'aa', winRate: 40 },
+    ]);
+
+    const res = await request('/api/meta/field-analysis?weeks=1', { user: USER_A });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      matchupImportedAt: string | null;
+      archetypes: { archetypeId: string; fieldWinRatePct: number; coveragePct: number }[];
+    };
+    expect(body.matchupImportedAt).not.toBeNull();
+    expect(body.archetypes.map((a) => a.archetypeId)).toEqual(['aa', 'bb']);
+    // aa: (50 % mirror × 50 + 50 % vs bb × 60) / 100 % = 55
+    expect(body.archetypes[0]?.fieldWinRatePct).toBe(55);
+    expect(body.archetypes[1]?.fieldWinRatePct).toBe(45);
+    expect(body.archetypes[0]?.coveragePct).toBe(100);
+  });
+
+  it('serves one archetype analysis with threats, rank and trend', async () => {
+    await clearTournamentData();
+    await seedTournament('t-ana', daysAgo(1), 4, [
+      standing('aa', { placing: 1, decklist: sampleDecklist }),
+      standing('aa', { placing: 2 }),
+      standing('bb', { placing: 3 }),
+      standing('bb', { placing: 4 }),
+    ]);
+    await seedMatchups([
+      { deck1: 'aa', deck2: 'bb', winRate: 40 },
+      { deck1: 'bb', deck2: 'aa', winRate: 60 },
+    ]);
+    // One legacy snapshot row (no archetypeId → matched by name) + one current.
+    await db.insert(schema.metaSnapshots).values([
+      {
+        archetype: 'AA',
+        frequencyPct: 40,
+        winRatePct: 52,
+        wins: 21,
+        losses: 19,
+        playerCount: 12,
+        period: '2026-W20',
+        sourceNote: 'test',
+      },
+      {
+        archetype: 'AA',
+        archetypeId: 'aa',
+        frequencyPct: 50,
+        winRatePct: 55,
+        wins: 22,
+        losses: 18,
+        playerCount: 14,
+        period: '2026-W21',
+        sourceNote: 'test',
+      },
+    ]);
+
+    const res = await request('/api/meta/archetypes/aa/analysis?weeks=1', { user: USER_A });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      archetype: { sharePct: number; playerCount: number };
+      fieldScore: {
+        rank: number;
+        fieldWinRatePct: number;
+        threats: { archetypeId: string }[];
+        freeWins: unknown[];
+      };
+      totalRanked: number;
+      listsAvailable: number;
+      trend: { period: string }[];
+    };
+    expect(body.archetype).toMatchObject({ sharePct: 50, playerCount: 2 });
+    // aa loses to bb (40 %) → bb is the threat, and aa ranks below bb.
+    expect(body.fieldScore.fieldWinRatePct).toBe(45);
+    expect(body.fieldScore.rank).toBe(2);
+    expect(body.fieldScore.threats.map((t) => t.archetypeId)).toEqual(['bb']);
+    expect(body.fieldScore.freeWins).toEqual([]);
+    expect(body.totalRanked).toBe(2);
+    expect(body.listsAvailable).toBe(1);
+    expect(body.trend.map((t) => t.period)).toEqual(['2026-W20', '2026-W21']);
+
+    const missing = await request('/api/meta/archetypes/unknown-deck/analysis', { user: USER_A });
+    expect(missing.status).toBe(404);
+
+    const invalid = await request('/api/meta/archetypes/UPPER_case!/analysis', { user: USER_A });
+    expect(invalid.status).toBe(400);
+  });
+
+  it('lazily seeds the matchup matrix from the bundled CSV and accepts new imports', async () => {
+    await clearTournamentData();
+
+    const first = await request('/api/matchups', { user: USER_A });
+    expect(first.status).toBe(200);
+    const seeded = (await first.json()) as { importedAt: string | null; rows: unknown[] };
+    expect(seeded.importedAt).not.toBeNull();
+    expect(seeded.rows.length).toBeGreaterThan(100); // the bundled TrainerHill export
+
+    const csv = 'deck1,deck2,wins,losses,ties,total,win_rate\naa,bb,30,20,0,50,60\nbad row\n';
+    const imported = await app.request('/api/matchups/import', {
+      method: 'POST',
+      headers: { 'x-test-user': USER_A, 'Content-Type': 'text/csv' },
+      body: csv,
+    });
+    expect(imported.status).toBe(200);
+    expect((await imported.json()) as object).toMatchObject({ imported: 1, skipped: 1 });
+
+    // Reads now serve the newest batch (the tiny import), not the seed.
+    const second = await request('/api/matchups', { user: USER_A });
+    const latest = (await second.json()) as { rows: { deck1: string }[] };
+    expect(latest.rows).toHaveLength(1);
+    expect(latest.rows[0]?.deck1).toBe('aa');
+
+    const badImport = await app.request('/api/matchups/import', {
+      method: 'POST',
+      headers: { 'x-test-user': USER_A, 'Content-Type': 'text/csv' },
+      body: 'not,a,matchup\n1,2,3',
+    });
+    expect(badImport.status).toBe(400);
+  });
+
+  it('requires a session on all drilldown routes', async () => {
+    for (const path of [
+      '/api/meta/field-analysis',
+      '/api/meta/archetypes/zoro/lists',
+      '/api/meta/archetypes/zoro/analysis',
+      '/api/matchups',
+    ]) {
+      const res = await request(path);
+      expect(res.status, path).toBe(401);
+    }
+  });
+
+  it('rejects an oversized CSV body with 413 before parsing', async () => {
+    const big = `deck1,deck2,wins,losses,ties,total,win_rate\n${'a'.repeat(600 * 1024)}`;
+    const res = await app.request('/api/matchups/import', {
+      method: 'POST',
+      headers: { 'x-test-user': USER_B, 'Content-Type': 'text/csv' },
+      body: big,
+    });
+    expect(res.status).toBe(413);
+  });
+
+  it('rate-limits repeated imports per user with 429', async () => {
+    const csv = 'deck1,deck2,wins,losses,ties,total,win_rate\nr1,r2,30,20,0,50,60\n';
+    // A dedicated user so the exhausted budget cannot bleed into other tests.
+    let got429 = false;
+    for (let i = 0; i < 7 && !got429; i++) {
+      const res = await app.request('/api/matchups/import', {
+        method: 'POST',
+        headers: { 'x-test-user': 'rate-limit-user', 'Content-Type': 'text/csv' },
+        body: csv,
+      });
+      if (res.status === 429) got429 = true;
+      else expect(res.status).toBe(200);
+    }
+    expect(got429).toBe(true);
+  });
+});
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,

@@ -4,15 +4,8 @@ import { matchLogParsed, opponentLogs } from '../db/schema.js';
 import type { ApiEnv } from '../middleware/session.js';
 import { analyticsQuerySchema } from '../validation.js';
 import { computeDeckAnalytics } from '../lib/deckAnalytics.js';
+import { windowCutoff } from '../lib/timeWindow.js';
 import { parseId, userOwnsDeck } from './shared.js';
-
-/** YYYY-MM-DD cutoff `weeks` weeks before today (UTC) for the time-window filter. */
-function windowCutoff(weeks: number): string {
-  const now = new Date();
-  const cutoff = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  cutoff.setUTCDate(cutoff.getUTCDate() - weeks * 7);
-  return cutoff.toISOString().slice(0, 10);
-}
 
 /**
  * /api/analytics — read-only deck performance derived from the parsed battle

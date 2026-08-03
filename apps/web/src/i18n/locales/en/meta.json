@@ -16,10 +16,73 @@
       "share": "Share",
       "players": "Players",
       "record": "W-L",
-      "winPct": "Win %"
+      "winPct": "Win %",
+      "fieldScore": "Field score"
     },
+    "fieldScoreHint": "Expected win rate against the current field (meta share × matchup win rate, 4-week window)",
+    "clickHint": "Click for decklists & field analysis",
+    "noSlugHint": "Details available after the next \"Sync Live Meta\"",
     "showTop": "Show top {{count}}",
     "showAll": "Show all {{count}} decks"
+  },
+  "archetypeDetail": {
+    "back": "Back to meta overview",
+    "windowLabel": "Time window",
+    "windowWeeks_one": "{{count}} week",
+    "windowWeeks_other": "{{count}} weeks",
+    "loading": "Loading archetype analysis…",
+    "notInWindow": "No tournament data for this deck in the selected window. Run \"Sync Live Meta\" or widen the window.",
+    "loadError": "Could not load the analysis.",
+    "sample": "{{tournaments}} tournaments · {{players}} players in window",
+    "kpi": {
+      "share": "Meta share",
+      "winRate": "Tournament WR",
+      "players": "Players",
+      "fieldScore": "Field score"
+    },
+    "fieldScore": {
+      "title": "Field performance",
+      "rank": "Rank {{rank}} of {{total}}",
+      "explanation": "Expected win rate against the current tournament field: each opponent's meta share × matchup win rate, the mirror counts as 50 %. Higher = better positioned against the field.",
+      "coverage": "Data coverage: {{pct}} % of the field",
+      "lowCoverage": "Low data coverage — interpret the score with care.",
+      "mirror": "Mirror probability: {{pct}} %",
+      "matchupSource": "Matchup data: TrainerHill · as of {{date}}",
+      "noMatchups": "No matchup data imported — the score rests on the mirror only."
+    },
+    "threats": {
+      "title": "What you must be prepared for",
+      "subtitle": "Opponents weighted by frequency × matchup weakness — common AND bad for you counts double.",
+      "empty": "No reliable negative matchups found in the field.",
+      "freeWinsTitle": "Good matchups",
+      "freeWinsEmpty": "No reliable positive matchups found in the field.",
+      "shareLabel": "{{pct}}% field",
+      "winRateLabel": "{{pct}}% WR",
+      "gamesLabel_one": "{{count}} game",
+      "gamesLabel_other": "{{count}} games"
+    },
+    "trend": {
+      "title": "Trend",
+      "point": "{{share}}% · WR {{winRate}}%",
+      "pointNoWr": "{{share}}%"
+    },
+    "lists": {
+      "title": "Most successful decklists",
+      "of": "{{shown}} of {{total}}",
+      "loadMore": "Load more lists",
+      "loadMoreError": "Loading more failed — please retry.",
+      "loading": "Loading decklists…",
+      "empty": "No published decklists in this window. After the next \"Sync Live Meta\" the tournament lists appear here.",
+      "placing": "Place {{placing}}",
+      "placingUnknown": "Placing unknown",
+      "playersShort": "{{count}} pl.",
+      "by": "by {{player}}",
+      "pokemon": "Pokémon",
+      "trainer": "Trainer",
+      "energy": "Energy",
+      "cardCount": "{{count}} cards",
+      "openTournament": "Open tournament standings"
+    }
   },
   "tournaments": {
     "title": "Recent Tournaments",

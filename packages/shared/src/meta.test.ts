@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { computeMetaSnapshots } from './meta.js';
+import {
+  computeMetaSnapshots,
+  isLikelyOnlineName,
+  normalizeArchetypeId,
+  pruneDecklist,
+} from './meta.js';
 import { isPostRotationPeriod, isoWeekLabel } from './season.js';
 
 const rec = (wins: number, losses: number) => ({ wins, losses, ties: 0 });
@@ -21,7 +26,13 @@ describe('computeMetaSnapshots', () => {
     expect(totalPlayers).toBe(4);
     expect(tournamentCount).toBe(1);
     const char = snapshots.find((s) => s.archetype === 'Charizard');
-    expect(char).toMatchObject({ playerCount: 2, wins: 10, losses: 4, period: '2026-W20' });
+    expect(char).toMatchObject({
+      archetypeId: 'char',
+      playerCount: 2,
+      wins: 10,
+      losses: 4,
+      period: '2026-W20',
+    });
     expect(char?.frequencyPct).toBe(50); // 2 of 4
     expect(char?.winRatePct).toBe(71); // 10/14 → 71
   });
@@ -59,6 +70,85 @@ describe('computeMetaSnapshots', () => {
     const { totalPlayers, tournamentCount } = computeMetaSnapshots([[], []], '2026-W20', 'test');
     expect(totalPlayers).toBe(0);
     expect(tournamentCount).toBe(0);
+  });
+});
+
+describe('normalizeArchetypeId', () => {
+  it('keeps clean slugs, lowercases, and caps the length', () => {
+    expect(normalizeArchetypeId('n-zoroark')).toBe('n-zoroark');
+    expect(normalizeArchetypeId('Dragapult-Dusknoir')).toBe('dragapult-dusknoir');
+    expect(normalizeArchetypeId('a'.repeat(200))).toBe('a'.repeat(80));
+  });
+
+  it('collapses missing or hostile ids to "other"', () => {
+    expect(normalizeArchetypeId(undefined)).toBe('other');
+    expect(normalizeArchetypeId('')).toBe('other');
+    expect(normalizeArchetypeId('-leading-dash')).toBe('other');
+    expect(normalizeArchetypeId('<script>alert(1)</script>')).toBe('other');
+    expect(normalizeArchetypeId('a b c')).toBe('other');
+  });
+});
+
+describe('pruneDecklist', () => {
+  it('keeps only known fields and clamps counts', () => {
+    const pruned = pruneDecklist({
+      pokemon: [{ name: 'Zoroark ex', count: 3.9, set: 'SVI', number: 42, junk: 'x' }],
+      trainer: [{ name: 'Ultra Ball', count: 400 }],
+      energy: [{ name: 'Dark Energy', count: 8 }],
+      evil: 'dropped',
+    });
+    expect(pruned).toEqual({
+      pokemon: [{ name: 'Zoroark ex', count: 3, set: 'SVI', number: '42' }],
+      trainer: [{ name: 'Ultra Ball', count: 60 }],
+      energy: [{ name: 'Dark Energy', count: 8 }],
+    });
+  });
+
+  it('drops malformed entries (bad types, empty names, non-positive counts)', () => {
+    const pruned = pruneDecklist({
+      pokemon: [
+        { name: '', count: 2 },
+        { name: 'Ok', count: 0 },
+        { name: 'Ok', count: Number.NaN },
+        'not-an-object',
+        null,
+        { name: 'Kept', count: 1 },
+      ],
+      trainer: 'not-an-array',
+      energy: [],
+    });
+    expect(pruned).toEqual({ pokemon: [{ name: 'Kept', count: 1 }], trainer: [], energy: [] });
+  });
+
+  it('caps entry counts and string lengths against bloated payloads', () => {
+    const pruned = pruneDecklist({
+      pokemon: Array.from({ length: 500 }, (_, i) => ({
+        name: `Card ${i} ${'x'.repeat(500)}`,
+        count: 1,
+        set: 'y'.repeat(500),
+      })),
+      trainer: [],
+      energy: [],
+    });
+    expect(pruned?.pokemon).toHaveLength(60);
+    expect(pruned?.pokemon[0]?.name.length).toBe(200);
+    expect(pruned?.pokemon[0]?.set?.length).toBe(40);
+  });
+
+  it('returns null for non-object roots and empty lists', () => {
+    expect(pruneDecklist(null)).toBeNull();
+    expect(pruneDecklist('a string')).toBeNull();
+    expect(pruneDecklist(42)).toBeNull();
+    expect(pruneDecklist({ pokemon: [], trainer: [], energy: [] })).toBeNull();
+    expect(pruneDecklist({})).toBeNull();
+  });
+});
+
+describe('isLikelyOnlineName', () => {
+  it('flags typical online-event names and passes in-person ones', () => {
+    expect(isLikelyOnlineName('Late Night Weekly #58')).toBe(true);
+    expect(isLikelyOnlineName('PTCGL Grand Open')).toBe(true);
+    expect(isLikelyOnlineName('Regional Championship Stuttgart')).toBe(false);
   });
 });
 

@@ -117,6 +117,9 @@ export type {
 export interface MetaSnapshot {
   id?: number;
   archetype: string;
+  /** Limitless deck id (slug) — the drilldown join key. Null on rows synced
+   *  before the column existed; the next sync backfills it. */
+  archetypeId: string | null;
   frequencyPct: number; // 0–100
   /** Tournament win rate 0–100. `null` means every game in the sample ended in a tie
    *  or the archetype had no recorded decisive games — it does NOT imply 50%. */

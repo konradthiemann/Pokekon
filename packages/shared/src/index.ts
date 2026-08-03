@@ -5,3 +5,5 @@ export * from './analytics.js';
 export * from './battleAnalysis.js';
 export * from './season.js';
 export * from './meta.js';
+export * from './fieldWinRate.js';
+export * from './matchupCsv.js';

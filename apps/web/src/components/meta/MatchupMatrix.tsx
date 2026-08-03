@@ -1,11 +1,14 @@
 /**
  * Displays a head-to-head win-rate matrix for the current Standard meta.
- * Data is loaded from /public/matchup-matrix.csv at runtime via fetch().
- * To update: replace public/matchup-matrix.csv with a new TrainerHill export.
+ * Data comes from GET /api/matchups (the latest imported TrainerHill batch;
+ * the server lazily seeds it from the CSV bundled with the API). To update:
+ * POST a fresh TrainerHill export to /api/matchups/import.
  */
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, RefreshCw } from 'lucide-react';
+import { MIN_MATCHUP_GAMES, type MatchupRow } from '@pokekon/shared';
+import { getMatchups } from '../../lib/api';
 import { PokemonIcon } from '../shared/PokemonIcon';
 
 // G-regulation decks rotated out April 10 2026 — exclude from display
@@ -13,47 +16,9 @@ const EXCLUDED_SLUGS = new Set(['gardevoir-ex-sv', 'gholdengo-lunatone']);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface MatchupEntry {
-  deck1: string;
-  deck2: string;
-  wins: number;
-  losses: number;
-  ties: number;
-  total: number;
-  winRate: number;
-}
-
-type MatchupMatrix = Record<string, Record<string, MatchupEntry>>;
+type MatchupMatrix = Record<string, Record<string, MatchupRow>>;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Parses RAW_CSV into typed MatchupEntry objects.
- * Expected format: header row (`deck1,deck2,wins,losses,ties,total,win_rate`)
- * followed by one data row per matchup pair; columns map directly to MatchupEntry
- * fields. Malformed rows (missing columns or non-numeric values) will silently
- * produce 0 for numeric fields rather than throwing — bad data will appear as
- * greyed-out cells due to the MIN_GAMES_FOR_COLOR threshold.
- */
-function parseCsv(csv: string): MatchupEntry[] {
-  return csv
-    .trim()
-    .split('\n')
-    .slice(1) // skip header
-    .filter((line) => line.trim() && line.includes(','))
-    .map((line) => {
-      const [deck1, deck2, wins, losses, ties, total, win_rate] = line.split(',');
-      return {
-        deck1,
-        deck2,
-        wins: Number(wins),
-        losses: Number(losses),
-        ties: Number(ties),
-        total: Number(total),
-        winRate: Number(win_rate),
-      };
-    });
-}
 
 /**
  * Converts a kebab-case slug into a title-cased display name for row/column labels
@@ -68,7 +33,9 @@ function formatDeckName(slug: string): string {
     .join(' ');
 }
 
-const MIN_GAMES_FOR_COLOR = 10;
+// The same "sample too small" threshold the field-score coverage uses — one
+// shared constant so matrix greying and score coverage can never drift apart.
+const MIN_GAMES_FOR_COLOR = MIN_MATCHUP_GAMES;
 
 function cellStyle(winRate: number, total: number): string {
   if (total < MIN_GAMES_FOR_COLOR) return 'bg-slate-100 text-slate-400';
@@ -89,44 +56,44 @@ export function MatchupMatrix() {
   const { t } = useTranslation('meta');
   const [minGames, setMinGames] = useState<number>(10);
   const [labelsOpen, setLabelsOpen] = useState(false);
-  const [csvText, setCsvText] = useState<string | null>(null);
-  const [csvDate, setCsvDate] = useState('2026-04-17');
+  const [entries, setEntries] = useState<MatchupRow[] | null>(null);
+  const [dataDate, setDataDate] = useState<string>('—');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
 
-  const fetchCsv = useCallback(() => {
-    fetch('/matchup-matrix.csv')
-      .then(async (r) => {
-        const lastMod = r.headers.get('Last-Modified');
-        if (lastMod) {
-          const d = new Date(lastMod);
-          if (!isNaN(d.getTime())) setCsvDate(d.toISOString().slice(0, 10));
-        }
-        return r.text();
-      })
-      .then((text) => {
-        setCsvText(text);
+  // Guards against overlapping requests (e.g. a quick double reload): only the
+  // most recently started fetch may write state.
+  const [fetchSeq, setFetchSeq] = useState(0);
+
+  const fetchData = useCallback(() => {
+    let cancelled = false;
+    getMatchups()
+      .then((data) => {
+        if (cancelled) return;
+        setEntries(data.rows);
+        if (data.importedAt) setDataDate(data.importedAt.slice(0, 10));
         setLoading(false);
       })
       .catch(() => {
+        if (cancelled) return;
         setFetchError(true);
         setLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const loadCsv = () => {
+  const loadData = () => {
     setLoading(true);
     setFetchError(false);
-    fetchCsv();
+    setFetchSeq((n) => n + 1);
   };
 
-  useEffect(() => {
-    fetchCsv();
-  }, [fetchCsv]);
+  useEffect(() => fetchData(), [fetchData, fetchSeq]);
 
   const { decks, matrix } = useMemo(() => {
-    if (!csvText) return { decks: [], matrix: {} as MatchupMatrix };
-    const entries = parseCsv(csvText);
+    if (!entries) return { decks: [], matrix: {} as MatchupMatrix };
     const deckSet = new Set<string>();
     entries.forEach((e) => {
       deckSet.add(e.deck1);
@@ -146,7 +113,7 @@ export function MatchupMatrix() {
     });
 
     return { decks, matrix };
-  }, [csvText]);
+  }, [entries]);
 
   if (loading) {
     return (
@@ -161,7 +128,7 @@ export function MatchupMatrix() {
     return (
       <div className="-m-4 py-12 flex flex-col items-center gap-3 text-sm">
         <p className="text-slate-600 font-semibold">{t('matchupMatrix.loadError')}</p>
-        <button onClick={loadCsv} className="btn-ghost text-xs">
+        <button onClick={loadData} className="btn-ghost text-xs">
           <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> {t('retry', { ns: 'common' })}
         </button>
       </div>
@@ -339,9 +306,9 @@ export function MatchupMatrix() {
       </div>
 
       <div className="px-4 py-2 text-xs text-slate-500 font-semibold border-t border-slate-200 flex items-center gap-3">
-        <span>{t('matchupMatrix.source', { date: csvDate })}</span>
+        <span>{t('matchupMatrix.source', { date: dataDate })}</span>
         <button
-          onClick={loadCsv}
+          onClick={loadData}
           className="ml-auto text-slate-400 hover:text-brand-700 transition-colors"
           title={t('matchupMatrix.reload')}
           aria-label={t('matchupMatrix.reload')}
