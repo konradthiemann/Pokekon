@@ -17,7 +17,7 @@
     "@fontsource-variable/nunito": "^5.2.7",
     "@pokekon/shared": "*",
     "@tanstack/react-query": "^5.99.0",
-    "better-auth": "^1.6.16",
+    "better-auth": "^1.6.25",
     "dexie": "^4.4.2",
     "i18next": "^26.3.1",
     "i18next-browser-languagedetector": "^8.2.1",
