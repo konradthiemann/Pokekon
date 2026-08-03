@@ -15,6 +15,7 @@ import {
   Grid3X3,
   Globe,
   AlertCircle,
+  FlaskConical,
 } from 'lucide-react';
 import type { RecentTournament } from '../types';
 import {
@@ -26,6 +27,7 @@ import {
 import { ArchetypeDetail } from '../components/meta/ArchetypeDetail';
 import { MetaWindowControl } from '../components/meta/MetaWindowControl';
 import { META_DEFAULT_DAYS } from '../components/meta/metaWindow';
+import { PredictionPanel } from '../components/meta/PredictionPanel';
 import { MatchupMatrix } from '../components/meta/MatchupMatrix';
 import { WinRateBadge } from '../components/meta/WinRateBadge';
 import { CollapsibleSection } from '../components/layout/CollapsibleSection';
@@ -623,6 +625,14 @@ export function MetaPage() {
           ) : (
             <MetaTable archetypes={archetypes} onSelect={setSelected} />
           )}
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title={t('prediction.title')}
+          icon={<FlaskConical className="w-4 h-4 text-brand-700" />}
+          defaultOpen
+        >
+          <PredictionPanel archetypes={archetypes} />
         </CollapsibleSection>
       </div>
 

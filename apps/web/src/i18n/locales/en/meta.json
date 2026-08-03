@@ -12,8 +12,25 @@
     "onlineBo1Hint": "Only online tournaments played Bo1 Swiss (ground-truth from Limitless: isOnline + Swiss mode) — the best proxy for local Bo1 Challenges & Cups. Turn off to include every recorded tournament (online + in-person, mixed format).",
     "sample": "{{tournaments}} tournaments · {{players}} players in window",
     "noData": "No data yet — run \"Sync Live Meta\".",
-    "scopeOnline": "Basis: online Bo1 tournaments only, ground-truth classified (isOnline + Swiss mode) — Bo1 Swiss like local Challenges/Cups. Structurally grounded, not empirically proven.",
-    "scopeAll": "Basis: all recorded tournaments (online + in-person, mixed Bo1/Bo3 format)."
+    "scopeOnline": "Based on online Bo1 tournaments only, ground-truth classified (isOnline + Swiss mode) — Bo1 Swiss like local Challenges/Cups. Structurally grounded, not empirically proven.",
+    "scopeAll": "Based on all recorded tournaments (online + in-person, mixed Bo1/Bo3 format)."
+  },
+  "prediction": {
+    "title": "Prediction — your local meta",
+    "intro": "Build the field you expect at your local (Bo1) event — e.g. seeded from the online meta and adjusted. The prediction computes each deck's expected win rate against exactly that field (same formula as the field analysis).",
+    "fieldTitle": "Your local field",
+    "seed": "Seed from online meta",
+    "clear": "Clear",
+    "empty": "No decks yet. \"Seed from online meta\" or add them manually below.",
+    "weightLabel": "Weight for {{archetype}}",
+    "remove": "Remove {{archetype}}",
+    "addPlaceholder": "Add a deck…",
+    "add": "Add",
+    "loading": "Loading matchup data…",
+    "noResult": "Give at least one deck a weight > 0 to compute the prediction.",
+    "rankingTitle": "Best decks in your field",
+    "rankingHint": "Expected win rate against your local field (share × matchup WR, mirror = 50%). Click a deck for details.",
+    "coverage": "{{pct}}% coverage"
   },
   "metaTable": {
     "empty": "No meta data yet. Click \"Sync Live Meta\" in the sidebar.",
@@ -57,7 +74,7 @@
       "coverage": "Data coverage: {{pct}} % of the field",
       "lowCoverage": "Low data coverage — interpret the score with care.",
       "mirror": "Mirror probability: {{pct}} %",
-      "matchupSource": "Matchup data: TrainerHill · as of {{date}}",
+      "matchupSource": "Matchup data: TrainerHill · as of {{date}} · mixed Bo1/Bo3 format, treat as approximate",
       "noMatchups": "No matchup data imported — the score rests on the mirror only."
     },
     "threats": {

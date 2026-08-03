@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { ShieldAlert, Sparkles } from 'lucide-react';
-import type { WeightedMatchup } from '@pokekon/shared';
-import type { ArchetypeAnalysis } from '../../lib/api';
+import type { FieldScore, WeightedMatchup } from '@pokekon/shared';
 import { PokemonIcon } from '../shared/PokemonIcon';
 import { WinRateBadge } from './WinRateBadge';
 
@@ -44,9 +43,9 @@ function WeightedMatchupRow({
  * "What you must be prepared for": opponents weighted by frequency × matchup
  * weakness (threats) and the good matchups (free wins), heaviest weight first.
  */
-export function ThreatsPanel({ analysis }: { analysis: ArchetypeAnalysis }) {
+export function ThreatsPanel({ fieldScore }: { fieldScore: FieldScore }) {
   const { t } = useTranslation('meta');
-  const { threats, freeWins } = analysis.fieldScore;
+  const { threats, freeWins } = fieldScore;
   const maxWeight = Math.max(
     ...threats.map((m) => m.weightPct),
     ...freeWins.map((m) => m.weightPct),

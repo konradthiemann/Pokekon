@@ -15,6 +15,23 @@
     "scopeOnline": "Basis: reine Online-Bo1-Turniere, Ground-Truth-klassifiziert (isOnline + Swiss-Modus) — Bo1-Swiss wie in lokalen Challenges/Cups. Strukturell begründet, empirisch nicht bewiesen.",
     "scopeAll": "Basis: alle erfassten Turniere (Online + Präsenz, gemischtes Bo1/Bo3-Format)."
   },
+  "prediction": {
+    "title": "Prediction — deine lokale Meta",
+    "intro": "Stelle das Feld zusammen, das du bei deinem lokalen (Bo1-)Turnier erwartest — z. B. aus der Online-Meta vorbefüllt und angepasst. Die Prediction berechnet für jedes Deck die erwartete Win-Rate gegen genau dieses Feld (dieselbe Formel wie die Feld-Analyse).",
+    "fieldTitle": "Dein lokales Feld",
+    "seed": "Aus Online-Meta vorbefüllen",
+    "clear": "Leeren",
+    "empty": "Noch keine Decks. \"Aus Online-Meta vorbefüllen\" oder unten manuell hinzufügen.",
+    "weightLabel": "Gewicht für {{archetype}}",
+    "remove": "{{archetype}} entfernen",
+    "addPlaceholder": "Deck hinzufügen…",
+    "add": "Hinzufügen",
+    "loading": "Lade Matchup-Daten…",
+    "noResult": "Gib mindestens einem Deck ein Gewicht > 0, um die Prediction zu berechnen.",
+    "rankingTitle": "Beste Decks in deinem Feld",
+    "rankingHint": "Erwartete Win-Rate gegen dein lokales Feld (Anteil × Matchup-WR, Mirror = 50 %). Klicke ein Deck für Details.",
+    "coverage": "{{pct}} % Deckung"
+  },
   "metaTable": {
     "empty": "Noch keine Meta-Daten. Klicke in der Sidebar auf \"Sync Live Meta\".",
     "loadError": "Meta-Analyse konnte nicht geladen werden.",
@@ -57,7 +74,7 @@
       "coverage": "Datenabdeckung: {{pct}} % des Felds",
       "lowCoverage": "Geringe Datenabdeckung — Score vorsichtig interpretieren.",
       "mirror": "Mirror-Wahrscheinlichkeit: {{pct}} %",
-      "matchupSource": "Matchup-Daten: TrainerHill · Stand {{date}}",
+      "matchupSource": "Matchup-Daten: TrainerHill · Stand {{date}} · gemischtes Bo1/Bo3-Format, als Näherung",
       "noMatchups": "Keine Matchup-Daten importiert — der Score basiert nur auf dem Mirror."
     },
     "threats": {

@@ -257,8 +257,12 @@ export function ArchetypeDetail({
           <TrendChips analysis={analysis} />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <FieldScorePanel analysis={analysis} />
-            <ThreatsPanel analysis={analysis} />
+            <FieldScorePanel
+              fieldScore={analysis.fieldScore}
+              totalRanked={analysis.totalRanked}
+              matchupImportedAt={analysis.matchupImportedAt}
+            />
+            <ThreatsPanel fieldScore={analysis.fieldScore} />
           </div>
 
           {/* Decklists */}
