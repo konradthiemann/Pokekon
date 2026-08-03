@@ -141,6 +141,10 @@ export async function runMetaSync(
   // The list endpoint lacks isOnline/phases, so classify each candidate via its
   // /details payload and keep the online Bo1-Swiss ones. `maxProbes` bounds the
   // extra requests; `maxTournaments` bounds how many events we ingest.
+  // NOTE: requests are sequential with no inter-request delay. If Limitless ever
+  // rate-limits by IP, a failed probe/standings fetch just falls through to the
+  // catch (fewer events, never a crash) — add a delay / Retry-After handling if
+  // that becomes an issue in practice.
   const selected: { t: LimitlessTournament; classification: TournamentClassification }[] = [];
   let probes = 0;
   for (const t of candidates) {

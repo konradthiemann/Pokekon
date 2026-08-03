@@ -81,7 +81,10 @@ export function PredictionPanel({ archetypes }: PredictionPanelProps) {
       ),
     );
 
-  const remove = (id: string) => update(field.filter((e) => e.archetypeId !== id));
+  const remove = (id: string) => {
+    update(field.filter((e) => e.archetypeId !== id));
+    setSelectedId((prev) => (prev === id ? null : prev));
+  };
 
   const clear = () => {
     update([]);

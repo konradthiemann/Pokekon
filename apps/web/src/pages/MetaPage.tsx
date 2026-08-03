@@ -473,9 +473,7 @@ function RecentTournaments() {
 
 export function MetaPage() {
   const { t } = useTranslation('meta');
-  const { metaSnapshots, syncMeta, isSyncing, syncProgress, syncError, lastSynced } =
-    useDashboardStore();
-  const sourceNote = metaSnapshots[0]?.sourceNote;
+  const { syncMeta, isSyncing, syncProgress, syncError, lastSynced } = useDashboardStore();
   const [selected, setSelected] = useState<ArchetypeSelection | null>(null);
 
   // Meta window (days back + online Bo1-Swiss scope). Drives BOTH the overview
@@ -485,29 +483,33 @@ export function MetaPage() {
   const [onlineBo1, setOnlineBo1] = useState(true);
   const metaWindow: MetaWindow = { days, online: onlineBo1, bo1: onlineBo1 };
 
-  const [fieldAnalysis, setFieldAnalysis] = useState<FieldAnalysis | null>(null);
-  const [fieldError, setFieldError] = useState(false);
-
   // The overview table IS the day-window field analysis (share, win rate, record
   // and meta-weighted field score per archetype), so the day/online controls
-  // genuinely drive the metashare. Refetched on window change and after each sync.
+  // genuinely drive the metashare. The result is tagged with the request key it
+  // answers (window + last sync) so switching windows shows a loading state
+  // rather than stale data — and no setState runs synchronously in the effect.
+  const [loaded, setLoaded] = useState<{ key: string; data: FieldAnalysis } | null>(null);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
+    const key = `${days}|${onlineBo1}|${lastSynced?.getTime() ?? 0}`;
     getFieldAnalysis({ days, online: onlineBo1, bo1: onlineBo1 })
       .then((res) => {
-        if (cancelled) return;
-        setFieldAnalysis(res);
-        setFieldError(false);
+        if (!cancelled) setLoaded({ key, data: res });
       })
       .catch(() => {
-        if (cancelled) return;
-        setFieldAnalysis(null);
-        setFieldError(true);
+        if (!cancelled) setFailedKey(key);
       });
     return () => {
       cancelled = true;
     };
-  }, [days, onlineBo1, metaSnapshots]);
+  }, [days, onlineBo1, lastSynced]);
+
+  const requestKey = `${days}|${onlineBo1}|${lastSynced?.getTime() ?? 0}`;
+  const fieldAnalysis = loaded?.key === requestKey ? loaded.data : null;
+  const fieldError = failedKey === requestKey;
+  const isLoadingField = fieldAnalysis === null && !fieldError;
 
   // The "Sync Live Meta" action also lives in the desktop sidebar, but that is
   // hidden on mobile (`md:flex`) — so the meta page carries its own copy,
@@ -586,13 +588,16 @@ export function MetaPage() {
           onDaysChange={setDays}
           onOnlineBo1Change={setOnlineBo1}
         />
-        <span className="text-xs text-slate-500">
+        <span className="flex items-center gap-1.5 text-xs text-slate-500">
+          {isLoadingField && <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />}
           {fieldAnalysis
             ? t('window.sample', {
                 tournaments: fieldAnalysis.tournamentCount,
                 players: fieldAnalysis.totalPlayers,
               })
-            : t('window.noData')}
+            : isLoadingField
+              ? t('window.loading')
+              : t('window.noData')}
         </span>
       </div>
       <p className="-mt-4 text-[11px] leading-snug text-slate-400">
@@ -615,12 +620,16 @@ export function MetaPage() {
               : t('page.tournamentMeta')
           }
           icon={<TrendingUp className="w-4 h-4 text-brand-700" />}
-          rightSlot={sourceNote && <span className="text-xs text-slate-500">{sourceNote}</span>}
           defaultOpen
         >
           {fieldError ? (
             <div className="-m-4 py-16 text-center text-sm text-slate-500">
               {t('metaTable.loadError')}
+            </div>
+          ) : isLoadingField && archetypes.length === 0 ? (
+            <div className="-m-4 flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
+              <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
+              {t('metaTable.loading')}
             </div>
           ) : (
             <MetaTable archetypes={archetypes} onSelect={setSelected} />

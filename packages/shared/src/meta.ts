@@ -124,8 +124,11 @@ export function isLikelyOnlineName(name: string): boolean {
   );
 }
 
-/** Swiss-phase match format of a tournament (BO1 for most online events). */
-export type SwissMode = 'BO1' | 'BO3' | 'OTHER';
+/** Swiss-phase match format of a tournament (BO1 for most online events). The
+ *  single source of truth for the mode enum — apps/api's schema imports these
+ *  values for the swiss_mode column, so the DB enum and this type can't drift. */
+export const SWISS_MODE_VALUES = ['BO1', 'BO3', 'OTHER'] as const;
+export type SwissMode = (typeof SWISS_MODE_VALUES)[number];
 
 /** Ground-truth classification of a tournament, from the Limitless `/details`
  *  endpoint. The tournament LIST endpoint does not carry these fields, so this
@@ -139,10 +142,15 @@ export interface TournamentClassification {
 }
 
 const MAX_PLATFORM_LENGTH = 40;
+/** A real tournament has a handful of phases; more (or a huge type string) is a
+ *  malformed or hostile response, so cap both before any string work. */
+const MAX_PHASES = 20;
+const MAX_PHASE_TYPE_LENGTH = 100;
 
 function normalizeSwissMode(raw: unknown): SwissMode | null {
   if (typeof raw !== 'string') return null;
-  const mode = raw.trim().toUpperCase();
+  // Slice before trim/upper so a pathological multi-MB string can't blow up.
+  const mode = raw.slice(0, 20).trim().toUpperCase();
   if (mode === '') return null;
   if (mode === 'BO1') return 'BO1';
   if (mode === 'BO3') return 'BO3';
@@ -173,12 +181,14 @@ export function classifyTournamentDetails(raw: unknown): TournamentClassificatio
 
   let swissMode: SwissMode | null = null;
   if (Array.isArray(obj.phases)) {
-    const phases = obj.phases.filter(
-      (p): p is Record<string, unknown> => typeof p === 'object' && p !== null,
-    );
-    const swissPhase =
-      phases.find((p) => typeof p.type === 'string' && p.type.toUpperCase().includes('SWISS')) ??
-      phases[0];
+    const phases = obj.phases
+      .slice(0, MAX_PHASES)
+      .filter((p): p is Record<string, unknown> => typeof p === 'object' && p !== null);
+    const isSwiss = (p: Record<string, unknown>): boolean =>
+      typeof p.type === 'string' &&
+      p.type.length <= MAX_PHASE_TYPE_LENGTH &&
+      p.type.toUpperCase().includes('SWISS');
+    const swissPhase = phases.find(isSwiss) ?? phases[0];
     if (swissPhase) swissMode = normalizeSwissMode(swissPhase.mode);
   }
 

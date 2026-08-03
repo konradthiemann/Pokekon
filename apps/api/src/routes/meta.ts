@@ -47,7 +47,9 @@ export interface MetaWindow {
 
 /** Conditions for the tournaments join: date range + optional online/Bo1 scope.
  *  With online+bo1 on (the default), only ground-truth online Bo1-Swiss events
- *  count — the metashare and win rate then mirror local Challenge/Cup play. */
+ *  count — the metashare and win rate then mirror local Challenge/Cup play.
+ *  The date condition is unconditional, so the array is never empty and
+ *  `and(...windowConditions(w))` can never collapse to an unfiltered query. */
 function windowConditions({ days, online, bo1 }: MetaWindow) {
   const conds = [gte(tournaments.date, windowStartDays(days))];
   if (online) conds.push(eq(tournaments.isOnline, true));
@@ -307,8 +309,9 @@ export function createMetaRoutes(): Hono<ApiEnv> {
             ...windowConditions({ days, online, bo1 }),
           ),
         ),
-      // Weekly share/WR trend from the snapshots. Legacy rows (synced before the
-      // archetype_id column existed) are matched by display name as a fallback.
+      // Weekly share/WR trend from the snapshots — always all-history since
+      // rotation, deliberately NOT filtered by the day window (it is a time
+      // series). Legacy rows (synced before archetype_id existed) match by name.
       db
         .select({
           period: metaSnapshots.period,

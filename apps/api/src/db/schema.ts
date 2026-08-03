@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
   pgTable,
   text,
@@ -11,7 +11,9 @@ import {
   real,
   jsonb,
   date,
+  check,
 } from 'drizzle-orm/pg-core';
+import { SWISS_MODE_VALUES } from '@pokekon/shared';
 import type { ParsedTurn, PrizePoint, TournamentDecklist } from '@pokekon/shared';
 
 export const user = pgTable('user', {
@@ -125,16 +127,12 @@ export const eventTypeValues = ['LC', 'LCup', 'Regional', 'Worlds', 'Online'] as
 export const matchResultValues = ['W', 'L', 'T'] as const;
 /** LLM analysis providers. GitHub Models is the default; further adapters can be added later. */
 export const aiProviderValues = ['github-models'] as const;
-/** Swiss-phase match format, read from the Limitless `/details` `phases[].mode`.
- *  'OTHER' = a mode we do not model; null (column-level) = unknown / not fetched. */
-export const swissModeValues = ['BO1', 'BO3', 'OTHER'] as const;
 
 export type CardType = (typeof cardTypeValues)[number];
 export type CardRole = (typeof cardRoleValues)[number];
 export type AiProvider = (typeof aiProviderValues)[number];
 export type EventType = (typeof eventTypeValues)[number];
 export type MatchResult = (typeof matchResultValues)[number];
-export type SwissMode = (typeof swissModeValues)[number];
 
 /** Shape of a single card entry inside a snapshot's jsonb payload. */
 export interface SnapshotCard {
@@ -279,13 +277,18 @@ export const tournaments = pgTable(
     // online-Bo1 meta reads filter on `isOnline = true AND swissMode = 'BO1'`.
     isOnline: boolean('is_online').notNull().default(false),
     platform: text('platform'), // e.g. "PTCGL"; null when unknown
-    swissMode: text('swiss_mode', { enum: swissModeValues }), // BO1/BO3/OTHER; null when unknown
+    swissMode: text('swiss_mode', { enum: SWISS_MODE_VALUES }), // BO1/BO3/OTHER; null when unknown
     fetchedAt: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('tournaments_date_idx').on(table.date),
-    // Supports the online-Bo1 window filter (isOnline + swissMode, ranged by date).
+    // Supports the online-Bo1 window filter. Date is heap-filtered on top; a
+    // covering (is_online, swiss_mode, date) index would only matter at a much
+    // larger scale than this dataset.
     index('tournaments_online_bo1_idx').on(table.isOnline, table.swissMode),
+    // Defence-in-depth: classifyTournamentDetails already constrains swiss_mode,
+    // but the DB enforces the enum too (NULL passes — the column is nullable).
+    check('tournaments_swiss_mode_chk', sql`${table.swissMode} in ('BO1', 'BO3', 'OTHER')`),
   ],
 );
 

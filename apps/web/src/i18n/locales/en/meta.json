@@ -12,6 +12,7 @@
     "onlineBo1Hint": "Only online tournaments played Bo1 Swiss (ground-truth from Limitless: isOnline + Swiss mode) — the best proxy for local Bo1 Challenges & Cups. Turn off to include every recorded tournament (online + in-person, mixed format).",
     "sample": "{{tournaments}} tournaments · {{players}} players in window",
     "noData": "No data yet — run \"Sync Live Meta\".",
+    "loading": "Loading…",
     "scopeOnline": "Based on online Bo1 tournaments only, ground-truth classified (isOnline + Swiss mode) — Bo1 Swiss like local Challenges/Cups. Structurally grounded, not empirically proven.",
     "scopeAll": "Based on all recorded tournaments (online + in-person, mixed Bo1/Bo3 format)."
   },
@@ -35,6 +36,7 @@
   "metaTable": {
     "empty": "No meta data yet. Click \"Sync Live Meta\" in the sidebar.",
     "loadError": "Could not load the meta analysis.",
+    "loading": "Loading meta analysis…",
     "showNames": "Show names",
     "hideNames": "Hide names",
     "names": "Names",

@@ -207,6 +207,14 @@ describe('classifyTournamentDetails', () => {
       isOnline: false,
       platform: 'x'.repeat(40),
     });
+    // A pathological phases array is bounded and long type strings are guarded,
+    // but the first phase's mode still classifies.
+    expect(
+      classifyTournamentDetails({
+        isOnline: true,
+        phases: Array.from({ length: 1000 }, () => ({ type: 'x'.repeat(1000), mode: 'BO1' })),
+      }).swissMode,
+    ).toBe('BO1');
   });
 });
 
