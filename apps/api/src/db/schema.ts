@@ -125,12 +125,16 @@ export const eventTypeValues = ['LC', 'LCup', 'Regional', 'Worlds', 'Online'] as
 export const matchResultValues = ['W', 'L', 'T'] as const;
 /** LLM analysis providers. GitHub Models is the default; further adapters can be added later. */
 export const aiProviderValues = ['github-models'] as const;
+/** Swiss-phase match format, read from the Limitless `/details` `phases[].mode`.
+ *  'OTHER' = a mode we do not model; null (column-level) = unknown / not fetched. */
+export const swissModeValues = ['BO1', 'BO3', 'OTHER'] as const;
 
 export type CardType = (typeof cardTypeValues)[number];
 export type CardRole = (typeof cardRoleValues)[number];
 export type AiProvider = (typeof aiProviderValues)[number];
 export type EventType = (typeof eventTypeValues)[number];
 export type MatchResult = (typeof matchResultValues)[number];
+export type SwissMode = (typeof swissModeValues)[number];
 
 /** Shape of a single card entry inside a snapshot's jsonb payload. */
 export interface SnapshotCard {
@@ -269,12 +273,20 @@ export const tournaments = pgTable(
     date: timestamp('date', { withTimezone: true }).notNull(),
     players: integer('players').notNull(),
     format: text('format').notNull().default('standard'),
-    // Written by the sync (name heuristic) but not consumed by the drilldown
-    // routes yet — reserved for a future online/offline field filter.
+    // Ground-truth classification from the Limitless `/details` endpoint. `isOnline`
+    // keeps a non-null default for legacy rows and the name-heuristic fallback (when a
+    // `/details` fetch fails); `platform`/`swissMode` are nullable = unknown. The
+    // online-Bo1 meta reads filter on `isOnline = true AND swissMode = 'BO1'`.
     isOnline: boolean('is_online').notNull().default(false),
+    platform: text('platform'), // e.g. "PTCGL"; null when unknown
+    swissMode: text('swiss_mode', { enum: swissModeValues }), // BO1/BO3/OTHER; null when unknown
     fetchedAt: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index('tournaments_date_idx').on(table.date)],
+  (table) => [
+    index('tournaments_date_idx').on(table.date),
+    // Supports the online-Bo1 window filter (isOnline + swissMode, ranged by date).
+    index('tournaments_online_bo1_idx').on(table.isOnline, table.swissMode),
+  ],
 );
 
 export const tournamentStandings = pgTable(

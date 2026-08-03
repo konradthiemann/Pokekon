@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  classifyTournamentDetails,
   computeMetaSnapshots,
   isLikelyOnlineName,
   normalizeArchetypeId,
@@ -149,6 +150,63 @@ describe('isLikelyOnlineName', () => {
     expect(isLikelyOnlineName('Late Night Weekly #58')).toBe(true);
     expect(isLikelyOnlineName('PTCGL Grand Open')).toBe(true);
     expect(isLikelyOnlineName('Regional Championship Stuttgart')).toBe(false);
+  });
+});
+
+describe('classifyTournamentDetails', () => {
+  it('reads the real isOnline, platform and Swiss-phase mode', () => {
+    expect(
+      classifyTournamentDetails({
+        isOnline: true,
+        platform: 'PTCGL',
+        phases: [
+          { phase: 1, type: 'SWISS', rounds: 8, mode: 'BO1' },
+          { phase: 2, type: 'SINGLE_BRACKET', rounds: null, mode: 'BO3' },
+        ],
+      }),
+    ).toEqual({ isOnline: true, platform: 'PTCGL', swissMode: 'BO1' });
+  });
+
+  it('marks in-person Bo3 events (isOnline false, swiss BO3)', () => {
+    expect(
+      classifyTournamentDetails({
+        isOnline: false,
+        platform: null,
+        phases: [{ type: 'SWISS', mode: 'BO3' }],
+      }),
+    ).toEqual({ isOnline: false, platform: null, swissMode: 'BO3' });
+  });
+
+  it('prefers the SWISS phase even when it is not first, and normalises case', () => {
+    expect(
+      classifyTournamentDetails({
+        isOnline: true,
+        phases: [
+          { type: 'single_bracket', mode: 'bo3' },
+          { type: 'swiss', mode: 'bo1' },
+        ],
+      }),
+    ).toMatchObject({ swissMode: 'BO1' });
+  });
+
+  it('maps unknown modes to OTHER and missing phases to null', () => {
+    expect(classifyTournamentDetails({ isOnline: true, phases: [{ mode: 'BO5' }] }).swissMode).toBe(
+      'OTHER',
+    );
+    expect(classifyTournamentDetails({ isOnline: true }).swissMode).toBeNull();
+    expect(classifyTournamentDetails({ isOnline: true, phases: [] }).swissMode).toBeNull();
+  });
+
+  it('is defensive: non-objects, wrong types and hostile payloads collapse safely', () => {
+    const empty = { isOnline: false, platform: null, swissMode: null };
+    expect(classifyTournamentDetails(null)).toEqual(empty);
+    expect(classifyTournamentDetails('online')).toEqual(empty);
+    expect(classifyTournamentDetails({ isOnline: 'true', phases: 'nope' })).toEqual(empty);
+    // platform is length-capped; isOnline only true for a real boolean true.
+    expect(classifyTournamentDetails({ isOnline: 1, platform: 'x'.repeat(100) })).toMatchObject({
+      isOnline: false,
+      platform: 'x'.repeat(40),
+    });
   });
 });
 

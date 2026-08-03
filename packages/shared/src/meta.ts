@@ -124,6 +124,67 @@ export function isLikelyOnlineName(name: string): boolean {
   );
 }
 
+/** Swiss-phase match format of a tournament (BO1 for most online events). */
+export type SwissMode = 'BO1' | 'BO3' | 'OTHER';
+
+/** Ground-truth classification of a tournament, from the Limitless `/details`
+ *  endpoint. The tournament LIST endpoint does not carry these fields, so this
+ *  is the only reliable way to tell an online Bo1-Swiss event from an in-person
+ *  Bo3 one (the name heuristic in `isLikelyOnlineName` is a lossy fallback). */
+export interface TournamentClassification {
+  isOnline: boolean;
+  platform: string | null;
+  /** Mode of the Swiss phase; null when no phase data is present. */
+  swissMode: SwissMode | null;
+}
+
+const MAX_PLATFORM_LENGTH = 40;
+
+function normalizeSwissMode(raw: unknown): SwissMode | null {
+  if (typeof raw !== 'string') return null;
+  const mode = raw.trim().toUpperCase();
+  if (mode === '') return null;
+  if (mode === 'BO1') return 'BO1';
+  if (mode === 'BO3') return 'BO3';
+  return 'OTHER';
+}
+
+/**
+ * Classify an untrusted Limitless `/details` payload into
+ * `{ isOnline, platform, swissMode }`. Reads the real `isOnline` boolean, the
+ * `platform` string and the `mode` of the Swiss phase (the phase explicitly
+ * typed `SWISS`, else the first phase — the online norm is Swiss first, a
+ * single-elimination top cut second). Defensive against hostile/malformed
+ * responses: unknown shapes collapse to `{ isOnline:false, platform:null,
+ * swissMode:null }`, strings are length-capped, so a bad payload can neither
+ * bloat the database nor smuggle an unexpected value into the meta reads.
+ */
+export function classifyTournamentDetails(raw: unknown): TournamentClassification {
+  const empty: TournamentClassification = { isOnline: false, platform: null, swissMode: null };
+  if (typeof raw !== 'object' || raw === null) return empty;
+  const obj = raw as Record<string, unknown>;
+
+  const isOnline = obj.isOnline === true;
+
+  let platform: string | null = null;
+  if (typeof obj.platform === 'string' && obj.platform.trim() !== '') {
+    platform = obj.platform.slice(0, MAX_PLATFORM_LENGTH);
+  }
+
+  let swissMode: SwissMode | null = null;
+  if (Array.isArray(obj.phases)) {
+    const phases = obj.phases.filter(
+      (p): p is Record<string, unknown> => typeof p === 'object' && p !== null,
+    );
+    const swissPhase =
+      phases.find((p) => typeof p.type === 'string' && p.type.toUpperCase().includes('SWISS')) ??
+      phases[0];
+    if (swissPhase) swissMode = normalizeSwissMode(swissPhase.mode);
+  }
+
+  return { isOnline, platform, swissMode };
+}
+
 /** Summary of a meta sync run. */
 export interface MetaSyncResult {
   archetypes: number;
