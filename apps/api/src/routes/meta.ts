@@ -281,9 +281,14 @@ export function createMetaRoutes(): Hono<ApiEnv> {
       const result = await runMetaSync(c.get('db'));
       return c.json(result);
     } catch (err) {
-      // Upstream fetch errors ("Limitless … → HTTP 503") are actionable for the
-      // user; anything else (e.g. database driver errors) stays server-side (L2).
       console.error('[meta] sync failed:', err);
+      // A Limitless rate-limit (429) is transient and self-resolving: report it as
+      // a 429 with a calm retry hint (the client localises status 429) instead of
+      // a scary 502 carrying a raw upstream URL. Other upstream fetch errors stay
+      // actionable; anything else (e.g. a DB driver error) stays server-side (L2).
+      if (err instanceof Error && err.message.includes('429')) {
+        return c.json({ error: 'Meta sync is rate-limited right now — try again shortly.' }, 429);
+      }
       const message =
         err instanceof Error && err.message.startsWith('Limitless')
           ? err.message

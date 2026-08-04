@@ -1066,6 +1066,22 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
     expect(all.find((t) => t.id === 'tfail')).toBeUndefined();
   });
 
+  it('surfaces a Limitless rate-limit as a 429 with a calm message, not a 502', async () => {
+    await clearTournamentData();
+    // Every Limitless call 429s; after the client's retries the list fetch throws.
+    // A fresh user id keeps this off the per-user sync rate-limit budget.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ error: 'rate limited' }, 429)),
+    );
+    const res = await request('/api/meta/sync', { user: 'user-c-ratelimit', method: 'POST' });
+    expect(res.status).toBe(429);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/rate-limited|try again/i);
+    // The raw upstream URL must not leak into the user-facing message.
+    expect(body.error).not.toContain('Limitless /api');
+  });
+
   it('computes and stores the own matchup matrix from round pairings', async () => {
     await clearTournamentData();
     const today = new Date().toISOString();
