@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { resolveArchetypeSprites, spriteForPokemon, SPRITE_BASE } from './pokemonSprites';
+import { resolveArchetypeSprites, SPRITE_BASES } from './pokemonSprites';
 
 type Pair = [string, string?];
 
@@ -7,17 +7,24 @@ type Pair = [string, string?];
 
 const SIZE_PX: Record<'sm' | 'md', number> = { sm: 24, md: 40 };
 
+/**
+ * Renders one Pokémon sprite, cascading through SPRITE_BASES on load error:
+ * Limitless' CDN first (has every current archetype's icons incl. mega/new
+ * forms and matches the data-driven deck.icons), then the pokesprite mirror,
+ * then nothing (the parent renders a Pokéball only when no slug resolved at all).
+ * Callers pass `key={name}` so a new slug remounts and restarts the cascade.
+ */
 function SpriteImg({ name, px }: { name: string; px: number }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) return null;
+  const [baseIdx, setBaseIdx] = useState(0);
+  if (baseIdx >= SPRITE_BASES.length) return null;
   return (
     <img
-      src={`${SPRITE_BASE}/${name}.png`}
+      src={`${SPRITE_BASES[baseIdx]}/${name}.png`}
       alt=""
       width={px}
       height={px}
       className="object-contain shrink-0"
-      onError={() => setFailed(true)}
+      onError={() => setBaseIdx((i) => i + 1)}
       loading="lazy"
     />
   );
@@ -74,10 +81,10 @@ export function PokemonIcon({
 }: PokemonIconProps) {
   const px = SIZE_PX[size];
   // Data-driven icons (from Limitless) take precedence; fall back to the map.
-  const dataPair: Pair | undefined =
-    icons && icons.length > 0
-      ? [spriteForPokemon(icons[0]), icons[1] ? spriteForPokemon(icons[1]) : undefined]
-      : undefined;
+  // Data-driven icons ARE Limitless deck.icons slugs already (pruned server-side),
+  // so use them verbatim — they resolve on the Limitless CDN (first cascade base)
+  // directly. Only the name-based fallback needs the pokesprite-form remapping.
+  const dataPair: Pair | undefined = icons && icons.length > 0 ? [icons[0], icons[1]] : undefined;
   const pair = dataPair ?? resolveArchetypeSprites(archetype);
 
   if (!pair) {
@@ -95,8 +102,8 @@ export function PokemonIcon({
 
   return (
     <span className={`inline-flex items-center gap-0.5 shrink-0 ${className}`}>
-      <SpriteImg name={primary} px={px} />
-      {dual && secondary && <SpriteImg name={secondary} px={px} />}
+      <SpriteImg key={primary} name={primary} px={px} />
+      {dual && secondary && <SpriteImg key={secondary} name={secondary} px={px} />}
       {dual && !secondary && reserveSecondary && (
         <span style={{ width: px, height: px, display: 'inline-block' }} />
       )}

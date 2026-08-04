@@ -1,5 +1,16 @@
-const SPRITE_BASE =
-  'https://raw.githubusercontent.com/bradley-erickson/pokesprite/master/pokemon/regular';
+// Sprite sources, tried in order until one loads (see SpriteImg cascade).
+//  1. Limitless' OWN icon CDN — matches the data-driven `deck.icons` slugs
+//     exactly and carries mega/newest forms (excadrill-mega, dipplin, thwackey…)
+//     that the pokesprite mirror lacks. This is why data-driven icons "just work"
+//     for every current archetype and update automatically as the meta shifts.
+//  2. pokesprite mirror — fallback for pokesprite-style slugs in the hand-
+//     maintained map (e.g. ogerpon-teal-mask, slowking-galar) that Limitless
+//     serves under a plainer name.
+// A slug on neither source falls through to the Pokéball glyph.
+const SPRITE_BASES = [
+  'https://r2.limitlesstcg.net/pokemon/gen9',
+  'https://raw.githubusercontent.com/bradley-erickson/pokesprite/master/pokemon/regular',
+] as const;
 
 type Pair = [string, string?];
 
@@ -167,4 +178,4 @@ export function spriteForPokemon(name: string): string {
   return pokemonToSprite(name);
 }
 
-export { resolve as resolveArchetypeSprites, SPRITE_BASE };
+export { resolve as resolveArchetypeSprites, SPRITE_BASES };
