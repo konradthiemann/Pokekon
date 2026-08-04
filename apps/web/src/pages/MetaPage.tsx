@@ -30,6 +30,7 @@ import { META_DEFAULT_DAYS } from '../components/meta/metaWindow';
 import { PredictionPanel } from '../components/meta/PredictionPanel';
 import { MatchupMatrix } from '../components/meta/MatchupMatrix';
 import { WinRateBadge } from '../components/meta/WinRateBadge';
+import { winRatePct1 } from '../components/meta/winRateColor';
 import { CollapsibleSection } from '../components/layout/CollapsibleSection';
 import { PokemonIcon } from '../components/shared/PokemonIcon';
 
@@ -258,7 +259,7 @@ function MetaTable({
                         {a.wins}-{a.losses}
                       </td>
                       <td className="px-3 py-1.5 text-right">
-                        <WinRateBadge pct={a.winRatePct} />
+                        <WinRateBadge pct={winRatePct1(a.wins, a.losses)} />
                       </td>
                       <td className="px-3 py-1.5 text-right whitespace-nowrap">
                         {a.fieldWinRatePct !== null ? (

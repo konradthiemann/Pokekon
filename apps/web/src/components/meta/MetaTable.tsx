@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronRight } from 'lucide-react';
 import type { ArchetypeStats } from '../../types';
 import { PokemonIcon } from '../shared/PokemonIcon';
+import { winRatePct1 } from './winRateColor';
 
 interface Props {
   stats: ArchetypeStats[];
@@ -18,7 +19,7 @@ function WinRateBadge({ rate, encounters }: { rate: number | null; encounters: n
   if (encounters < 5) {
     return (
       <span className="text-slate-500 font-bold">
-        {rate}%{' '}
+        {rate.toFixed(1)}%{' '}
         <span className="text-slate-400 font-medium">
           {t('myMatchups.sampleSize', { count: encounters })}
         </span>
@@ -26,7 +27,7 @@ function WinRateBadge({ rate, encounters }: { rate: number | null; encounters: n
     );
   }
   const color = rate >= 60 ? 'text-emerald-700' : rate >= 40 ? 'text-amber-700' : 'text-red-700';
-  return <span className={`font-bold ${color}`}>{rate}%</span>;
+  return <span className={`font-bold ${color}`}>{rate.toFixed(1)}%</span>;
 }
 
 export function MetaTable({ stats }: Props) {
@@ -150,7 +151,7 @@ export function MetaTable({ stats }: Props) {
                     {s.ties || '—'}
                   </td>
                   <td className="px-4 py-2.5 text-right">
-                    <WinRateBadge rate={s.winRate} encounters={s.encounters} />
+                    <WinRateBadge rate={winRatePct1(s.wins, s.losses)} encounters={s.encounters} />
                   </td>
                 </tr>
               ))}

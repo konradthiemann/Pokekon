@@ -16,7 +16,7 @@ import { MatchupTable } from './MatchupTable';
 import { MetaWindowControl } from './MetaWindowControl';
 import { ThreatsPanel } from './ThreatsPanel';
 import { WinRateBadge } from './WinRateBadge';
-import { winRateColorClass } from './winRateColor';
+import { winRateColorClass, winRatePct1 } from './winRateColor';
 
 const LISTS_PAGE_SIZE = 4;
 
@@ -227,7 +227,9 @@ export function ArchetypeDetail({
             <div className="card p-3">
               <p className="text-xs text-slate-500">{t('archetypeDetail.kpi.winRate')}</p>
               <p className="text-xl font-extrabold tabular-nums">
-                <WinRateBadge pct={analysis.archetype.winRatePct} />
+                <WinRateBadge
+                  pct={winRatePct1(analysis.archetype.wins, analysis.archetype.losses)}
+                />
               </p>
             </div>
             <div className="card p-3">
