@@ -39,10 +39,23 @@ Electric `#f59e0b`, Psychic `#d946ef` (deepen for chart bars so each clears ~3:1
 
 ## Component classes
 
-- `.card` — white, `slate-200` border, `rounded-2xl`, `shadow-card`.
+- `.card` — white, `slate-200` border, `rounded-lg` (was `rounded-2xl`), `shadow-card`.
 - `.btn` / `.btn-primary` (blue gradient, white text) / `.btn-ghost` — ≥44px tall.
-- `.badge-win` / `.badge-loss` / `.badge-tie` / `.badge-lc` / `.badge-lcup` — soft pills, dark text.
+- `.badge-win` / `.badge-loss` / `.badge-tie` / `.badge-lc` / `.badge-lcup` — squared pills (`rounded-md`), dark text.
 - `.input` — white field, `slate-300` border, brand focus ring.
+
+## Analytical/angular style shift (2026-08)
+
+The UI has moved slightly toward a "data panel" aesthetic while keeping the playful Poké-Light palette and all WCAG-AA guarantees:
+
+| Element | Before | After | Effect |
+|---------|--------|--------|--------|
+| Card radius | `rounded-2xl` | `rounded-lg` | Squarer corners read more "analytics app" |
+| `shadow-card` | subtle blue-tinted bloom | flat slate tint — `0 1px 2px rgba(15,23,42,0.06), 0 4px 12px -6px rgba(15,23,42,0.10)` | Crisper, less glossy lift |
+| Badges | `rounded-full` pills | `rounded-md` | More compact, more angular |
+| Metric numbers | default kerning | `tabular-nums` (via `.stat-value`) | Digits lock to a fixed grid; columns stay aligned on rerender |
+
+No dark utilities were reintroduced. WCAG-AA contrast ratios remain unchanged.
 
 ## Accessibility baseline (WCAG 2.2 AA)
 

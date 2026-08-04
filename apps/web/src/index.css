@@ -45,9 +45,11 @@
 }
 
 @layer components {
-  /* ── Card — a white "TCG card" floating on the playmat ─────────────────── */
+  /* ── Card — a crisp data panel on the playmat ──────────────────────────── */
+  /* Squarer corners (rounded-lg, was 2xl) read more "analytics/finance app"
+     than the earlier playful look — a small, deliberate angular shift. */
   .card {
-    @apply bg-white border border-slate-200 rounded-2xl p-4 shadow-card;
+    @apply bg-white border border-slate-200 rounded-lg p-4 shadow-card;
   }
 
   /* Eyebrow label inside a card */
@@ -55,14 +57,15 @@
     @apply text-[11px] font-extrabold text-slate-500 uppercase tracking-widest mb-3;
   }
 
-  /* Large metric number */
+  /* Large metric number — tabular figures so columns of numbers align (a core
+     trait of number-heavy trading/finance UIs). */
   .stat-value {
-    @apply text-3xl font-black text-slate-900 tracking-tight;
+    @apply text-3xl font-black text-slate-900 tracking-tight tabular-nums;
   }
 
-  /* ── Badges — friendly pills, dark text on a soft tint ─────────────────── */
+  /* ── Badges — compact chips, dark text on a soft tint (squared, not pills) ── */
   .badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold;
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold;
   }
   .badge-win {
     @apply badge bg-emerald-100 text-emerald-800 px-2.5 py-1;
@@ -80,10 +83,10 @@
     @apply badge bg-purple-100 text-purple-800;
   }
 
-  /* ── Buttons — chunky, rounded, easy to hit (≥44px tall) ───────────────── */
+  /* ── Buttons — crisp, easy to hit (≥44px tall) ─────────────────────────── */
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px]
-      rounded-xl text-sm font-bold transition-all;
+      rounded-lg text-sm font-bold transition-all;
   }
   .btn-primary {
     @apply btn text-white shadow-pop hover:-translate-y-0.5 active:translate-y-0
@@ -100,7 +103,7 @@
 
   /* ── Form controls ─────────────────────────────────────────────────────── */
   .input {
-    @apply w-full rounded-xl bg-white border border-slate-300 px-3 py-2.5 text-sm
+    @apply w-full rounded-md bg-white border border-slate-300 px-3 py-2.5 text-sm
       text-slate-900 placeholder:text-slate-400
       focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none transition-colors;
   }

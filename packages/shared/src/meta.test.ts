@@ -5,8 +5,9 @@ import {
   isLikelyOnlineName,
   normalizeArchetypeId,
   pruneDecklist,
+  pruneIcons,
 } from './meta.js';
-import { isPostRotationPeriod, isoWeekLabel } from './season.js';
+import { isPostRotationPeriod, isoWeekBounds, isoWeekLabel } from './season.js';
 
 const rec = (wins: number, losses: number) => ({ wins, losses, ties: 0 });
 
@@ -71,6 +72,37 @@ describe('computeMetaSnapshots', () => {
     const { totalPlayers, tournamentCount } = computeMetaSnapshots([[], []], '2026-W20', 'test');
     expect(totalPlayers).toBe(0);
     expect(tournamentCount).toBe(0);
+  });
+
+  it('captures the archetype icons from the first pilot that carries them', () => {
+    const { snapshots } = computeMetaSnapshots(
+      [
+        [
+          { deck: { id: 'gf', name: 'Grimmsnarl Froslass' }, record: rec(2, 2) }, // no icons
+          {
+            deck: { id: 'gf', name: 'Grimmsnarl Froslass', icons: ['Grimmsnarl', 'froslass'] },
+            record: rec(3, 1),
+          },
+        ],
+      ],
+      '2026-W20',
+      'test',
+    );
+    expect(snapshots[0]?.icons).toEqual(['grimmsnarl', 'froslass']);
+  });
+});
+
+describe('pruneIcons', () => {
+  it('lowercases valid sprite slugs and caps the count', () => {
+    expect(pruneIcons(['Dragapult', 'dusknoir'])).toEqual(['dragapult', 'dusknoir']);
+    expect(pruneIcons(['ogerpon-teal-mask'])).toEqual(['ogerpon-teal-mask']);
+    expect(pruneIcons(['a', 'b', 'c', 'd', 'e', 'f'])).toEqual(['a', 'b', 'c', 'd']); // MAX_ICONS
+  });
+
+  it('drops non-strings, empties and non-slug values', () => {
+    expect(pruneIcons(['ok', 42, null, '', '  ', '<script>'])).toEqual(['ok']);
+    expect(pruneIcons('not-an-array')).toEqual([]);
+    expect(pruneIcons(undefined)).toEqual([]);
   });
 });
 
@@ -223,5 +255,16 @@ describe('season helpers', () => {
     expect(isoWeekLabel(new Date('2026-04-09T12:00:00Z'))).toMatch(/^2026-W\d{2}$/);
     expect(isPostRotationPeriod('2026-W20')).toBe(true);
     expect(isPostRotationPeriod('2026-W10')).toBe(false);
+  });
+
+  it('bounds an ISO week from Monday 00:00 UTC to the next Monday', () => {
+    // 2026-08-05 is a Wednesday; its ISO week runs Mon 2026-08-03 .. Mon 2026-08-10.
+    const { start, end } = isoWeekBounds(new Date('2026-08-05T14:30:00Z'));
+    expect(start.toISOString()).toBe('2026-08-03T00:00:00.000Z');
+    expect(end.toISOString()).toBe('2026-08-10T00:00:00.000Z');
+    // A Sunday still maps to the same week (Sunday = ISO day 7, not a new week).
+    expect(isoWeekBounds(new Date('2026-08-09T23:00:00Z')).start.toISOString()).toBe(
+      '2026-08-03T00:00:00.000Z',
+    );
   });
 });

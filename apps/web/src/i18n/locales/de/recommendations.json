@@ -68,29 +68,10 @@
       "reasoningDeclining": "\"{{bestLabel}}\" → {{bestWr}}% WR ({{bestGames}}). \"{{worstLabel}}\" → {{worstWr}}% WR ({{worstGames}}). Deine letzten Änderungen haben dieses Matchup womöglich verschlechtert."
     },
     "tech": {
-      "suggestion": "1× {{card}} hinzufügen",
+      "suggestion": "Matchup gegen {{archetype}} verbessern",
       "reasoning": "Deine Bilanz gegen {{archetype}}: {{wins}}S/{{losses}}N ({{winRate}}% WR in {{games}}).",
       "localNote": "Das ist ein wichtiges lokales Matchup.",
-      "reasons": {
-        "dragapultEx": "Handkarten-Disruption (Regulation H) verlangsamt Dragapults Aufbau; reduziert die gegnerische Hand im Midgame.",
-        "dragapultBlaziken": "Stört die Energie-Beschleunigung von Blaziken, bevor sie ins Rollen kommt.",
-        "dragapultDusknoir": "Setzt die gegnerische Hand auf wenige Karten zurück, bevor Dusknoirs Fähigkeiten-Kette aktiv wird.",
-        "nsZoroark": "Erledigt Zorua auf der Bank, bevor es sich entwickelt, und kappt so die Zieh-Engine.",
-        "lucarioHariyama": "Stört Bank und Hand, um Lucarios aggressives Early Game zu bremsen.",
-        "alakazamDudunsparce": "Entwickelt Alakazam zurück zu Abra und entfernt damit die Fähigkeiten-Engine.",
-        "starmieFroslass": "Handkarten-Disruption durchbricht den Aufbau-Loop von Starmie / Froslass.",
-        "cynthiasGarchompEx": "Reduziert die Handgröße, bevor Garchomps Fähigkeiten-Kette aktiv wird.",
-        "rocketsMewtwo": "Handkarten-Disruption verhindert den Aufbau der Mewtwo-Angriffskette.",
-        "ogerponMeganium": "Stört die Meganium-Bank und verhindert die Energie-Beschleunigung für Ogerpon.",
-        "ragingBoltOgerpon": "Reduziert den Schaden durch Raging Bolts starke Angriffe.",
-        "ragingBoltEx": "Reduziert den Schaden von Raging Bolts Ancient-Angriffen.",
-        "grimmsnarlFroslass": "Entwickelt Grimmsnarl zurück und unterbricht fähigkeitsbasierte Strategien, bevor sie greifen.",
-        "rocketsHonchkrow": "Handkarten-Disruption stört Honchkrows Aufbau, bevor es angreift.",
-        "okidogiBarbaracle": "Hand-Reset stört Barbaracles Lock-Strategie von Beginn an.",
-        "megaVenusaur": "Bank-Schaden schaltet die Unterstützer-Pokémon aus, die Mega Venusaur ermöglichen.",
-        "greninja": "Handkarten-Disruption verlangsamt Greninjas Aufbau-Kette.",
-        "slowking": "Entwickelt Slowking zurück und unterbricht fähigkeitsbasierte Stall-Strategien."
-      }
+      "dataHint": "Statt einer geratenen Tech-Karte: Gleiche deine Liste im Listen-Vergleich mit den erfolgreichsten Listen deines Archetyps ab (deck-fit-sicher, da gleiche Shell) — so siehst du datenbelegt, welche Karten Top-Piloten spielen und dir fehlen."
     },
     "zeroWin": {
       "suggestion": "Matchup gegen {{archetype}} recherchieren",

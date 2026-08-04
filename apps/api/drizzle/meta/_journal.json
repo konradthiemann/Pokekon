@@ -57,6 +57,13 @@
       "when": 1785769607148,
       "tag": "0007_wonderful_shadow_king",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785829637419,
+      "tag": "0008_supreme_norman_osborn",
+      "breakpoints": true
     }
   ]
 }

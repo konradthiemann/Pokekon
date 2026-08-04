@@ -35,3 +35,20 @@ export function isoWeekLabel(date: Date): string {
   const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
   return `${d.getUTCFullYear()}-W${week.toString().padStart(2, '0')}`;
 }
+
+/**
+ * UTC date bounds `[start, end)` of the ISO week that contains `date` — Monday
+ * 00:00 UTC to the following Monday. Pairs with `isoWeekLabel` (same ISO week
+ * definition), so the meta sync can recompute exactly one period's snapshots
+ * from the persisted tournaments after a delta import skips already-ingested
+ * events (the fetched subset alone would under-count the period's aggregate).
+ */
+export function isoWeekBounds(date: Date): { start: Date; end: Date } {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const isoDay = d.getUTCDay() || 7; // Sunday (0) → 7, so Monday is day 1
+  const start = new Date(d);
+  start.setUTCDate(d.getUTCDate() - (isoDay - 1));
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 7);
+  return { start, end };
+}

@@ -256,6 +256,16 @@ server cron (plan §6.2) is the next migration step.
 - **Limitless TCG API** — `metaFetch.ts` and `deckComparison.ts` fetch directly,
   falling back to `corsproxy.io` on CORS/HTTP failure. This browser-side path is
   legacy: it moves to a server-side cron job (no CORS proxy needed) per plan §6.2.
+  The sync job (`jobs/syncMeta.ts`) fetches standings **and** `/pairings` per
+  tournament; the round pairings are resolved to per-archetype head-to-heads and
+  stored in `tournament_matchups` — forming an own online-Bo1 matchup matrix.
+  Archetype icons (`deck.icons`) are persisted in `tournament_standings.icons`
+  during sync and surfaced as data-driven sprites throughout the Meta tab.
+- **Matchup matrix** — `GET /api/meta/matchups?days&online&bo1` returns a blended
+  matrix: real online-Bo1 head-to-heads from `tournament_matchups` take precedence
+  over the external TrainerHill CSV wherever there are enough own games; pairs with
+  insufficient own data fall back to TrainerHill. A `matchupSource` breakdown in
+  the response lets the UI flag real vs approximate coverage.
 - **LLM analysis** — now **server-side and provider-agnostic** ([ai/](../apps/api/src/ai/),
   `POST /api/analysis/log`). The default provider is GitHub Models; the per-user
   API key is BYOK, stored encrypted server-side and never in the browser bundle

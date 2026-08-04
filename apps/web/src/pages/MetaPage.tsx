@@ -235,6 +235,7 @@ function MetaTable({
                           <div className="shrink-0 flex items-center" style={{ width: ICON_BOX }}>
                             <PokemonIcon
                               archetype={a.archetypeName}
+                              icons={a.icons}
                               size="sm"
                               dual
                               reserveSecondary
@@ -537,6 +538,12 @@ export function MetaPage() {
   }
 
   const archetypes = fieldAnalysis?.archetypes ?? [];
+  // Data-driven archetype icons (Limitless deck.icons), keyed by slug — shared
+  // with the matchup matrix so every deck renders the icons the source publishes.
+  // `icons` is additive: an API that predates it (rollout window) or legacy
+  // snapshot rows omit it, so guard with optional chaining — never crash the tab.
+  const iconsById: Record<string, string[]> = {};
+  for (const a of archetypes) if (a.icons?.length) iconsById[a.archetypeId] = a.icons;
 
   return (
     <div className="space-y-6">
@@ -610,7 +617,7 @@ export function MetaPage() {
           icon={<Grid3X3 className="w-4 h-4 text-brand-700" />}
           defaultOpen
         >
-          <MatchupMatrix />
+          <MatchupMatrix window={metaWindow} iconsById={iconsById} />
         </CollapsibleSection>
 
         <CollapsibleSection
@@ -641,7 +648,7 @@ export function MetaPage() {
           icon={<FlaskConical className="w-4 h-4 text-brand-700" />}
           defaultOpen
         >
-          <PredictionPanel archetypes={archetypes} />
+          <PredictionPanel archetypes={archetypes} window={metaWindow} />
         </CollapsibleSection>
       </div>
 

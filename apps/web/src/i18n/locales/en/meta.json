@@ -31,7 +31,10 @@
     "noResult": "Give at least one deck a weight > 0 to compute the prediction.",
     "rankingTitle": "Best decks in your field",
     "rankingHint": "Expected win rate against your local field (share × matchup WR, mirror = 50%). Click a deck for details.",
-    "coverage": "{{pct}}% coverage"
+    "coverage": "{{pct}}% coverage",
+    "listsTitle": "Best lists for {{deck}}",
+    "listsHint": "This deck's most successful tournament lists in the window — a build template against your local field.",
+    "listsEmpty": "No published lists for this deck in the window yet."
   },
   "metaTable": {
     "empty": "No meta data yet. Click \"Sync Live Meta\" in the sidebar.",
@@ -90,6 +93,14 @@
       "gamesLabel_one": "{{count}} game",
       "gamesLabel_other": "{{count}} games"
     },
+    "matchupTable": {
+      "title": "Matchups vs the field",
+      "subtitle": "Real head-to-head win rate of this archetype against every deck in the field — favorable on top, unfavorable at the bottom.",
+      "deck": "Opponent",
+      "winRate": "Matchup WR",
+      "sample": "Games",
+      "share": "Field share"
+    },
     "trend": {
       "title": "Trend",
       "point": "{{share}}% · WR {{winRate}}%",
@@ -142,6 +153,7 @@
     "gamesShort": "{{count}}g",
     "cellTooltip": "{{row}} vs {{col}}: {{winRate}}% · {{wins}}W-{{losses}}L-{{ties}}T",
     "source": "Source: TrainerHill.com · {{date}} · Cells show win rate from row deck's perspective",
+    "sourceBlend": "Real data: {{ownGames}} online-Bo1 matches ({{ownPairs}} pairings) · {{fallback}} pairings via TrainerHill (approx.) · win rate from row deck's perspective",
     "reload": "Reload data"
   },
   "metaShareChart": {

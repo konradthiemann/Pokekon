@@ -1,7 +1,8 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MapPin, X, Plus } from 'lucide-react';
+import { MapPin, X } from 'lucide-react';
 import { useDashboardStore } from '../../store/dashboardStore';
+import { toArchetypeSlug } from '../../constants/archetypes';
+import { ArchetypePicker } from '../shared/ArchetypePicker';
 import { SidePanel } from './SidePanel';
 
 // Suggested archetypes for quick-add (based on current meta)
@@ -21,7 +22,6 @@ const QUICK_ADD = [
 export function LocalMetaPanel() {
   const { t } = useTranslation('deck');
   const { localMeta, setLocalMeta, archetypeStats } = useDashboardStore();
-  const [input, setInput] = useState('');
 
   const metaArchetypes = archetypeStats.map((a) => a.archetype);
   const allOptions = [...new Set([...QUICK_ADD, ...metaArchetypes])].filter(
@@ -32,7 +32,6 @@ export function LocalMetaPanel() {
     const trimmed = arch.trim();
     if (!trimmed || localMeta.includes(trimmed)) return;
     setLocalMeta([...localMeta, trimmed]);
-    setInput('');
   };
 
   const remove = (arch: string) => setLocalMeta(localMeta.filter((a) => a !== arch));
@@ -65,31 +64,13 @@ export function LocalMetaPanel() {
           </div>
         )}
 
-        {/* Add input */}
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && add(input)}
-            placeholder={t('localMeta.placeholder')}
-            list="arch-suggestions"
-            className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
-          />
-          <datalist id="arch-suggestions">
-            {allOptions.map((a) => (
-              <option key={a} value={a} />
-            ))}
-          </datalist>
-          <button
-            onClick={() => add(input)}
-            disabled={!input.trim()}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-200 transition-colors disabled:opacity-40"
-          >
-            <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-            {t('localMeta.add')}
-          </button>
-        </div>
+        {/* Add via picker — a menu, not free text (no typos, no slug guessing) */}
+        <ArchetypePicker
+          onSelect={(a) => add(a.name)}
+          extra={metaArchetypes.map((name) => ({ slug: toArchetypeSlug(name), name }))}
+          placeholder={t('localMeta.placeholder')}
+          ariaLabel={t('localMeta.add')}
+        />
 
         {/* Quick-add chips */}
         {localMeta.length < 8 && allOptions.length > 0 && (

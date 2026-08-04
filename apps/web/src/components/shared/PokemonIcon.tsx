@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { resolveArchetypeSprites, SPRITE_BASE } from './pokemonSprites';
+import { resolveArchetypeSprites, spriteForPokemon, SPRITE_BASE } from './pokemonSprites';
+
+type Pair = [string, string?];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -42,6 +44,13 @@ function Pokeball({ px }: { px: number }) {
 interface PokemonIconProps {
   /** Archetype display name or kebab slug. Apostrophe variants handled automatically. */
   archetype: string;
+  /**
+   * Data-driven Pokémon sprite slugs (Limitless `deck.icons`). When present and
+   * non-empty, these win over the name-based lookup — so the meta always renders
+   * the icons the source actually publishes (fixes wrong/missing archetype icons).
+   * The hand-maintained map remains the fallback for locally-typed archetypes.
+   */
+  icons?: string[];
   /** 'sm' = 24px, 'md' = 40px. Defaults to 'sm'. */
   size?: 'sm' | 'md';
   /** When true, renders the secondary Pokémon sprite alongside the primary. */
@@ -57,13 +66,19 @@ interface PokemonIconProps {
 
 export function PokemonIcon({
   archetype,
+  icons,
   size = 'sm',
   dual = false,
   reserveSecondary = false,
   className = '',
 }: PokemonIconProps) {
   const px = SIZE_PX[size];
-  const pair = resolveArchetypeSprites(archetype);
+  // Data-driven icons (from Limitless) take precedence; fall back to the map.
+  const dataPair: Pair | undefined =
+    icons && icons.length > 0
+      ? [spriteForPokemon(icons[0]), icons[1] ? spriteForPokemon(icons[1]) : undefined]
+      : undefined;
+  const pair = dataPair ?? resolveArchetypeSprites(archetype);
 
   if (!pair) {
     return (

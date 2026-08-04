@@ -1,10 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlaskConical, Plus, Trophy, Wand2, X } from 'lucide-react';
-import { computeFieldScores, type ArchetypeShare, type FieldScore } from '@pokekon/shared';
-import { getMatchups, type FieldAnalysisArchetype, type MatchupData } from '../../lib/api';
+import {
+  computeFieldScores,
+  type ArchetypeShare,
+  type FieldScore,
+  type MatchupRow,
+} from '@pokekon/shared';
+import {
+  getArchetypeLists,
+  getMetaMatchups,
+  type ArchetypeListEntry,
+  type FieldAnalysisArchetype,
+  type MetaWindow,
+} from '../../lib/api';
 import { getLocalMetaField, setLocalMetaField, type LocalFieldEntry } from '../../lib/preferences';
 import { PokemonIcon } from '../shared/PokemonIcon';
+import { DecklistCard } from './DecklistCard';
 import { FieldScorePanel } from './FieldScorePanel';
 import { ThreatsPanel } from './ThreatsPanel';
 import { winRateColorClass } from './winRateColor';
@@ -12,6 +24,8 @@ import { winRateColorClass } from './winRateColor';
 interface PredictionPanelProps {
   /** Current online meta — the option source for the picker and the seed. */
   archetypes: FieldAnalysisArchetype[];
+  /** Active meta window — the matchup matrix and per-deck lists respect it. */
+  window: MetaWindow;
 }
 
 /** Round a share to a readable seed weight (min 1 so nothing drops to zero). */
@@ -25,22 +39,33 @@ const seedWeight = (sharePct: number): number => Math.max(1, Math.round(sharePct
  * client-side arithmetic over the fetched matchup matrix, no server round-trip;
  * the field persists in localStorage like the existing local-meta list.
  */
-export function PredictionPanel({ archetypes }: PredictionPanelProps) {
+export function PredictionPanel({ archetypes, window }: PredictionPanelProps) {
   const { t } = useTranslation('meta');
+  const { days, online, bo1 } = window;
   const [field, setField] = useState<LocalFieldEntry[]>(() => getLocalMetaField());
-  const [matchups, setMatchups] = useState<MatchupData | null>(null);
+  const [matchups, setMatchups] = useState<{
+    rows: MatchupRow[];
+    importedAt: string | null;
+  } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toAdd, setToAdd] = useState('');
 
+  // Real online-Bo1 matchup matrix for the active window (with TrainerHill
+  // fallback), the same source the field analysis uses — so the prediction and
+  // the meta table agree. Refetches when the window changes.
   useEffect(() => {
     let cancelled = false;
-    getMatchups()
-      .then((m) => !cancelled && setMatchups(m))
-      .catch(() => !cancelled && setMatchups({ importedAt: null, rows: [] }));
+    getMetaMatchups({ days, online, bo1 })
+      .then(
+        (m) =>
+          !cancelled &&
+          setMatchups({ rows: m.rows, importedAt: m.matchupSource.trainerHillImportedAt }),
+      )
+      .catch(() => !cancelled && setMatchups({ rows: [], importedAt: null }));
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [days, online, bo1]);
 
   // Persist on every change (mirrors the existing local-meta behaviour).
   const update = (next: LocalFieldEntry[]) => {
@@ -106,6 +131,31 @@ export function PredictionPanel({ archetypes }: PredictionPanelProps) {
   }, [field, totalWeight, matchups]);
 
   const selected = scores.find((s) => s.archetypeId === selectedId) ?? scores[0] ?? null;
+
+  // The selected deck's most successful tournament lists (build templates vs the
+  // field). Keyed by deck+window so a stale deck's lists never flash; all setState
+  // happens in the async resolution (no sync setState in the effect body).
+  const [listsState, setListsState] = useState<{ key: string; lists: ArchetypeListEntry[] } | null>(
+    null,
+  );
+  const selId = selected?.archetypeId ?? null;
+  const listsKey = selId ? `${selId}|${days}|${online}|${bo1}` : '';
+  useEffect(() => {
+    if (!selId) return;
+    let cancelled = false;
+    const key = `${selId}|${days}|${online}|${bo1}`;
+    getArchetypeLists(selId, { days, online, bo1, limit: 3, offset: 0 })
+      .then((r) => {
+        if (!cancelled) setListsState({ key, lists: r.lists });
+      })
+      .catch(() => {
+        if (!cancelled) setListsState({ key, lists: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selId, days, online, bo1]);
+  const lists = listsState?.key === listsKey ? listsState.lists : null;
 
   return (
     <div className="space-y-4">
@@ -248,14 +298,40 @@ export function PredictionPanel({ archetypes }: PredictionPanelProps) {
           </div>
 
           {selected && (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <FieldScorePanel
-                fieldScore={selected}
-                totalRanked={scores.length}
-                matchupImportedAt={matchups.importedAt}
-              />
-              <ThreatsPanel fieldScore={selected} />
-            </div>
+            <>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <FieldScorePanel
+                  fieldScore={selected}
+                  totalRanked={scores.length}
+                  matchupImportedAt={matchups.importedAt}
+                />
+                <ThreatsPanel fieldScore={selected} />
+              </div>
+
+              {/* Build templates: the selected deck's most successful tournament lists */}
+              <div className="space-y-2">
+                <h3 className="card-header mb-0 flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-amber-600" aria-hidden="true" />
+                  {t('prediction.listsTitle', { deck: selected.archetypeName })}
+                </h3>
+                <p className="text-xs text-slate-500">{t('prediction.listsHint')}</p>
+                {lists === null ? (
+                  <p className="py-4 text-center text-xs text-slate-500">
+                    {t('prediction.loading')}
+                  </p>
+                ) : lists.length === 0 ? (
+                  <p className="py-4 text-center text-xs text-slate-500">
+                    {t('prediction.listsEmpty')}
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                    {lists.map((entry) => (
+                      <DecklistCard key={entry.id} entry={entry} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       )}

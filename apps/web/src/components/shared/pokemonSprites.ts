@@ -32,7 +32,10 @@ const ARCHETYPE_SPRITES: Record<string, Pair> = {
   'Ogerpon Box': ['ogerpon-teal-mask', 'ogerpon-wellspring-mask'],
   // Other paired decks (auto-builder handles Ogerpon via POKEMON_FORM below)
   'Flareon Noctowl': ['flareon', 'noctowl'],
-  'Festival Lead': ['ogerpon-teal-mask'],
+  // Festival Lead is a Grass/evolution deck — Limitless icons it as Dipplin + Thwackey
+  // (the old ogerpon-teal-mask mapping was wrong). Data-driven deck.icons override this.
+  'Festival Lead': ['dipplin', 'thwackey'],
+  'Mega Excadrill': ['excadrill-mega'],
   // Possessives
   "Cynthia's Garchomp ex": ['garchomp'],
   "Cynthia's Garchomp": ['garchomp'],
@@ -56,7 +59,7 @@ const SLUG_SPRITES: Record<string, Pair> = {
   'dragapult-dusknoir': ['dragapult', 'dusknoir'],
   'dragapult-ex': ['dragapult'],
   'ethanss-typhlosion': ['typhlosion'],
-  'festival-lead': ['ogerpon-teal-mask'],
+  'festival-lead': ['dipplin', 'thwackey'],
   'flareon-noctowl': ['flareon', 'noctowl'],
   'froslass-munkidori': ['froslass', 'munkidori'],
   'grimmsnarl-froslass': ['grimmsnarl', 'froslass'],
@@ -71,6 +74,7 @@ const SLUG_SPRITES: Record<string, Pair> = {
   'mega-absol-box': ['absol-mega', 'kangaskhan-mega'],
   'mega-charizard-x': ['charizard-mega-x'],
   'mega-dragonite': ['dragonite'],
+  'mega-excadrill': ['excadrill-mega'],
   'mega-lucario': ['lucario-mega'],
   'mega-starmie': ['starmie-mega'],
   'mega-venusaur': ['venusaur-mega'],
@@ -154,6 +158,13 @@ function resolve(archetype: string): Pair | undefined {
   if (SLUG_SPRITES[archetype]) return SLUG_SPRITES[archetype];
   const norm = archetype.replace(/[''ʼʹ]/g, "'");
   return ARCHETYPE_SPRITES[norm] ?? SLUG_SPRITES[norm] ?? autoBuild(archetype);
+}
+
+/** Map a single Pokémon slug (e.g. a Limitless `deck.icons` entry) to its
+ *  competitive sprite filename, applying the form overrides (ogerpon → teal-mask
+ *  etc.). Used by the data-driven icon path in PokemonIcon. */
+export function spriteForPokemon(name: string): string {
+  return pokemonToSprite(name);
 }
 
 export { resolve as resolveArchetypeSprites, SPRITE_BASE };

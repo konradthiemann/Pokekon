@@ -31,7 +31,10 @@
     "noResult": "Gib mindestens einem Deck ein Gewicht > 0, um die Prediction zu berechnen.",
     "rankingTitle": "Beste Decks in deinem Feld",
     "rankingHint": "Erwartete Win-Rate gegen dein lokales Feld (Anteil × Matchup-WR, Mirror = 50 %). Klicke ein Deck für Details.",
-    "coverage": "{{pct}} % Deckung"
+    "coverage": "{{pct}} % Deckung",
+    "listsTitle": "Beste Listen für {{deck}}",
+    "listsHint": "Erfolgreichste Turnierlisten dieses Decks im Fenster — als Bauvorlage gegen dein lokales Feld.",
+    "listsEmpty": "Noch keine veröffentlichten Listen für dieses Deck im Fenster."
   },
   "metaTable": {
     "empty": "Noch keine Meta-Daten. Klicke in der Sidebar auf \"Sync Live Meta\".",
@@ -90,6 +93,14 @@
       "gamesLabel_one": "{{count}} Spiel",
       "gamesLabel_other": "{{count}} Spiele"
     },
+    "matchupTable": {
+      "title": "Matchups gegen das Feld",
+      "subtitle": "Echte Head-to-Head-Winrate dieses Archetyps gegen jedes Deck im Feld — gute oben, schlechte unten.",
+      "deck": "Gegner",
+      "winRate": "Matchup-WR",
+      "sample": "Spiele",
+      "share": "Feld-Anteil"
+    },
     "trend": {
       "title": "Verlauf",
       "point": "{{share}}% · WR {{winRate}}%",
@@ -142,6 +153,7 @@
     "gamesShort": "{{count}}g",
     "cellTooltip": "{{row}} vs {{col}}: {{winRate}}% · {{wins}}W-{{losses}}L-{{ties}}T",
     "source": "Quelle: TrainerHill.com · {{date}} · Zellen zeigen die Winrate aus Sicht des Zeilen-Decks",
+    "sourceBlend": "Echte Daten: {{ownGames}} Online-Bo1-Matches ({{ownPairs}} Paarungen) · {{fallback}} Paarungen via TrainerHill (Näherung) · Winrate aus Sicht des Zeilen-Decks",
     "reload": "Daten neu laden"
   },
   "metaShareChart": {

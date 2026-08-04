@@ -248,6 +248,10 @@ export const metaSnapshots = pgTable(
     wins: integer('wins').notNull(),
     losses: integer('losses').notNull(),
     playerCount: integer('player_count').notNull(),
+    // Pokémon sprite slugs from Limitless `deck.icons` (data-driven archetype
+    // icons); null for rows synced before this column existed — the frontend
+    // falls back to its slug→sprite map then.
+    icons: jsonb('icons').$type<string[]>(),
     period: text('period').notNull(), // ISO week, e.g. "2026-W15"
     sourceNote: text('source_note').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -279,6 +283,11 @@ export const tournaments = pgTable(
     platform: text('platform'), // e.g. "PTCGL"; null when unknown
     swissMode: text('swiss_mode', { enum: SWISS_MODE_VALUES }), // BO1/BO3/OTHER; null when unknown
     fetchedAt: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
+    // When the round pairings were fetched and aggregated into tournament_matchups.
+    // Null = not yet processed → the delta meta sync picks it up; set = already
+    // done → skipped on later runs (a completed tournament is immutable). This is
+    // what lets the sync "only load the missing data".
+    pairingsSyncedAt: timestamp('pairings_synced_at', { withTimezone: true }),
   },
   (table) => [
     index('tournaments_date_idx').on(table.date),
@@ -309,6 +318,9 @@ export const tournamentStandings = pgTable(
     // Published 60-card list (pruned to known fields on ingest); null when the
     // player did not submit one.
     decklist: jsonb('decklist').$type<TournamentDecklist>(),
+    // Pokémon sprite slugs from Limitless `deck.icons` (constant per archetype,
+    // stored per row like archetype_name); null for legacy rows.
+    icons: jsonb('icons').$type<string[]>(),
   },
   (table) => [
     index('tournament_standings_tournamentId_idx').on(table.tournamentId),
@@ -336,6 +348,34 @@ export const matchupMatrix = pgTable(
   (table) => [
     index('matchup_matrix_decks_idx').on(table.deck1, table.deck2),
     index('matchup_matrix_importedAt_idx').on(table.importedAt),
+  ],
+);
+
+// ─── Own matchup matrix (computed from real online-Bo1 round pairings) ────────
+// Aggregated head-to-head per tournament, derived by the meta sync from the
+// Limitless /pairings endpoint (join: pairing username → standings deck). One
+// canonical row per unordered pair per tournament (deckA < deckB); reads sum
+// over the day window and join tournaments for the online/Bo1 filter, so the
+// win rates are ACTUAL online-Bo1 results and — unlike the external TrainerHill
+// matrix — respect the same time window as the metashare. Rows are replaced
+// wholesale when a tournament's pairings are (re)processed.
+
+export const tournamentMatchups = pgTable(
+  'tournament_matchups',
+  {
+    id: serial('id').primaryKey(),
+    tournamentId: text('tournament_id')
+      .notNull()
+      .references(() => tournaments.id, { onDelete: 'cascade' }),
+    deckA: text('deck_a').notNull(), // archetype slug, canonical deckA < deckB
+    deckB: text('deck_b').notNull(),
+    aWins: integer('a_wins').notNull().default(0), // games deckA won vs deckB
+    bWins: integer('b_wins').notNull().default(0),
+    ties: integer('ties').notNull().default(0),
+  },
+  (table) => [
+    index('tournament_matchups_tournamentId_idx').on(table.tournamentId),
+    index('tournament_matchups_decks_idx').on(table.deckA, table.deckB),
   ],
 );
 

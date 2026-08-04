@@ -9,40 +9,13 @@ import type {
   OpponentLog,
 } from '../types';
 
-// ─── Tech card suggestions keyed by opponent archetype ────────────────────────
-
-/**
- * Hand-curated lookup of tech card suggestions indexed by archetype display name.
- * Keys are case-sensitive and must match the `archetype` field stored in `OpponentLog`
- * exactly (e.g. "Dragapult ex", not "dragapult-ex"). Update this object manually
- * whenever the competitive meta shifts and new counter-cards become relevant.
- *
- * `reasonKey` references a translation under `recommendations:rules.tech.reasons.*`
- * so the explanation text follows the active UI language.
- */
-// All suggested cards must be Standard-legal (Regulation H, I, J — post-G rotation April 2026).
-// Iono, Path to the Peak, Lost Vacuum, Collapsed Stadium, Canceling Cologne are all G or older — removed.
-const TECH_SUGGESTIONS: Record<string, { card: string; reasonKey: string }> = {
-  'Dragapult ex': { card: 'Eri', reasonKey: 'dragapultEx' },
-  'Dragapult Blaziken': { card: 'Eri', reasonKey: 'dragapultBlaziken' },
-  'Dragapult Dusknoir': { card: 'Unfair Stamp', reasonKey: 'dragapultDusknoir' },
-  "N's Zoroark ex": { card: 'Briar', reasonKey: 'nsZoroark' },
-  "N's Zoroark": { card: 'Briar', reasonKey: 'nsZoroark' },
-  'Lucario Hariyama': { card: 'Fezandipiti ex', reasonKey: 'lucarioHariyama' },
-  'Alakazam Dudunsparce': { card: 'TM: Devolution', reasonKey: 'alakazamDudunsparce' },
-  'Starmie Froslass': { card: 'Eri', reasonKey: 'starmieFroslass' },
-  "Cynthia's Garchomp ex": { card: 'Unfair Stamp', reasonKey: 'cynthiasGarchompEx' },
-  "Rocket's Mewtwo": { card: 'Eri', reasonKey: 'rocketsMewtwo' },
-  'Ogerpon Meganium': { card: 'Fezandipiti ex', reasonKey: 'ogerponMeganium' },
-  'Raging Bolt Ogerpon': { card: "Hero's Cape", reasonKey: 'ragingBoltOgerpon' },
-  'Raging Bolt ex': { card: "Hero's Cape", reasonKey: 'ragingBoltEx' },
-  'Grimmsnarl Froslass': { card: 'TM: Devolution', reasonKey: 'grimmsnarlFroslass' },
-  "Rocket's Honchkrow": { card: 'Eri', reasonKey: 'rocketsHonchkrow' },
-  'Okidogi Barbaracle': { card: 'Unfair Stamp', reasonKey: 'okidogiBarbaracle' },
-  'Mega Venusaur': { card: 'Briar', reasonKey: 'megaVenusaur' },
-  Greninja: { card: 'Unfair Stamp', reasonKey: 'greninja' },
-  Slowking: { card: 'TM: Devolution', reasonKey: 'slowking' },
-};
+// NOTE: The old hand-curated `TECH_SUGGESTIONS` table (archetype → "add card X")
+// was removed deliberately. Asserting a specific counter card is not defensible:
+// a card that appears often in winning lists may be a universal STAPLE (not a
+// tech), and a genuine tech may not fit every deck's energy/shell. Rule 2 below
+// now only reports the matchup weakness from the user's OWN data and points to
+// the data-driven List Comparison (successful lists of their own archetype,
+// which is deck-fit-safe). See the "tech-suggestion-lift-not-frequency" memory.
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -109,7 +82,6 @@ export function useRecommendations({
     // Build a normalized set for fast local-meta lookup
     const localMetaSet = new Set(localMeta.map((a) => a.toLowerCase()));
 
-    const deckCardNames = new Set(deckCards.map((c) => c.name.toLowerCase()));
     const totalEncounters = archetypeStats.reduce((s, a) => s + a.encounters, 0);
 
     const sortedStats = [...archetypeStats]
@@ -182,26 +154,26 @@ export function useRecommendations({
       }
     }
 
-    // ── 2. TECH SUGGESTIONS FOR BAD MATCHUPS ─────────────────────────────────
+    // ── 2. WEAK MATCHUPS (data-grounded, no fabricated tech card) ────────────
+    // Flag matchups the user actually loses (from their OWN logged games) and
+    // point to the data-driven List Comparison instead of asserting a counter
+    // card. Zero-win matchups are Rule 3's job, so require at least one win here.
     for (const stats of sortedStats) {
-      if (stats.winRate > 50 || stats.encounters < 5) continue;
-      const tech = TECH_SUGGESTIONS[stats.archetype];
-      if (!tech || deckCardNames.has(tech.card.toLowerCase())) continue;
-
+      if (stats.wins === 0 || stats.winRate > 50 || stats.encounters < 5) continue;
       const isLocal = localMetaSet.has(stats.archetype.toLowerCase());
       recs.push({
         id: `tech-${stats.archetype}`,
-        // Local meta archetypes are always high priority when win rate is bad
-        priority: isLocal || stats.encounters >= 4 ? 'high' : 'medium',
+        // High for a key local matchup or a well-sampled loss; medium otherwise.
+        priority: isLocal || stats.encounters >= 8 ? 'high' : 'medium',
         category: 'tech',
-        suggestion: `${t('rules.tech.suggestion', { card: tech.card })}${isLocal ? localMetaBadge : ''}`,
+        suggestion: `${t('rules.tech.suggestion', { archetype: stats.archetype })}${isLocal ? localMetaBadge : ''}`,
         reasoning: `${t('rules.tech.reasoning', {
           wins: stats.wins,
           losses: stats.losses,
           archetype: stats.archetype,
           winRate: stats.winRate,
           games: games(stats.encounters),
-        })}${isLocal ? ` ${t('rules.tech.localNote')}` : ''} ${t(`rules.tech.reasons.${tech.reasonKey}`)}`,
+        })}${isLocal ? ` ${t('rules.tech.localNote')}` : ''} ${t('rules.tech.dataHint')}`,
         dataPoints: stats.encounters,
       });
     }
