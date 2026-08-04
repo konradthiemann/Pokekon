@@ -31,11 +31,14 @@ import {
 // Runnable as a Railway cron: `node dist/jobs/syncMeta.js`.
 //
 // Delta import ("only load the missing data"): a completed tournament is
-// immutable, so once its standings AND pairings are stored it is skipped on
-// later runs. Each sync therefore only pays for NEW events; coverage accumulates
-// across runs. Because the delta skip means a run does not re-fetch every event
-// in the window, the weekly snapshots are recomputed from the DB, not from the
-// (partial) fetch of the current run.
+// immutable, so once its /details verdict is stored it is never probed again —
+// and that is stored for QUALIFYING and NON-qualifying events alike. Remembering
+// the rejects is what lets coverage grow: each bounded run advances its probe
+// budget to older, still-unclassified events rather than re-classifying the same
+// recent rejects, so the ingested window widens run over run (it was previously
+// pinned to ~one week). Because a run does not re-fetch every event in the window,
+// the weekly snapshots are recomputed from the DB, not from the current run's
+// (partial) fetch.
 
 const LIMITLESS_BASE = 'https://play.limitlesstcg.com';
 
@@ -247,6 +250,80 @@ async function recomputeCurrentPeriodSnapshots(
   };
 }
 
+/**
+ * Fetch standings + pairings for a QUALIFYING event and persist it. Returns true
+ * when standings were stored (the event now counts toward the meta), false when
+ * the event had no usable standings or the standings fetch failed. A failed
+ * PAIRINGS fetch is not fatal: standings still persist and `pairingsSyncedAt`
+ * stays null, so the matchup matrix is retried on a later run.
+ */
+async function ingestTournament(
+  db: Db,
+  t: LimitlessTournament,
+  classification: TournamentClassification,
+): Promise<boolean> {
+  const id = t.id.slice(0, 100);
+  let standings: LimitlessStanding[];
+  try {
+    standings = await limitlessJson<LimitlessStanding[]>(
+      `/api/tournaments/${encodeURIComponent(id)}/standings`,
+    );
+  } catch (err) {
+    console.warn(`[syncMeta] standings fetch failed for ${t.id}:`, err);
+    return false;
+  }
+  if (!Array.isArray(standings) || standings.length === 0) return false;
+
+  let pairings: PairingLite[] | null;
+  try {
+    const raw = await limitlessJson<unknown>(`/api/tournaments/${encodeURIComponent(id)}/pairings`);
+    pairings = Array.isArray(raw) ? (raw as PairingLite[]) : [];
+  } catch (err) {
+    console.warn(`[syncMeta] pairings fetch failed for ${t.id}:`, err);
+    pairings = null;
+  }
+
+  try {
+    await persistTournament(db, t, standings, classification, pairings);
+    return true;
+  } catch (err) {
+    console.warn(`[syncMeta] persist failed for ${t.id}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Persist ONLY a probed event's header + `/details` classification — no
+ * standings, no pairings. This is the delta import's forward gear: a NON-
+ * qualifying event (in-person, or a Bo3-Swiss online event) is recorded so later
+ * runs skip it instead of re-probing `/details` for it every single time. Without
+ * this, a run's probe budget is spent re-classifying the same rejects at the top
+ * of the list and never reaches the older qualifying events further back — which
+ * is exactly why the ingested set was stuck at one week's worth of tournaments.
+ */
+async function persistClassificationOnly(
+  db: Db,
+  t: LimitlessTournament,
+  classification: TournamentClassification,
+): Promise<void> {
+  const id = t.id.slice(0, 100);
+  const header = {
+    name: t.name.slice(0, 200),
+    date: new Date(t.date),
+    players: t.players,
+    format: (t.format ?? 'standard').slice(0, 40),
+    isOnline: classification.isOnline,
+    platform: classification.platform,
+    swissMode: classification.swissMode,
+    fetchedAt: new Date(),
+    pairingsSyncedAt: null,
+  };
+  await db
+    .insert(tournaments)
+    .values({ id, ...header })
+    .onConflictDoUpdate({ target: tournaments.id, set: header });
+}
+
 export async function runMetaSync(
   db: Db,
   opts: {
@@ -258,21 +335,25 @@ export async function runMetaSync(
     bo1Only?: boolean;
   } = {},
 ): Promise<MetaSyncResult> {
-  // Defaults target the local-Bo1 use case: recent ONLINE Bo1-Swiss events. The
-  // caps are high enough to ingest ALL qualifying events in the window in one run
-  // — the delta skip below keeps the per-run cost bounded to NEW events only, so
-  // a high ceiling no longer means re-fetching everything every time.
+  // Defaults target the local-Bo1 use case: recent ONLINE Bo1-Swiss events over a
+  // ~6-week window. The per-run caps are deliberately BOUNDED, not exhaustive: the
+  // classification-persistence delta (see the loop) means every run advances the
+  // frontier to older, still-unclassified events, so coverage GROWS across runs
+  // instead of being pinned to whatever a single run could fetch. `LIST_LIMIT` is
+  // wide enough that ~6 weeks of Standard events are in reach; a value the API
+  // caps below simply yields fewer rows (never an error).
   const {
-    days = 30,
+    days = 45,
     minPlayers = 16,
-    maxTournaments = 80,
-    maxProbes = 160,
+    maxTournaments = 50,
+    maxProbes = 120,
     onlineOnly = true,
     bo1Only = true,
   } = opts;
+  const LIST_LIMIT = 500;
 
   const list = await limitlessJson<LimitlessTournament[]>(
-    '/api/tournaments?game=PTCG&completed=true&limit=100&format=standard',
+    `/api/tournaments?game=PTCG&completed=true&limit=${LIST_LIMIT}&format=standard`,
   );
 
   const cutoff = new Date();
@@ -283,19 +364,29 @@ export async function runMetaSync(
     .filter((t) => t.players >= minPlayers && new Date(t.date) >= cutoff && isPostRotation(t.date))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  // Delta import: skip events already ingested AND pairing-processed. A completed
-  // tournament never changes, so this is safe and is the whole point — each run
-  // only fetches details/standings/pairings for what is still missing.
+  // Delta import: load the STORED /details verdict for every candidate already in
+  // the DB — whether or not it qualified. A completed tournament never changes, so
+  // a stored verdict is never re-probed. This is what makes coverage grow across
+  // runs: rejects are remembered (see persistClassificationOnly), so each run's
+  // probe budget skips past them to older, still-unclassified events instead of
+  // burning out on the same recent rejects every time.
   const candidateIds = candidates.map((t) => t.id.slice(0, 100));
   const existingRows = candidateIds.length
     ? await db
-        .select({ id: tournaments.id, pairingsSyncedAt: tournaments.pairingsSyncedAt })
+        .select({
+          id: tournaments.id,
+          isOnline: tournaments.isOnline,
+          platform: tournaments.platform,
+          swissMode: tournaments.swissMode,
+          pairingsSyncedAt: tournaments.pairingsSyncedAt,
+        })
         .from(tournaments)
         .where(inArray(tournaments.id, candidateIds))
     : [];
-  const fullyDone = new Set(
-    existingRows.filter((r) => r.pairingsSyncedAt !== null).map((r) => r.id),
-  );
+  const existing = new Map(existingRows.map((r) => [r.id, r]));
+
+  const qualifies = (c: TournamentClassification): boolean =>
+    (!onlineOnly || c.isOnline) && (!bo1Only || c.swissMode === 'BO1');
 
   // The list endpoint lacks isOnline/phases, so classify each NEW candidate via
   // its /details payload and keep the online Bo1-Swiss ones. Requests are
@@ -306,9 +397,26 @@ export async function runMetaSync(
   for (const t of candidates) {
     if (ingested >= maxTournaments || probes >= maxProbes) break;
     const id = t.id.slice(0, 100);
-    if (fullyDone.has(id)) continue; // delta skip — already fully imported
-    probes += 1;
+    const rec = existing.get(id);
 
+    if (rec) {
+      // Already classified on an earlier run — never re-probe. The one thing left
+      // to do is finish a QUALIFYING event whose standings/pairings never landed
+      // (a prior fetch failure): retry the ingest from its stored verdict.
+      const stored: TournamentClassification = {
+        isOnline: rec.isOnline,
+        platform: rec.platform,
+        swissMode: rec.swissMode,
+      };
+      if (qualifies(stored) && rec.pairingsSyncedAt === null) {
+        if (await ingestTournament(db, t, stored)) ingested += 1;
+      }
+      continue;
+    }
+
+    // NEW candidate: spend one probe on /details, then record the verdict either
+    // way so a later run never probes it again.
+    probes += 1;
     let classification: TournamentClassification;
     try {
       const details = await limitlessJson<unknown>(
@@ -319,39 +427,14 @@ export async function runMetaSync(
       console.warn(`[syncMeta] details fetch failed for ${t.id}:`, err);
       classification = { isOnline: isLikelyOnlineName(t.name), platform: null, swissMode: null };
     }
-    if (onlineOnly && !classification.isOnline) continue;
-    if (bo1Only && classification.swissMode !== 'BO1') continue;
 
-    let standings: LimitlessStanding[];
-    try {
-      standings = await limitlessJson<LimitlessStanding[]>(
-        `/api/tournaments/${encodeURIComponent(id)}/standings`,
-      );
-    } catch (err) {
-      console.warn(`[syncMeta] standings fetch failed for ${t.id}:`, err);
+    if (!qualifies(classification)) {
+      // Remember the reject so it is skipped (not re-probed) next run.
+      await persistClassificationOnly(db, t, classification);
       continue;
     }
-    if (!Array.isArray(standings) || standings.length === 0) continue;
 
-    // Own matchup matrix source. A failed fetch keeps pairingsSyncedAt null so the
-    // event is retried next run (its standings still persist).
-    let pairings: PairingLite[] | null;
-    try {
-      const raw = await limitlessJson<unknown>(
-        `/api/tournaments/${encodeURIComponent(id)}/pairings`,
-      );
-      pairings = Array.isArray(raw) ? (raw as PairingLite[]) : [];
-    } catch (err) {
-      console.warn(`[syncMeta] pairings fetch failed for ${t.id}:`, err);
-      pairings = null;
-    }
-
-    try {
-      await persistTournament(db, t, standings, classification, pairings);
-      ingested += 1;
-    } catch (err) {
-      console.warn(`[syncMeta] persist failed for ${t.id}:`, err);
-    }
+    if (await ingestTournament(db, t, classification)) ingested += 1;
   }
 
   // Recompute the week's snapshots from the full DB set (see the function doc).

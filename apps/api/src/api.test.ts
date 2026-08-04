@@ -982,6 +982,80 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
     expect(rows.every((r) => r.archetypeId === 'second-deck')).toBe(true);
   });
 
+  it('remembers non-qualifying events so coverage grows without re-probing them', async () => {
+    await clearTournamentData();
+    // A reject classified on a PRIOR run: header only, no standings. It must never
+    // be probed again — that is what frees each run's budget to reach older events.
+    await db.insert(schema.tournaments).values({
+      id: 'told-reject',
+      name: 'Old Reject',
+      date: daysAgo(3),
+      players: 40,
+      isOnline: false,
+      swissMode: 'BO3',
+    });
+
+    const detailsCalls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/tournaments/tqual/details')) {
+          detailsCalls.push('tqual');
+          return jsonResponse({ isOnline: true, platform: 'PTCGL', phases: [{ mode: 'BO1' }] });
+        }
+        if (url.includes('/tournaments/tqual/standings'))
+          return jsonResponse([
+            {
+              placing: 1,
+              player: 'alice',
+              deck: { id: 'char', name: 'Charizard' },
+              record: { wins: 6, losses: 1 },
+            },
+            {
+              placing: 2,
+              player: 'bob',
+              deck: { id: 'char', name: 'Charizard' },
+              record: { wins: 5, losses: 2 },
+            },
+          ]);
+        if (url.includes('/tournaments/tqual/pairings'))
+          return jsonResponse([{ round: 1, player1: 'alice', player2: 'bob', winner: 'alice' }]);
+        if (url.includes('/tournaments/treject/details')) {
+          detailsCalls.push('treject');
+          return jsonResponse({ isOnline: false, platform: null, phases: [{ mode: 'BO3' }] });
+        }
+        // Already-classified reject: probing it is the bug this test guards against.
+        if (url.includes('/tournaments/told-reject/details')) detailsCalls.push('told-reject');
+        return jsonResponse([
+          { id: 'tqual', name: 'Weekly Online', players: 40, date: daysAgo(1).toISOString() },
+          { id: 'treject', name: 'Regional IRL', players: 40, date: daysAgo(2).toISOString() },
+          { id: 'told-reject', name: 'Old Reject', players: 40, date: daysAgo(3).toISOString() },
+        ]);
+      }),
+    );
+
+    expect((await request('/api/meta/sync', { user: USER_B, method: 'POST' })).status).toBe(200);
+
+    // Only the two NEW events were probed; the remembered reject was skipped.
+    expect(detailsCalls.sort()).toEqual(['tqual', 'treject']);
+
+    const standings = await db
+      .select({ tournamentId: schema.tournamentStandings.tournamentId })
+      .from(schema.tournamentStandings);
+    // Qualifying event ingested (2 standings); neither reject contributed any.
+    expect(standings.filter((s) => s.tournamentId === 'tqual')).toHaveLength(2);
+    expect(standings.filter((s) => s.tournamentId === 'treject')).toHaveLength(0);
+    expect(standings.filter((s) => s.tournamentId === 'told-reject')).toHaveLength(0);
+
+    // The NEW reject is now REMEMBERED (header persisted with its verdict) so the
+    // next run skips it too — it is a classification-only row, not meta data.
+    const all = await db.select().from(schema.tournaments);
+    const treject = all.find((t) => t.id === 'treject');
+    expect(treject?.isOnline).toBe(false);
+    expect(treject?.swissMode).toBe('BO3');
+    expect(treject?.pairingsSyncedAt).toBeNull();
+  });
+
   it('computes and stores the own matchup matrix from round pairings', async () => {
     await clearTournamentData();
     const today = new Date().toISOString();
