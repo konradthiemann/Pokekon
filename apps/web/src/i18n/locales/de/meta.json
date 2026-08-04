@@ -8,6 +8,8 @@
   },
   "window": {
     "lastDays": "Letzte Tage:",
+    "daysAria": "Anzahl der betrachteten Tage",
+    "daysSuffix": "Tage",
     "onlineBo1": "Nur Online-Bo1",
     "onlineBo1Hint": "Nur Online-Turniere im Bo1-Swiss-Format (Ground-Truth aus Limitless: isOnline + Swiss-Modus) — der beste Proxy für lokale Bo1-Challenges & -Cups. Ausschalten zeigt alle erfassten Turniere (Online + Präsenz, gemischtes Format).",
     "sample": "{{tournaments}} Turniere · {{players}} Spieler im Fenster",
@@ -32,6 +34,9 @@
     "rankingTitle": "Beste Decks in deinem Feld",
     "rankingHint": "Erwartete Win-Rate gegen dein lokales Feld (Anteil × Matchup-WR, Mirror = 50 %). Klicke ein Deck für Details.",
     "coverage": "{{pct}} % Deckung",
+    "perspective": "Aus Sicht von:",
+    "bestPositioned": "Bestpositioniert gegen dein Feld: {{deck}} · {{wr}} % Feld-WR",
+    "fieldCount": "Dein Feld ({{count}})",
     "listsTitle": "Beste Listen für {{deck}}",
     "listsHint": "Erfolgreichste Turnierlisten dieses Decks im Fenster — als Bauvorlage gegen dein lokales Feld.",
     "listsEmpty": "Noch keine veröffentlichten Listen für dieses Deck im Fenster."

@@ -568,25 +568,30 @@ export function MetaPage() {
               ? t('sidebar.syncing', { ns: 'layout' })
               : t('sidebar.syncLiveMeta', { ns: 'layout' })}
           </button>
-          {!isSyncing && lastSynced && (
-            <span className="text-[11px] text-slate-500">
-              {t('sidebar.syncedAt', { ns: 'layout', time: lastSynced.toLocaleTimeString() })}
-            </span>
-          )}
+          {/* Always reserve the line height so the button doesn't jump on sync. */}
+          <span className="min-h-[0.9rem] text-[11px] text-slate-500">
+            {!isSyncing && lastSynced
+              ? t('sidebar.syncedAt', { ns: 'layout', time: lastSynced.toLocaleTimeString() })
+              : ''}
+          </span>
         </div>
       </div>
 
-      {isSyncing && syncProgress && (
-        <p className="-mt-3 truncate text-xs text-slate-500" title={syncProgress}>
-          {syncProgress}
-        </p>
-      )}
-      {!isSyncing && syncError && (
-        <div className="-mt-3 flex items-start gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span className="break-words">{syncError}</span>
-        </div>
-      )}
+      {/* Reserved status slot — always rendered so starting a sync (progress text
+          appears) or an error can't shift the layout below. aria-live announces
+          sync progress to assistive tech. */}
+      <div className="-mt-2 min-h-[1.25rem]" aria-live="polite">
+        {isSyncing && syncProgress ? (
+          <p className="truncate text-xs text-slate-500" title={syncProgress}>
+            {syncProgress}
+          </p>
+        ) : !isSyncing && syncError ? (
+          <div className="flex items-start gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span className="break-words">{syncError}</span>
+          </div>
+        ) : null}
+      </div>
 
       {/* Window control (days + online-Bo1 scope) + sample-size readout */}
       <div className="card flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-3">

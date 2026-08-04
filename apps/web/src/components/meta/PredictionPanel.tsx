@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlaskConical, Plus, Trophy, Wand2, X } from 'lucide-react';
+import { ChevronRight, FlaskConical, Plus, Trophy, Wand2, X } from 'lucide-react';
 import {
   computeFieldScores,
   type ArchetypeShare,
@@ -16,10 +16,10 @@ import {
 } from '../../lib/api';
 import { getLocalMetaField, setLocalMetaField, type LocalFieldEntry } from '../../lib/preferences';
 import { PokemonIcon } from '../shared/PokemonIcon';
+import { QuantityStepper } from '../shared/QuantityStepper';
 import { DecklistCard } from './DecklistCard';
 import { FieldScorePanel } from './FieldScorePanel';
 import { ThreatsPanel } from './ThreatsPanel';
-import { winRateColorClass } from './winRateColor';
 
 interface PredictionPanelProps {
   /** Current online meta — the option source for the picker and the seed. */
@@ -49,6 +49,7 @@ export function PredictionPanel({ archetypes, window }: PredictionPanelProps) {
   } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toAdd, setToAdd] = useState('');
+  const [fieldOpen, setFieldOpen] = useState(true);
 
   // Real online-Bo1 matchup matrix for the active window (with TrainerHill
   // fallback), the same source the field analysis uses — so the prediction and
@@ -131,6 +132,8 @@ export function PredictionPanel({ archetypes, window }: PredictionPanelProps) {
   }, [field, totalWeight, matchups]);
 
   const selected = scores.find((s) => s.archetypeId === selectedId) ?? scores[0] ?? null;
+  // scores is already sorted by field win rate → scores[0] is the best-positioned.
+  const best = scores[0] ?? null;
 
   // The selected deck's most successful tournament lists (build templates vs the
   // field). Keyed by deck+window so a stale deck's lists never flash; all setState
@@ -161,13 +164,22 @@ export function PredictionPanel({ archetypes, window }: PredictionPanelProps) {
     <div className="space-y-4">
       <p className="text-sm text-slate-600">{t('prediction.intro')}</p>
 
-      {/* Field editor */}
-      <div className="card space-y-3 p-4">
+      {/* Field editor — collapsible so it doesn't dominate once configured */}
+      <div className="card space-y-3 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="card-header flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFieldOpen((o) => !o)}
+            aria-expanded={fieldOpen}
+            className="card-header mb-0 flex items-center gap-1.5 hover:text-slate-700"
+          >
+            <ChevronRight
+              className={`h-3 w-3 shrink-0 transition-transform ${fieldOpen ? 'rotate-90' : ''}`}
+              aria-hidden="true"
+            />
             <FlaskConical className="h-4 w-4 text-brand-700" aria-hidden="true" />
-            {t('prediction.fieldTitle')}
-          </h3>
+            {t('prediction.fieldCount', { count: field.length })}
+          </button>
           <div className="flex items-center gap-2">
             <button
               onClick={seedFromOnline}
@@ -185,66 +197,69 @@ export function PredictionPanel({ archetypes, window }: PredictionPanelProps) {
           </div>
         </div>
 
-        {field.length === 0 ? (
-          <p className="text-xs text-slate-500">{t('prediction.empty')}</p>
-        ) : (
-          <div className="space-y-1.5">
-            {field.map((e) => {
-              const sharePct = totalWeight > 0 ? (e.weight / totalWeight) * 100 : 0;
-              return (
-                <div key={e.archetypeId} className="flex items-center gap-2">
-                  <PokemonIcon archetype={e.name} size="sm" dual />
-                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-800">
-                    {e.name}
-                  </span>
-                  <span className="w-12 text-right text-xs tabular-nums text-slate-500">
-                    {sharePct.toFixed(1)}%
-                  </span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={e.weight}
-                    onChange={(ev) => setWeight(e.archetypeId, Number(ev.target.value))}
-                    className="input w-16 px-2 py-1 text-right text-xs tabular-nums"
-                    aria-label={t('prediction.weightLabel', { archetype: e.name })}
-                  />
-                  <button
-                    onClick={() => remove(e.archetypeId)}
-                    className="shrink-0 text-slate-400 transition-colors hover:text-red-600"
-                    aria-label={t('prediction.remove', { archetype: e.name })}
-                  >
-                    <X className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {fieldOpen && (
+          <>
+            {field.length === 0 ? (
+              <p className="text-xs text-slate-500">{t('prediction.empty')}</p>
+            ) : (
+              <div className="space-y-1.5">
+                {field.map((e) => {
+                  const sharePct = totalWeight > 0 ? (e.weight / totalWeight) * 100 : 0;
+                  return (
+                    <div key={e.archetypeId} className="flex items-center gap-2">
+                      <PokemonIcon archetype={e.name} size="sm" dual />
+                      <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-800">
+                        {e.name}
+                      </span>
+                      <span className="w-12 text-right text-xs tabular-nums text-slate-500">
+                        {sharePct.toFixed(1)}%
+                      </span>
+                      <QuantityStepper
+                        value={e.weight}
+                        onChange={(w) => setWeight(e.archetypeId, w)}
+                        min={0}
+                        max={99}
+                        ariaLabel={t('prediction.weightLabel', { archetype: e.name })}
+                      />
+                      <button
+                        onClick={() => remove(e.archetypeId)}
+                        className="shrink-0 text-slate-400 transition-colors hover:text-red-600"
+                        aria-label={t('prediction.remove', { archetype: e.name })}
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-        {options.length > 0 && (
-          <div className="flex items-center gap-2 pt-1">
-            <select
-              value={toAdd}
-              onChange={(e) => setToAdd(e.target.value)}
-              className="input flex-1 px-2 py-1.5 text-xs"
-              aria-label={t('prediction.addPlaceholder')}
-            >
-              <option value="">{t('prediction.addPlaceholder')}</option>
-              {options.map((a) => (
-                <option key={a.archetypeId} value={a.archetypeId}>
-                  {a.archetypeName}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => toAdd && addArchetype(toAdd)}
-              disabled={!toAdd}
-              className="btn-ghost text-xs disabled:opacity-50"
-            >
-              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-              {t('prediction.add')}
-            </button>
-          </div>
+            {options.length > 0 && (
+              <div className="flex items-center gap-2 pt-1">
+                <select
+                  value={toAdd}
+                  onChange={(e) => setToAdd(e.target.value)}
+                  className="input flex-1 px-2 py-1.5 text-xs"
+                  aria-label={t('prediction.addPlaceholder')}
+                >
+                  <option value="">{t('prediction.addPlaceholder')}</option>
+                  {options.map((a) => (
+                    <option key={a.archetypeId} value={a.archetypeId}>
+                      {a.archetypeName}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => toAdd && addArchetype(toAdd)}
+                  disabled={!toAdd}
+                  className="btn-ghost text-xs disabled:opacity-50"
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('prediction.add')}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -255,50 +270,39 @@ export function PredictionPanel({ archetypes, window }: PredictionPanelProps) {
         <p className="py-6 text-center text-xs text-slate-500">{t('prediction.noResult')}</p>
       ) : (
         <div className="space-y-4">
-          <div className="card space-y-2 p-4">
-            <h3 className="card-header flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-amber-600" aria-hidden="true" />
-              {t('prediction.rankingTitle')}
-            </h3>
-            <p className="text-xs text-slate-500">{t('prediction.rankingHint')}</p>
-            <div className="space-y-1">
-              {scores.map((s) => {
-                const isSel = selected?.archetypeId === s.archetypeId;
-                return (
-                  <button
-                    key={s.archetypeId}
-                    onClick={() => setSelectedId(s.archetypeId)}
-                    className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors ${
-                      isSel ? 'bg-brand-50 ring-1 ring-brand-200' : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className="w-5 text-center text-xs font-bold tabular-nums text-brand-700">
-                      {s.rank}
-                    </span>
-                    <PokemonIcon archetype={s.archetypeName} size="sm" dual />
-                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-800">
-                      {s.archetypeName}
-                    </span>
-                    <span className="text-[11px] tabular-nums text-slate-400">
-                      {t('prediction.coverage', { pct: s.coveragePct })}
-                    </span>
-                    <span
-                      className={`w-14 text-right text-sm font-bold tabular-nums ${
-                        s.fieldWinRatePct !== null
-                          ? winRateColorClass(s.fieldWinRatePct)
-                          : 'text-slate-400'
-                      }`}
-                    >
-                      {s.fieldWinRatePct !== null ? `${s.fieldWinRatePct.toFixed(1)}%` : '—'}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {selected && (
             <>
+              {/* Perspective picker — choose which deck to evaluate against the
+                  field. Replaces the old count-ordered "ranking"; the dropdown is
+                  ordered by field score and shows each deck's field WR, so the
+                  best-positioned deck stays obvious without a noisy list. */}
+              <div className="card space-y-2 p-3">
+                {best && best.fieldWinRatePct !== null && (
+                  <p className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <Trophy className="h-3.5 w-3.5 text-amber-600" aria-hidden="true" />
+                    {t('prediction.bestPositioned', {
+                      deck: best.archetypeName,
+                      wr: best.fieldWinRatePct.toFixed(1),
+                    })}
+                  </p>
+                )}
+                <label className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600">
+                  {t('prediction.perspective')}
+                  <select
+                    value={selected.archetypeId}
+                    onChange={(e) => setSelectedId(e.target.value)}
+                    className="input max-w-xs flex-1 px-2 py-1.5 text-xs"
+                  >
+                    {scores.map((s) => (
+                      <option key={s.archetypeId} value={s.archetypeId}>
+                        {s.archetypeName}
+                        {s.fieldWinRatePct !== null ? ` · ${s.fieldWinRatePct.toFixed(1)}%` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <FieldScorePanel
                   fieldScore={selected}
