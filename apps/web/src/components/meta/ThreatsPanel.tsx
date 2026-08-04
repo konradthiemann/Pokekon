@@ -27,7 +27,7 @@ function WeightedMatchupRow({
         </div>
       </div>
       <span className="text-xs text-slate-500 tabular-nums shrink-0">
-        {t('archetypeDetail.threats.shareLabel', { pct: m.sharePct })}
+        {t('archetypeDetail.threats.shareLabel', { pct: m.sharePct.toFixed(1) })}
       </span>
       <span
         className="w-14 text-right shrink-0"

@@ -79,7 +79,7 @@ export function MatchupTable({
                   {m.games}
                 </td>
                 <td className="px-3 py-1.5 text-right text-xs tabular-nums text-slate-500">
-                  {m.sharePct}%
+                  {m.sharePct.toFixed(1)}%
                 </td>
               </tr>
             ))}
