@@ -39,16 +39,16 @@ export function MatchupTable({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-100">
-              <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+              <th className="px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-600">
                 {t('archetypeDetail.matchupTable.deck')}
               </th>
-              <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+              <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-600">
                 {t('archetypeDetail.matchupTable.winRate')}
               </th>
-              <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+              <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-600">
                 {t('archetypeDetail.matchupTable.sample')}
               </th>
-              <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+              <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-600">
                 {t('archetypeDetail.matchupTable.share')}
               </th>
             </tr>
@@ -59,7 +59,7 @@ export function MatchupTable({
                 key={m.archetypeId}
                 className="border-b border-slate-100 transition-colors hover:bg-slate-50"
               >
-                <td className="px-3 py-2">
+                <td className="px-3 py-1.5">
                   <div className="flex min-w-0 items-center gap-2">
                     <PokemonIcon
                       archetype={m.archetypeName}
@@ -72,13 +72,13 @@ export function MatchupTable({
                     </span>
                   </div>
                 </td>
-                <td className="px-3 py-2 text-right font-mono">
+                <td className="px-3 py-1.5 text-right font-mono">
                   <WinRateBadge pct={Math.round(m.winRatePct * 10) / 10} />
                 </td>
-                <td className="px-3 py-2 text-right text-xs tabular-nums text-slate-500">
+                <td className="px-3 py-1.5 text-right text-xs tabular-nums text-slate-500">
                   {m.games}
                 </td>
-                <td className="px-3 py-2 text-right text-xs tabular-nums text-slate-500">
+                <td className="px-3 py-1.5 text-right text-xs tabular-nums text-slate-500">
                   {m.sharePct}%
                 </td>
               </tr>
