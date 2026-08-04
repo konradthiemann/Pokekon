@@ -18,6 +18,7 @@ export interface PairingLite {
   player1?: string | null;
   player2?: string | null;
   winner?: string | number | null;
+  round?: number;
 }
 
 /** Aggregated head-to-head of two archetypes within one tournament. Canonical
@@ -89,4 +90,64 @@ export function computeMatchupsFromPairings(
   }
 
   return [...byPair.values()];
+}
+
+/** One recorded game of a single pilot: the opponent's archetype + the result.
+ *  Powers the drill-down that shows how a specific decklist actually fared vs each
+ *  archetype (proving a real matchup advantage instead of a guess). */
+export interface StandingMatchResult {
+  opponentArchetypeId: string; // slug, or 'other' when the opponent's deck is unknown
+  result: 'W' | 'L' | 'T';
+  round: number;
+}
+
+/**
+ * Resolve raw pairings into per-PILOT game records, keyed by username, so each
+ * standing/decklist can carry its actual game-by-game results vs each opponent
+ * archetype. Unlike `computeMatchupsFromPairings` (which aggregates and drops both
+ * the pilot link and the 'other' bucket), this keeps every decided/tied game for
+ * BOTH players — including vs 'other' — and the consumer filters to the archetypes
+ * it cares about. Byes and incomplete matches are skipped.
+ */
+export function computeStandingMatchResults(
+  usernameToArchetype: Map<string, string>,
+  pairings: PairingLite[],
+): Map<string, StandingMatchResult[]> {
+  const byUser = new Map<string, StandingMatchResult[]>();
+  if (!Array.isArray(pairings)) return byUser;
+
+  const push = (
+    user: string,
+    opponentArchetypeId: string,
+    result: 'W' | 'L' | 'T',
+    round: number,
+  ) => {
+    const list = byUser.get(user) ?? [];
+    list.push({ opponentArchetypeId, result, round });
+    byUser.set(user, list);
+  };
+
+  for (const p of pairings.slice(0, MAX_PAIRINGS)) {
+    const p1 = typeof p.player1 === 'string' && p.player1 !== '' ? p.player1 : null;
+    const p2 = typeof p.player2 === 'string' && p.player2 !== '' ? p.player2 : null;
+    if (p1 === null || p2 === null || p1 === p2) continue; // bye / malformed
+    if (isIncomplete(p.winner)) continue;
+
+    const round = typeof p.round === 'number' && Number.isFinite(p.round) ? p.round : 0;
+    const arch1 = usernameToArchetype.get(p1) ?? OTHER_ARCHETYPE_ID;
+    const arch2 = usernameToArchetype.get(p2) ?? OTHER_ARCHETYPE_ID;
+
+    if (isTie(p.winner)) {
+      push(p1, arch2, 'T', round);
+      push(p2, arch1, 'T', round);
+    } else if (p.winner === p1) {
+      push(p1, arch2, 'W', round);
+      push(p2, arch1, 'L', round);
+    } else if (p.winner === p2) {
+      push(p1, arch2, 'L', round);
+      push(p2, arch1, 'W', round);
+    }
+  }
+
+  return byUser;
 }

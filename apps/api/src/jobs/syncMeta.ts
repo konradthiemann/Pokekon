@@ -4,6 +4,7 @@ import {
   classifyTournamentDetails,
   computeMatchupsFromPairings,
   computeMetaSnapshots,
+  computeStandingMatchResults,
   isLikelyOnlineName,
   isoWeekBounds,
   isoWeekLabel,
@@ -100,8 +101,24 @@ async function persistTournament(
     fetchedAt: new Date(),
     pairingsSyncedAt: pairingsProcessed ? new Date() : null,
   };
+  // Resolve pairings in memory (usernames are never persisted, only used here):
+  // the username → archetype map, plus — when pairings were fetched — each pilot's
+  // game-by-game results, attached to their standing row for the drill-down.
+  const usernameToArchetype = new Map<string, string>();
+  for (const p of standings) {
+    if (typeof p.player === 'string' && p.player !== '') {
+      usernameToArchetype.set(p.player, normalizeArchetypeId(p.deck?.id));
+    }
+  }
+  const matchResultsByUser =
+    pairings !== null ? computeStandingMatchResults(usernameToArchetype, pairings) : null;
+
   const rows = standings.slice(0, MAX_STANDINGS_PER_TOURNAMENT).map((p) => {
     const icons = pruneIcons(p.deck?.icons);
+    const matchResults =
+      matchResultsByUser !== null && typeof p.player === 'string'
+        ? (matchResultsByUser.get(p.player) ?? [])
+        : null;
     return {
       tournamentId: id,
       archetypeId: normalizeArchetypeId(p.deck?.id),
@@ -113,18 +130,10 @@ async function persistTournament(
       ties: p.record?.ties ?? 0,
       decklist: pruneDecklist(p.decklist),
       icons: icons.length > 0 ? icons : null,
+      matchResults,
     };
   });
 
-  // Resolve the round pairings to archetype head-to-heads in memory (the username
-  // → archetype map comes from THIS tournament's standings; usernames are never
-  // stored). Only computed when pairings were actually fetched.
-  const usernameToArchetype = new Map<string, string>();
-  for (const p of standings) {
-    if (typeof p.player === 'string' && p.player !== '') {
-      usernameToArchetype.set(p.player, normalizeArchetypeId(p.deck?.id));
-    }
-  }
   const matchupRows =
     pairings !== null
       ? computeMatchupsFromPairings(usernameToArchetype, pairings).map((m) => ({

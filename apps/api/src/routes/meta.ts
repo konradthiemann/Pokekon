@@ -390,6 +390,7 @@ export function createMetaRoutes(): Hono<ApiEnv> {
           losses: tournamentStandings.losses,
           ties: tournamentStandings.ties,
           decklist: tournamentStandings.decklist,
+          matchResults: tournamentStandings.matchResults,
           tournamentId: tournaments.id,
           tournamentName: tournaments.name,
           tournamentDate: tournaments.date,
@@ -419,6 +420,7 @@ export function createMetaRoutes(): Hono<ApiEnv> {
         losses: r.losses,
         ties: r.ties,
         decklist: r.decklist,
+        matchResults: r.matchResults ?? [],
         tournament: {
           id: r.tournamentId,
           name: r.tournamentName,

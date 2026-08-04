@@ -39,7 +39,11 @@
     "fieldCount": "Dein Feld ({{count}})",
     "listsTitle": "Beste Listen für {{deck}}",
     "listsHint": "Erfolgreichste Turnierlisten dieses Decks im Fenster — als Bauvorlage gegen dein lokales Feld.",
-    "listsEmpty": "Noch keine veröffentlichten Listen für dieses Deck im Fenster."
+    "listsEmpty": "Noch keine veröffentlichten Listen für dieses Deck im Fenster.",
+    "listsSelectHint": "Klick eine Liste, um zu sehen, wie sie real gegen dein Feld gespielt hat.",
+    "listWhy": "Echte Spiele dieser Liste gegen deine lokale Meta:",
+    "noFieldGames": "Für diese Liste sind noch keine Spiele gegen dein Feld erfasst (nach dem nächsten Sync verfügbar).",
+    "gameVs": "Runde {{round}}"
   },
   "metaTable": {
     "empty": "Noch keine Meta-Daten. Klicke in der Sidebar auf \"Sync Live Meta\".",

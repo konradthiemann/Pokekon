@@ -39,7 +39,11 @@
     "fieldCount": "Your field ({{count}})",
     "listsTitle": "Best lists for {{deck}}",
     "listsHint": "This deck's most successful tournament lists in the window — a build template against your local field.",
-    "listsEmpty": "No published lists for this deck in the window yet."
+    "listsEmpty": "No published lists for this deck in the window yet.",
+    "listsSelectHint": "Click a list to see how it actually fared against your field.",
+    "listWhy": "This list's real games vs your local field:",
+    "noFieldGames": "No recorded games vs your field for this list yet (available after the next sync).",
+    "gameVs": "Round {{round}}"
   },
   "metaTable": {
     "empty": "No meta data yet. Click \"Sync Live Meta\" in the sidebar.",

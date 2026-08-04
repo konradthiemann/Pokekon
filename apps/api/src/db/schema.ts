@@ -14,7 +14,12 @@ import {
   check,
 } from 'drizzle-orm/pg-core';
 import { SWISS_MODE_VALUES } from '@pokekon/shared';
-import type { ParsedTurn, PrizePoint, TournamentDecklist } from '@pokekon/shared';
+import type {
+  ParsedTurn,
+  PrizePoint,
+  StandingMatchResult,
+  TournamentDecklist,
+} from '@pokekon/shared';
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
@@ -321,6 +326,11 @@ export const tournamentStandings = pgTable(
     // Pokémon sprite slugs from Limitless `deck.icons` (constant per archetype,
     // stored per row like archetype_name); null for legacy rows.
     icons: jsonb('icons').$type<string[]>(),
+    // This pilot's game-by-game results (opponent archetype + W/L/T + round),
+    // derived from the round pairings on ingest. Lets the prediction drill-down
+    // show how THIS decklist actually fared vs each archetype. Null for legacy
+    // rows / tournaments whose pairings weren't processed.
+    matchResults: jsonb('match_results').$type<StandingMatchResult[]>(),
   },
   (table) => [
     index('tournament_standings_tournamentId_idx').on(table.tournamentId),

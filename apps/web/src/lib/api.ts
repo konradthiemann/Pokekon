@@ -5,6 +5,7 @@ import type {
   FieldScore,
   MatchupRow,
   MetaSyncResult,
+  StandingMatchResult,
   TournamentDecklist,
 } from '@pokekon/shared';
 import type {
@@ -512,6 +513,9 @@ export interface ArchetypeListEntry {
    *  `decklist IS NOT NULL` — standings without a published list never
    *  reach this endpoint. */
   decklist: TournamentDecklist;
+  /** This pilot's game-by-game results (opponent archetype + W/L/T), for the
+   *  drill-down. Empty when the tournament's pairings weren't processed. */
+  matchResults: StandingMatchResult[];
   tournament: { id: string; name: string; date: string; players: number };
 }
 

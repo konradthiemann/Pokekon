@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { computeMatchupsFromPairings, type PairingLite } from './matchupPairings.js';
+import {
+  computeMatchupsFromPairings,
+  computeStandingMatchResults,
+  type PairingLite,
+} from './matchupPairings.js';
 
 // player → archetype map like the sync builds from a tournament's standings.
 const decks = new Map<string, string>([
@@ -99,5 +103,36 @@ describe('computeMatchupsFromPairings', () => {
 
   it('returns [] for a non-array input', () => {
     expect(computeMatchupsFromPairings(decks, null as unknown as PairingLite[])).toEqual([]);
+  });
+});
+
+describe('computeStandingMatchResults', () => {
+  it('records per-pilot W/L for both players with the round and opponent archetype', () => {
+    const res = computeStandingMatchResults(decks, [
+      { round: 3, player1: 'alice', player2: 'bob', winner: 'alice' },
+    ]);
+    expect(res.get('alice')).toEqual([{ opponentArchetypeId: 'n-zoroark', result: 'W', round: 3 }]);
+    expect(res.get('bob')).toEqual([
+      { opponentArchetypeId: 'dragapult-ex', result: 'L', round: 3 },
+    ]);
+  });
+
+  it('records ties for both players and keeps games vs the "other" bucket', () => {
+    const res = computeStandingMatchResults(decks, [
+      { round: 1, player1: 'alice', player2: 'bob', winner: 0 },
+      { round: 2, player1: 'alice', player2: 'erin', winner: 'alice' }, // erin = other
+    ]);
+    expect(res.get('alice')).toEqual([
+      { opponentArchetypeId: 'n-zoroark', result: 'T', round: 1 },
+      { opponentArchetypeId: 'other', result: 'W', round: 2 },
+    ]);
+  });
+
+  it('skips byes and incomplete matches', () => {
+    const res = computeStandingMatchResults(decks, [
+      { round: 1, player1: 'alice', winner: 'alice' }, // bye
+      { round: 2, player1: 'alice', player2: 'bob', winner: -1 }, // incomplete
+    ]);
+    expect(res.size).toBe(0);
   });
 });

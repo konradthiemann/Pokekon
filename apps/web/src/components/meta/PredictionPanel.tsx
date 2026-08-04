@@ -19,6 +19,7 @@ import { PokemonIcon } from '../shared/PokemonIcon';
 import { QuantityStepper } from '../shared/QuantityStepper';
 import { DecklistCard } from './DecklistCard';
 import { FieldScorePanel } from './FieldScorePanel';
+import { ListFieldPerformance } from './ListFieldPerformance';
 import { ThreatsPanel } from './ThreatsPanel';
 
 interface PredictionPanelProps {
@@ -50,6 +51,11 @@ export function PredictionPanel({ archetypes, window }: PredictionPanelProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toAdd, setToAdd] = useState('');
   const [fieldOpen, setFieldOpen] = useState(true);
+  const [expandedListId, setExpandedListId] = useState<number | null>(null);
+
+  // Data-driven icons (from the online meta) for the drill-down opponents.
+  const iconsById: Record<string, string[]> = {};
+  for (const a of archetypes) if (a.icons?.length) iconsById[a.archetypeId] = a.icons;
 
   // Real online-Bo1 matchup matrix for the active window (with TrainerHill
   // fallback), the same source the field analysis uses — so the prediction and
@@ -328,11 +334,41 @@ export function PredictionPanel({ archetypes, window }: PredictionPanelProps) {
                     {t('prediction.listsEmpty')}
                   </p>
                 ) : (
-                  <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                    {lists.map((entry) => (
-                      <DecklistCard key={entry.id} entry={entry} />
-                    ))}
-                  </div>
+                  <>
+                    <p className="text-[11px] text-slate-500">{t('prediction.listsSelectHint')}</p>
+                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                      {lists.map((entry) => {
+                        // First list is open by default; -1 = user collapsed all.
+                        const isOpen = (expandedListId ?? lists[0]?.id) === entry.id;
+                        return (
+                          <div key={entry.id} className="space-y-2">
+                            <DecklistCard entry={entry} />
+                            <button
+                              type="button"
+                              onClick={() => setExpandedListId(isOpen ? -1 : entry.id)}
+                              aria-expanded={isOpen}
+                              className="flex w-full items-center gap-1.5 text-[11px] font-semibold text-brand-700 hover:text-brand-800"
+                            >
+                              <ChevronRight
+                                className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                                aria-hidden="true"
+                              />
+                              {t('prediction.listWhy')}
+                            </button>
+                            {isOpen && (
+                              <div className="card p-3">
+                                <ListFieldPerformance
+                                  matchResults={entry.matchResults}
+                                  field={field}
+                                  iconsById={iconsById}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
               </div>
             </>

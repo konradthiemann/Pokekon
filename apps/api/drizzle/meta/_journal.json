@@ -64,6 +64,13 @@
       "when": 1785829637419,
       "tag": "0008_supreme_norman_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785842873690,
+      "tag": "0009_conscious_stature",
+      "breakpoints": true
     }
   ]
 }

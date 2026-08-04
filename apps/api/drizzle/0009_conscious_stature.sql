@@ -1,0 +1,1 @@
+ALTER TABLE "tournament_standings" ADD COLUMN "match_results" jsonb;
