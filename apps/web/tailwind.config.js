@@ -4,17 +4,22 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // Nunito Variable (self-hosted) → rounded, friendly, highly legible.
-        // ui-rounded / SF Pro Rounded keep the character before the font loads.
+        // Neutral, crisp system sans — the rounded Nunito read too "playful" for
+        // an analytics/finance-style dashboard. System fonts (SF Pro on macOS,
+        // Segoe UI on Windows) are sharp and legible with no web-font dependency.
         sans: [
-          'Nunito Variable',
-          'ui-rounded',
-          'SF Pro Rounded',
-          '-apple-system',
+          'ui-sans-serif',
           'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
           'Segoe UI',
+          'Roboto',
+          'Helvetica Neue',
+          'Arial',
           'sans-serif',
         ],
+        // Tabular monospace for dense figures (records, matrix cells).
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
       },
       colors: {
         // Primary accent — Pokémon blue, deepened so white text clears AA (5.2:1).

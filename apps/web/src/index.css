@@ -45,11 +45,11 @@
 }
 
 @layer components {
-  /* ── Card — a crisp data panel on the playmat ──────────────────────────── */
-  /* Squarer corners (rounded-lg, was 2xl) read more "analytics/finance app"
-     than the earlier playful look — a small, deliberate angular shift. */
+  /* ── Card — a flat, sharp data panel on the playmat ────────────────────── */
+  /* Sharp corners (rounded-md) + hairline border + minimal shadow = a data
+     panel, not a playful floating tile. The analytical/finance look. */
   .card {
-    @apply bg-white border border-slate-200 rounded-lg p-4 shadow-card;
+    @apply bg-white border border-slate-200 rounded-md p-4 shadow-card;
   }
 
   /* Eyebrow label inside a card */
@@ -83,18 +83,13 @@
     @apply badge bg-purple-100 text-purple-800;
   }
 
-  /* ── Buttons — crisp, easy to hit (≥44px tall) ─────────────────────────── */
+  /* ── Buttons — flat, solid, crisp (≥44px tall); no gradient/bounce ─────── */
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px]
-      rounded-lg text-sm font-bold transition-all;
+      rounded-md text-sm font-bold transition-colors;
   }
   .btn-primary {
-    @apply btn text-white shadow-pop hover:-translate-y-0.5 active:translate-y-0
-      active:scale-[0.98];
-    background-image: linear-gradient(135deg, #3b82f6, #2563eb);
-  }
-  .btn-primary:hover {
-    background-image: linear-gradient(135deg, #2563eb, #1d4ed8);
+    @apply btn bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800;
   }
   .btn-ghost {
     @apply btn bg-white text-slate-700 border border-slate-300
