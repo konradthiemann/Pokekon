@@ -4,17 +4,22 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // Nunito Variable (self-hosted) → rounded, friendly, highly legible.
-        // ui-rounded / SF Pro Rounded keep the character before the font loads.
+        // Neutral, crisp system sans — the rounded Nunito read too "playful" for
+        // an analytics/finance-style dashboard. System fonts (SF Pro on macOS,
+        // Segoe UI on Windows) are sharp and legible with no web-font dependency.
         sans: [
-          'Nunito Variable',
-          'ui-rounded',
-          'SF Pro Rounded',
-          '-apple-system',
+          'ui-sans-serif',
           'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
           'Segoe UI',
+          'Roboto',
+          'Helvetica Neue',
+          'Arial',
           'sans-serif',
         ],
+        // Tabular monospace for dense figures (records, matrix cells).
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
       },
       colors: {
         // Primary accent — Pokémon blue, deepened so white text clears AA (5.2:1).
@@ -39,9 +44,10 @@ export default {
         },
       },
       boxShadow: {
-        // Soft, slightly blue-tinted lift — "card floating on the playmat".
-        card: '0 1px 2px rgba(15,23,42,0.04), 0 10px 28px -14px rgba(37,99,235,0.25)',
-        pop: '0 10px 30px -10px rgba(37,99,235,0.45)',
+        // Flat, neutral lift — a crisp data panel rather than a glossy floating
+        // card. Smaller spread + slate (not blue) tint reads more analytical.
+        card: '0 1px 2px rgba(15,23,42,0.06), 0 4px 12px -6px rgba(15,23,42,0.10)',
+        pop: '0 8px 22px -10px rgba(37,99,235,0.40)',
       },
     },
   },

@@ -1,14 +1,15 @@
 /**
  * Displays a head-to-head win-rate matrix for the current Standard meta.
- * Data comes from GET /api/matchups (the latest imported TrainerHill batch;
- * the server lazily seeds it from the CSV bundled with the API). To update:
- * POST a fresh TrainerHill export to /api/matchups/import.
+ * Data comes from GET /api/meta/matchups — REAL online-Bo1 head-to-heads (own
+ * data computed from Limitless round pairings) blended with the external
+ * TrainerHill matrix as a fallback for pairs the own data doesn't cover with
+ * enough games. Scoped to the same day/online window as the metashare.
  */
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, RefreshCw } from 'lucide-react';
 import { MIN_MATCHUP_GAMES, type MatchupRow } from '@pokekon/shared';
-import { getMatchups } from '../../lib/api';
+import { getMetaMatchups, type MatchupSource, type MetaWindow } from '../../lib/api';
 import { PokemonIcon } from '../shared/PokemonIcon';
 
 // G-regulation decks rotated out April 10 2026 — exclude from display
@@ -52,12 +53,18 @@ function cellStyle(winRate: number, total: number): string {
 
 const MIN_GAMES_FILTER_OPTIONS = [1, 10, 20, 50] as const;
 
-export function MatchupMatrix() {
+export function MatchupMatrix({
+  window,
+  iconsById,
+}: {
+  window: MetaWindow;
+  iconsById: Record<string, string[]>;
+}) {
   const { t } = useTranslation('meta');
   const [minGames, setMinGames] = useState<number>(10);
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [entries, setEntries] = useState<MatchupRow[] | null>(null);
-  const [dataDate, setDataDate] = useState<string>('—');
+  const [source, setSource] = useState<MatchupSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
 
@@ -65,13 +72,18 @@ export function MatchupMatrix() {
   // most recently started fetch may write state.
   const [fetchSeq, setFetchSeq] = useState(0);
 
+  const { days, online, bo1 } = window;
   const fetchData = useCallback(() => {
+    // No synchronous setState here — the effect calls this directly, and React 19
+    // forbids sync state updates in an effect body. Loading/error are flipped in
+    // the async resolution (allowed) or by the reload handler (an event).
     let cancelled = false;
-    getMatchups()
+    getMetaMatchups({ days, online, bo1 })
       .then((data) => {
         if (cancelled) return;
         setEntries(data.rows);
-        if (data.importedAt) setDataDate(data.importedAt.slice(0, 10));
+        setSource(data.matchupSource);
+        setFetchError(false);
         setLoading(false);
       })
       .catch(() => {
@@ -82,7 +94,7 @@ export function MatchupMatrix() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [days, online, bo1]);
 
   const loadData = () => {
     setLoading(true);
@@ -243,7 +255,7 @@ export function MatchupMatrix() {
                   }}
                 >
                   <div className="flex items-center gap-1.5 overflow-hidden">
-                    <PokemonIcon archetype={row} size="sm" dual />
+                    <PokemonIcon archetype={row} icons={iconsById[row]} size="sm" dual />
                     {labelsOpen && (
                       <span className="text-xs font-bold text-slate-800 truncate">
                         {formatDeckName(row)}
@@ -306,7 +318,17 @@ export function MatchupMatrix() {
       </div>
 
       <div className="px-4 py-2 text-xs text-slate-500 font-semibold border-t border-slate-200 flex items-center gap-3">
-        <span>{t('matchupMatrix.source', { date: dataDate })}</span>
+        <span>
+          {source && source.ownGames > 0
+            ? t('matchupMatrix.sourceBlend', {
+                ownGames: source.ownGames,
+                ownPairs: source.ownPairs,
+                fallback: source.fallbackPairs,
+              })
+            : t('matchupMatrix.source', {
+                date: source?.trainerHillImportedAt?.slice(0, 10) ?? '—',
+              })}
+        </span>
         <button
           onClick={loadData}
           className="ml-auto text-slate-400 hover:text-brand-700 transition-colors"

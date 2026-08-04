@@ -5,6 +5,7 @@ import type {
   FieldScore,
   MatchupRow,
   MetaSyncResult,
+  StandingMatchResult,
   TournamentDecklist,
 } from '@pokekon/shared';
 import type {
@@ -475,15 +476,28 @@ export interface FieldAnalysisArchetype {
   wins: number;
   losses: number;
   playerCount: number;
+  /** Data-driven Pokémon sprite slugs (Limitless deck.icons); [] when none. */
+  icons: string[];
   fieldWinRatePct: number | null;
   coveragePct: number;
   rank: number;
+}
+
+/** How much of the matchup data behind a field score is real vs. approximate:
+ *  `ownPairs`/`ownGames` come from real online-Bo1 matches, `fallbackPairs` from
+ *  the external TrainerHill matrix filling coverage gaps. */
+export interface MatchupSource {
+  ownPairs: number;
+  fallbackPairs: number;
+  ownGames: number;
+  trainerHillImportedAt: string | null;
 }
 
 export interface FieldAnalysis extends MetaWindow {
   tournamentCount: number;
   totalPlayers: number;
   matchupImportedAt: string | null;
+  matchupSource: MatchupSource;
   archetypes: FieldAnalysisArchetype[];
 }
 
@@ -499,6 +513,9 @@ export interface ArchetypeListEntry {
    *  `decklist IS NOT NULL` — standings without a published list never
    *  reach this endpoint. */
   decklist: TournamentDecklist;
+  /** This pilot's game-by-game results (opponent archetype + W/L/T), for the
+   *  drill-down. Empty when the tournament's pairings weren't processed. */
+  matchResults: StandingMatchResult[];
   tournament: { id: string; name: string; date: string; players: number };
 }
 
@@ -511,6 +528,7 @@ export interface ArchetypeAnalysis extends MetaWindow {
   tournamentCount: number;
   totalPlayers: number;
   matchupImportedAt: string | null;
+  matchupSource: MatchupSource;
   archetype: {
     archetypeId: string;
     archetypeName: string;
@@ -519,8 +537,12 @@ export interface ArchetypeAnalysis extends MetaWindow {
     wins: number;
     losses: number;
     playerCount: number;
+    icons: string[];
   };
   fieldScore: FieldScore;
+  /** archetypeId → data-driven sprite slugs, for the drilldown matchup table's
+   *  opponent icons (covers every archetype in the field). */
+  iconsById: Record<string, string[]>;
   totalRanked: number;
   listsAvailable: number;
   trend: { period: string; frequencyPct: number; winRatePct: number | null }[];
@@ -562,4 +584,16 @@ export interface MatchupData {
 
 export async function getMatchups(): Promise<MatchupData> {
   return request<MatchupData>('/api/matchups');
+}
+
+/** The windowed head-to-head matrix: real online-Bo1 results (own data) with
+ *  TrainerHill filling coverage gaps, scoped to the same day/online window as
+ *  the metashare. `matchupSource` reports the real-vs-approximate blend. */
+export interface MetaMatchups extends MetaWindow {
+  matchupSource: MatchupSource;
+  rows: MatchupRow[];
+}
+
+export async function getMetaMatchups(window: MetaWindow): Promise<MetaMatchups> {
+  return request<MetaMatchups>(`/api/meta/matchups?${metaWindowParams(window)}`);
 }

@@ -25,6 +25,7 @@
     "loadingTournament": "Loading {{name}} ({{players}} players)…",
     "savingMetaData": "Saving meta data…",
     "unknownError": "Unknown error",
+    "rateLimited": "Too many sync requests, or Limitless is throttling us — please try again in a few minutes.",
     "errors": {
       "tournamentListFailed": "Tournament list fetch failed: {{status}}",
       "noTournaments": "No tournaments with 30+ players found.",

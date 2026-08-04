@@ -24,6 +24,7 @@ import {
   copyDeckCards,
 } from '../db/queries';
 import { fetchRecentTournaments } from '../lib/metaFetch';
+import { ApiError } from '../lib/api';
 import type { MetaSyncResult } from '@pokekon/shared';
 import { fetchArchetypeComparison } from '../lib/deckComparison';
 import type { ComparisonResult } from '../lib/deckComparison';
@@ -253,7 +254,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       await get().refresh();
       return result;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : i18n.t('layout:sync.unknownError');
+      // A 429 (our own sync rate limit OR Limitless throttling our server) is
+      // transient — show a calm retry hint, not a raw upstream error string.
+      const msg =
+        err instanceof ApiError && err.status === 429
+          ? i18n.t('layout:sync.rateLimited')
+          : err instanceof Error
+            ? err.message
+            : i18n.t('layout:sync.unknownError');
       set({ isSyncing: false, syncProgress: '', syncError: msg });
       throw err;
     }

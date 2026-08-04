@@ -30,6 +30,7 @@ import { META_DEFAULT_DAYS } from '../components/meta/metaWindow';
 import { PredictionPanel } from '../components/meta/PredictionPanel';
 import { MatchupMatrix } from '../components/meta/MatchupMatrix';
 import { WinRateBadge } from '../components/meta/WinRateBadge';
+import { winRatePct1 } from '../components/meta/winRateColor';
 import { CollapsibleSection } from '../components/layout/CollapsibleSection';
 import { PokemonIcon } from '../components/shared/PokemonIcon';
 
@@ -229,12 +230,13 @@ function MetaTable({
                       }
                       title={t('metaTable.clickHint')}
                     >
-                      <td className="px-3 py-2 text-slate-400 text-xs tabular-nums">{i + 1}</td>
-                      <td className="py-2 px-2 overflow-hidden">
+                      <td className="px-3 py-1.5 text-slate-400 text-xs tabular-nums">{i + 1}</td>
+                      <td className="py-1.5 px-2 overflow-hidden">
                         <div className="flex items-center gap-1.5">
                           <div className="shrink-0 flex items-center" style={{ width: ICON_BOX }}>
                             <PokemonIcon
                               archetype={a.archetypeName}
+                              icons={a.icons}
                               size="sm"
                               dual
                               reserveSecondary
@@ -247,19 +249,19 @@ function MetaTable({
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-1.5">
                         <ShareBar pct={a.sharePct} max={maxShare} />
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-600 tabular-nums text-xs">
+                      <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums text-xs">
                         {a.playerCount}
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-500 font-mono text-xs">
+                      <td className="px-3 py-1.5 text-right text-slate-500 font-mono text-xs">
                         {a.wins}-{a.losses}
                       </td>
-                      <td className="px-3 py-2 text-right">
-                        <WinRateBadge pct={a.winRatePct} />
+                      <td className="px-3 py-1.5 text-right">
+                        <WinRateBadge pct={winRatePct1(a.wins, a.losses)} />
                       </td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <td className="px-3 py-1.5 text-right whitespace-nowrap">
                         {a.fieldWinRatePct !== null ? (
                           <>
                             <WinRateBadge pct={Math.round(a.fieldWinRatePct * 10) / 10} />
@@ -537,9 +539,15 @@ export function MetaPage() {
   }
 
   const archetypes = fieldAnalysis?.archetypes ?? [];
+  // Data-driven archetype icons (Limitless deck.icons), keyed by slug — shared
+  // with the matchup matrix so every deck renders the icons the source publishes.
+  // `icons` is additive: an API that predates it (rollout window) or legacy
+  // snapshot rows omit it, so guard with optional chaining — never crash the tab.
+  const iconsById: Record<string, string[]> = {};
+  for (const a of archetypes) if (a.icons?.length) iconsById[a.archetypeId] = a.icons;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">
@@ -561,25 +569,30 @@ export function MetaPage() {
               ? t('sidebar.syncing', { ns: 'layout' })
               : t('sidebar.syncLiveMeta', { ns: 'layout' })}
           </button>
-          {!isSyncing && lastSynced && (
-            <span className="text-[11px] text-slate-500">
-              {t('sidebar.syncedAt', { ns: 'layout', time: lastSynced.toLocaleTimeString() })}
-            </span>
-          )}
+          {/* Always reserve the line height so the button doesn't jump on sync. */}
+          <span className="min-h-[0.9rem] text-[11px] text-slate-500">
+            {!isSyncing && lastSynced
+              ? t('sidebar.syncedAt', { ns: 'layout', time: lastSynced.toLocaleTimeString() })
+              : ''}
+          </span>
         </div>
       </div>
 
-      {isSyncing && syncProgress && (
-        <p className="-mt-3 truncate text-xs text-slate-500" title={syncProgress}>
-          {syncProgress}
-        </p>
-      )}
-      {!isSyncing && syncError && (
-        <div className="-mt-3 flex items-start gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span className="break-words">{syncError}</span>
-        </div>
-      )}
+      {/* Reserved status slot — always rendered so starting a sync (progress text
+          appears) or an error can't shift the layout below. aria-live announces
+          sync progress to assistive tech. */}
+      <div className="-mt-2 min-h-[1.25rem]" aria-live="polite">
+        {isSyncing && syncProgress ? (
+          <p className="truncate text-xs text-slate-500" title={syncProgress}>
+            {syncProgress}
+          </p>
+        ) : !isSyncing && syncError ? (
+          <div className="flex items-start gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span className="break-words">{syncError}</span>
+          </div>
+        ) : null}
+      </div>
 
       {/* Window control (days + online-Bo1 scope) + sample-size readout */}
       <div className="card flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-3">
@@ -610,7 +623,7 @@ export function MetaPage() {
           icon={<Grid3X3 className="w-4 h-4 text-brand-700" />}
           defaultOpen
         >
-          <MatchupMatrix />
+          <MatchupMatrix window={metaWindow} iconsById={iconsById} />
         </CollapsibleSection>
 
         <CollapsibleSection
@@ -641,7 +654,7 @@ export function MetaPage() {
           icon={<FlaskConical className="w-4 h-4 text-brand-700" />}
           defaultOpen
         >
-          <PredictionPanel archetypes={archetypes} />
+          <PredictionPanel archetypes={archetypes} window={metaWindow} />
         </CollapsibleSection>
       </div>
 

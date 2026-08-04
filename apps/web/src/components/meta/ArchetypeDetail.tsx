@@ -12,10 +12,11 @@ import {
 import { PokemonIcon } from '../shared/PokemonIcon';
 import { DecklistCard } from './DecklistCard';
 import { FieldScorePanel } from './FieldScorePanel';
+import { MatchupTable } from './MatchupTable';
 import { MetaWindowControl } from './MetaWindowControl';
 import { ThreatsPanel } from './ThreatsPanel';
 import { WinRateBadge } from './WinRateBadge';
-import { winRateColorClass } from './winRateColor';
+import { winRateColorClass, winRatePct1 } from './winRateColor';
 
 const LISTS_PAGE_SIZE = 4;
 
@@ -180,7 +181,7 @@ export function ArchetypeDetail({
       </div>
 
       <div className="flex items-center gap-3">
-        <PokemonIcon archetype={archetypeName} size="md" dual />
+        <PokemonIcon archetype={archetypeName} icons={analysis?.archetype.icons} size="md" dual />
         <div>
           <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">{archetypeName}</h2>
           {analysis && (
@@ -226,7 +227,9 @@ export function ArchetypeDetail({
             <div className="card p-3">
               <p className="text-xs text-slate-500">{t('archetypeDetail.kpi.winRate')}</p>
               <p className="text-xl font-extrabold tabular-nums">
-                <WinRateBadge pct={analysis.archetype.winRatePct} />
+                <WinRateBadge
+                  pct={winRatePct1(analysis.archetype.wins, analysis.archetype.losses)}
+                />
               </p>
             </div>
             <div className="card p-3">
@@ -264,6 +267,10 @@ export function ArchetypeDetail({
             />
             <ThreatsPanel fieldScore={analysis.fieldScore} />
           </div>
+
+          {/* Full head-to-head table: this archetype vs every deck in the field.
+              iconsById is additive — default to {} so an older API can't crash it. */}
+          <MatchupTable fieldScore={analysis.fieldScore} iconsById={analysis.iconsById ?? {}} />
 
           {/* Decklists */}
           <div className="space-y-3">

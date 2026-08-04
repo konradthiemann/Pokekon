@@ -907,22 +907,213 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
     expect(body.lists[0]?.decklist.pokemon[0]).toEqual({ name: 'Charizard ex', count: 3 });
   });
 
-  it("replaces (not duplicates) a tournament's standings on re-sync", async () => {
-    await clearTournamentData();
+  // makeFetch for the delta tests: standings + details + pairings for T9, list otherwise.
+  const makeT9Fetch = (deckId: string, opts: { pairingsOk?: boolean } = {}) => {
     const today = new Date().toISOString();
-    const makeFetch = (deckId: string) =>
+    return vi.fn(async (url: string) => {
+      if (url.includes('/api/tournaments/T9/standings')) {
+        return jsonResponse([
+          {
+            placing: 1,
+            player: 'alice',
+            deck: { id: deckId, name: deckId.toUpperCase() },
+            record: { wins: 6, losses: 1, ties: 0 },
+          },
+          {
+            placing: 2,
+            player: 'bob',
+            deck: { id: deckId, name: deckId.toUpperCase() },
+            record: { wins: 5, losses: 2, ties: 0 },
+          },
+        ]);
+      }
+      if (url.includes('/api/tournaments/T9/details')) {
+        return jsonResponse({
+          isOnline: true,
+          platform: 'PTCGL',
+          phases: [{ type: 'SWISS', mode: 'BO1' }],
+        });
+      }
+      if (url.includes('/api/tournaments/T9/pairings')) {
+        return opts.pairingsOk === false
+          ? jsonResponse(null, 500)
+          : jsonResponse([{ round: 1, player1: 'alice', player2: 'bob', winner: 'alice' }]);
+      }
+      return jsonResponse([{ id: 'T9', name: 'Weekly Online', players: 40, date: today }]);
+    });
+  };
+
+  it('delta import skips a fully-imported tournament, keeping data (and never duplicating)', async () => {
+    await clearTournamentData();
+    vi.stubGlobal('fetch', makeT9Fetch('first-deck'));
+    expect((await request('/api/meta/sync', { user: USER_A, method: 'POST' })).status).toBe(200);
+
+    // Second sync serves DIFFERENT data, but the completed event is already fully
+    // imported → the delta import skips it: the old standings are kept (immutable
+    // event, re-fetching would just waste calls) and rows are never duplicated.
+    vi.stubGlobal('fetch', makeT9Fetch('second-deck'));
+    expect((await request('/api/meta/sync', { user: USER_A, method: 'POST' })).status).toBe(200);
+
+    const rows = await db
+      .select({ archetypeId: schema.tournamentStandings.archetypeId })
+      .from(schema.tournamentStandings);
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.archetypeId === 'first-deck')).toBe(true);
+  });
+
+  it('delta import retries a tournament whose pairings failed on a later sync', async () => {
+    await clearTournamentData();
+    // First sync: pairings fetch fails → standings persist but pairings_synced_at
+    // stays null, so the event is NOT considered fully imported. (Sync writes
+    // global data; the requesting user only matters for rate limiting, so these
+    // two tests use USER_B to stay under the sync rate limit.)
+    vi.stubGlobal('fetch', makeT9Fetch('first-deck', { pairingsOk: false }));
+    expect((await request('/api/meta/sync', { user: USER_B, method: 'POST' })).status).toBe(200);
+
+    // Second sync: because it was incomplete, it is retried and its standings are
+    // replaced with the fresh data (and pairings now succeed).
+    vi.stubGlobal('fetch', makeT9Fetch('second-deck', { pairingsOk: true }));
+    expect((await request('/api/meta/sync', { user: USER_B, method: 'POST' })).status).toBe(200);
+
+    const rows = await db
+      .select({ archetypeId: schema.tournamentStandings.archetypeId })
+      .from(schema.tournamentStandings);
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.archetypeId === 'second-deck')).toBe(true);
+  });
+
+  it('remembers non-qualifying events so coverage grows without re-probing them', async () => {
+    await clearTournamentData();
+    // A reject classified on a PRIOR run: header only, no standings. It must never
+    // be probed again — that is what frees each run's budget to reach older events.
+    await db.insert(schema.tournaments).values({
+      id: 'told-reject',
+      name: 'Old Reject',
+      date: daysAgo(3),
+      players: 40,
+      isOnline: false,
+      swissMode: 'BO3',
+    });
+
+    const detailsCalls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
       vi.fn(async (url: string) => {
-        if (url.includes('/api/tournaments/T9/standings')) {
+        if (url.includes('/tournaments/tqual/details')) {
+          detailsCalls.push('tqual');
+          return jsonResponse({ isOnline: true, platform: 'PTCGL', phases: [{ mode: 'BO1' }] });
+        }
+        if (url.includes('/tournaments/tqual/standings'))
           return jsonResponse([
             {
               placing: 1,
-              deck: { id: deckId, name: deckId.toUpperCase() },
+              player: 'alice',
+              deck: { id: 'char', name: 'Charizard' },
+              record: { wins: 6, losses: 1 },
+            },
+            {
+              placing: 2,
+              player: 'bob',
+              deck: { id: 'char', name: 'Charizard' },
+              record: { wins: 5, losses: 2 },
+            },
+          ]);
+        if (url.includes('/tournaments/tqual/pairings'))
+          return jsonResponse([{ round: 1, player1: 'alice', player2: 'bob', winner: 'alice' }]);
+        if (url.includes('/tournaments/treject/details')) {
+          detailsCalls.push('treject');
+          return jsonResponse({ isOnline: false, platform: null, phases: [{ mode: 'BO3' }] });
+        }
+        // A probe that keeps failing (Limitless 429/5xx) must NOT be recorded as a
+        // verdict — it stays "unknown" and is retried on a later run, never buried.
+        if (url.includes('/tournaments/tfail/details')) {
+          detailsCalls.push('tfail');
+          return jsonResponse(null, 500);
+        }
+        // Already-classified reject: probing it is the bug this test guards against.
+        if (url.includes('/tournaments/told-reject/details')) detailsCalls.push('told-reject');
+        return jsonResponse([
+          { id: 'tqual', name: 'Weekly Online', players: 40, date: daysAgo(1).toISOString() },
+          { id: 'tfail', name: 'Flaky Online', players: 40, date: daysAgo(1).toISOString() },
+          { id: 'treject', name: 'Regional IRL', players: 40, date: daysAgo(2).toISOString() },
+          { id: 'told-reject', name: 'Old Reject', players: 40, date: daysAgo(3).toISOString() },
+        ]);
+      }),
+    );
+
+    expect((await request('/api/meta/sync', { user: USER_B, method: 'POST' })).status).toBe(200);
+
+    // The three NEW events were probed; the already-classified reject never was.
+    expect(new Set(detailsCalls)).toEqual(new Set(['tqual', 'tfail', 'treject']));
+    expect(detailsCalls).not.toContain('told-reject');
+
+    const standings = await db
+      .select({ tournamentId: schema.tournamentStandings.tournamentId })
+      .from(schema.tournamentStandings);
+    // Qualifying event ingested (2 standings); no reject / failed probe contributed.
+    expect(standings.filter((s) => s.tournamentId === 'tqual')).toHaveLength(2);
+    expect(standings.filter((s) => s.tournamentId === 'treject')).toHaveLength(0);
+
+    const all = await db.select().from(schema.tournaments);
+    // The NEW reject is REMEMBERED (header persisted with its verdict) so the next
+    // run skips it too — a classification-only row, not meta data.
+    const treject = all.find((t) => t.id === 'treject');
+    expect(treject?.isOnline).toBe(false);
+    expect(treject?.swissMode).toBe('BO3');
+    expect(treject?.pairingsSyncedAt).toBeNull();
+    // The failed probe is NOT recorded — a transient error must never bury an event
+    // as a permanent reject; it simply gets retried next run.
+    expect(all.find((t) => t.id === 'tfail')).toBeUndefined();
+  });
+
+  it('surfaces a Limitless rate-limit as a 429 with a calm message, not a 502', async () => {
+    await clearTournamentData();
+    // Every Limitless call 429s; after the client's retries the list fetch throws.
+    // A fresh user id keeps this off the per-user sync rate-limit budget.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ error: 'rate limited' }, 429)),
+    );
+    const res = await request('/api/meta/sync', { user: 'user-c-ratelimit', method: 'POST' });
+    expect(res.status).toBe(429);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/rate-limited|try again/i);
+    // The raw upstream URL must not leak into the user-facing message.
+    expect(body.error).not.toContain('Limitless /api');
+  });
+
+  it('computes and stores the own matchup matrix from round pairings', async () => {
+    await clearTournamentData();
+    const today = new Date().toISOString();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/api/tournaments/T9/standings')) {
+          // 2 pilots per archetype so both clear the min-2 snapshot filter.
+          return jsonResponse([
+            {
+              placing: 1,
+              player: 'alice',
+              deck: { id: 'dragapult-ex', name: 'Dragapult ex', icons: ['dragapult', 'dusknoir'] },
               record: { wins: 6, losses: 1, ties: 0 },
             },
             {
               placing: 2,
-              deck: { id: deckId, name: deckId.toUpperCase() },
+              player: 'carol',
+              deck: { id: 'dragapult-ex', name: 'Dragapult ex', icons: ['dragapult', 'dusknoir'] },
               record: { wins: 5, losses: 2, ties: 0 },
+            },
+            {
+              placing: 3,
+              player: 'bob',
+              deck: { id: 'n-zoroark', name: "N's Zoroark ex" },
+              record: { wins: 5, losses: 2, ties: 0 },
+            },
+            {
+              placing: 4,
+              player: 'dave',
+              deck: { id: 'n-zoroark', name: "N's Zoroark ex" },
+              record: { wins: 4, losses: 3, ties: 0 },
             },
           ]);
         }
@@ -933,21 +1124,36 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
             phases: [{ type: 'SWISS', mode: 'BO1' }],
           });
         }
+        if (url.includes('/api/tournaments/T9/pairings')) {
+          // alice (dragapult-ex) beats bob (n-zoroark).
+          return jsonResponse([{ round: 1, player1: 'alice', player2: 'bob', winner: 'alice' }]);
+        }
         return jsonResponse([{ id: 'T9', name: 'Weekly Online', players: 40, date: today }]);
-      });
+      }),
+    );
+    // USER_B here to keep USER_A under the per-user sync rate limit (sync is global).
+    expect((await request('/api/meta/sync', { user: USER_B, method: 'POST' })).status).toBe(200);
 
-    vi.stubGlobal('fetch', makeFetch('first-deck'));
-    expect((await request('/api/meta/sync', { user: USER_A, method: 'POST' })).status).toBe(200);
+    // A real head-to-head, canonicalised (dragapult-ex < n-zoroark), alice's win in aWins.
+    const matchups = await db.select().from(schema.tournamentMatchups);
+    expect(matchups).toHaveLength(1);
+    expect(matchups[0]).toMatchObject({
+      deckA: 'dragapult-ex',
+      deckB: 'n-zoroark',
+      aWins: 1,
+      bWins: 0,
+      ties: 0,
+    });
 
-    vi.stubGlobal('fetch', makeFetch('second-deck'));
-    expect((await request('/api/meta/sync', { user: USER_A, method: 'POST' })).status).toBe(200);
-
-    const rows = await db
-      .select({ archetypeId: schema.tournamentStandings.archetypeId })
-      .from(schema.tournamentStandings);
-    // The second sync fully replaced the first run's standings (2 rows, not 4).
-    expect(rows).toHaveLength(2);
-    expect(rows.every((r) => r.archetypeId === 'second-deck')).toBe(true);
+    // Data-driven icons flowed through from Limitless deck.icons into the snapshot.
+    const meta = (await (await request('/api/meta', { user: USER_A })).json()) as {
+      archetype: string;
+      icons: string[] | null;
+    }[];
+    expect(meta.find((r) => r.archetype === 'Dragapult ex')?.icons).toEqual([
+      'dragapult',
+      'dusknoir',
+    ]);
   });
 
   it('orders lists by relative placing, respects the window, and paginates', async () => {
@@ -1007,6 +1213,47 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
     expect(body.archetypes[0]?.coveragePct).toBe(100);
   });
 
+  it('field score prefers real matchup data (own matrix) over TrainerHill and exposes the source + matrix', async () => {
+    await clearTournamentData();
+    await seedTournament('t-own', daysAgo(1), 4, [
+      standing('aa', { placing: 1 }),
+      standing('aa', { placing: 2 }),
+      standing('bb', { placing: 3 }),
+      standing('bb', { placing: 4 }),
+    ]);
+    // TrainerHill says aa beats bb 60 % → aa field score would be 55…
+    await seedMatchups([
+      { deck1: 'aa', deck2: 'bb', winRate: 60 },
+      { deck1: 'bb', deck2: 'aa', winRate: 40 },
+    ]);
+    // …but the real online-Bo1 matches say 12–0 (100 %), enough games to override.
+    await db.insert(schema.tournamentMatchups).values({
+      tournamentId: 't-own',
+      deckA: 'aa',
+      deckB: 'bb',
+      aWins: 12,
+      bWins: 0,
+      ties: 0,
+    });
+
+    const body = (await (
+      await request('/api/meta/field-analysis?days=7', { user: USER_A })
+    ).json()) as {
+      matchupSource: { ownPairs: number; fallbackPairs: number; ownGames: number };
+      archetypes: { archetypeId: string; fieldWinRatePct: number }[];
+    };
+    // aa: 50 % mirror × 50 + 50 % vs bb × 100 (OWN) = 75 — not 55 (TrainerHill).
+    expect(body.archetypes.find((a) => a.archetypeId === 'aa')?.fieldWinRatePct).toBe(75);
+    expect(body.matchupSource.ownGames).toBe(12);
+    expect(body.matchupSource.ownPairs).toBeGreaterThanOrEqual(1);
+
+    // The windowed matrix endpoint surfaces the real directed win rate.
+    const matrix = (await (
+      await request('/api/meta/matchups?days=7', { user: USER_A })
+    ).json()) as { rows: { deck1: string; deck2: string; winRate: number }[] };
+    expect(matrix.rows.find((r) => r.deck1 === 'aa' && r.deck2 === 'bb')?.winRate).toBe(100);
+  });
+
   it('restricts the field to online Bo1 events by default; includes all when asked', async () => {
     await clearTournamentData();
     await seedTournament('online-bo1', daysAgo(1), 20, [standing('aa'), standing('aa')]);
@@ -1036,6 +1283,39 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
     };
     expect(allBody.totalPlayers).toBe(4);
     expect(allBody.archetypes.map((a) => a.archetypeId).sort()).toEqual(['aa', 'bb']);
+  });
+
+  it('days window genuinely drives the metashare (more days → more decks/players)', async () => {
+    await clearTournamentData();
+    // Two online-Bo1 events at different ages, 2 pilots each.
+    await seedTournament('recent', daysAgo(2), 20, [standing('aa'), standing('aa')]);
+    await seedTournament('older', daysAgo(20), 20, [standing('bb'), standing('bb')]);
+
+    const w7 = (await (
+      await request('/api/meta/field-analysis?days=7', { user: USER_A })
+    ).json()) as {
+      totalPlayers: number;
+      tournamentCount: number;
+      archetypes: { archetypeId: string }[];
+    };
+    expect(w7.tournamentCount).toBe(1);
+    expect(w7.totalPlayers).toBe(2);
+    expect(w7.archetypes.map((a) => a.archetypeId)).toEqual(['aa']);
+
+    // Widening to 30 days brings in the older event — proof that the day control
+    // changes the result. The reported "days does nothing" was a data-coverage
+    // symptom (too few tournaments ingested, all recent), not a broken filter;
+    // Phase 0's higher ingest cap + delta accumulation is the real fix.
+    const w30 = (await (
+      await request('/api/meta/field-analysis?days=30', { user: USER_A })
+    ).json()) as {
+      totalPlayers: number;
+      tournamentCount: number;
+      archetypes: { archetypeId: string }[];
+    };
+    expect(w30.tournamentCount).toBe(2);
+    expect(w30.totalPlayers).toBe(4);
+    expect(w30.archetypes.map((a) => a.archetypeId).sort()).toEqual(['aa', 'bb']);
   });
 
   it('serves one archetype analysis with threats, rank and trend', async () => {

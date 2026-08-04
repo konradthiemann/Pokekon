@@ -6,5 +6,8 @@ import { winRateColorClass } from './winRateColor';
  */
 export function WinRateBadge({ pct }: { pct: number | null }) {
   if (pct === null) return <span className="text-slate-400 font-mono">—</span>;
-  return <span className={`font-mono font-semibold ${winRateColorClass(pct)}`}>{pct}%</span>;
+  // Always one decimal so win-rate columns line up (no mix of "49%" and "48.3%").
+  return (
+    <span className={`font-mono font-semibold ${winRateColorClass(pct)}`}>{pct.toFixed(1)}%</span>
+  );
 }

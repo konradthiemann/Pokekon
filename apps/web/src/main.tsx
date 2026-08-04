@@ -1,8 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-// Self-hosted variable font (no runtime CDN call) — the playful, highly
-// legible face that carries the brand for an 8–50 audience.
-import '@fontsource-variable/nunito/index.css';
+// Typography is a neutral system-font stack (see tailwind.config.js) for a crisp,
+// analytical look — no web-font import needed.
 import './index.css';
 import './i18n';
 import App from './App.tsx';

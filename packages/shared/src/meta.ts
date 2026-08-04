@@ -1,9 +1,12 @@
 // Pure tournament-meta aggregation, shared by the server sync job (producer) and
 // the web meta views (consumer contract). No I/O here — callers fetch standings.
 
-/** A tournament standing row, as far as meta aggregation cares. */
+/** A tournament standing row, as far as meta aggregation cares. `deck.icons`
+ *  are the Pokémon sprite slugs Limitless attaches to the archetype (e.g.
+ *  `["grimmsnarl","froslass"]`) — the data-driven source for the app's icons,
+ *  so a hand-maintained slug→sprite map is only a fallback. */
 export interface StandingLite {
-  deck?: { id: string; name: string };
+  deck?: { id: string; name: string; icons?: string[] };
   record?: { wins: number; losses: number; ties?: number };
 }
 
@@ -68,6 +71,29 @@ export function pruneDecklist(raw: unknown): TournamentDecklist | null {
   return totalCards > 0 ? result : null;
 }
 
+/** A real archetype icon set is one or two Pokémon (e.g. Grimmsnarl Froslass);
+ *  a handful at most. More is a malformed or hostile response, not data. */
+const MAX_ICONS = 4;
+
+/**
+ * Reduce an untrusted `deck.icons` payload (external API response) to safe
+ * lowercase sprite slugs. Non-strings, empty entries and anything that is not a
+ * plain kebab-case slug are dropped; the array is capped at `MAX_ICONS`. Returns
+ * `[]` when nothing usable remains — callers store that as "no icons published"
+ * and fall back to the hand-maintained slug→sprite map. Keeping the icons
+ * data-driven fixes wrong/missing archetype icons without touching code.
+ */
+export function pruneIcons(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const entry of raw.slice(0, MAX_ICONS)) {
+    if (typeof entry !== 'string') continue;
+    const slug = entry.toLowerCase().trim().slice(0, 60);
+    if (slug !== '' && ARCHETYPE_SLUG_PATTERN.test(slug)) out.push(slug);
+  }
+  return out;
+}
+
 /** One aggregated archetype row for a period (the insert/wire shape, sans id). */
 export interface MetaSnapshotData {
   archetype: string;
@@ -78,6 +104,9 @@ export interface MetaSnapshotData {
   wins: number;
   losses: number;
   playerCount: number;
+  /** Pokémon sprite slugs for the archetype (Limitless `deck.icons`), pruned;
+   *  empty when the source published none. Data-driven icons (see `pruneIcons`). */
+  icons: string[];
   period: string; // ISO week, e.g. "2026-W15"
   sourceNote: string;
 }
@@ -217,7 +246,7 @@ export function computeMetaSnapshots(
 ): { snapshots: MetaSnapshotData[]; totalPlayers: number; tournamentCount: number } {
   const archMap = new Map<
     string,
-    { displayName: string; wins: number; losses: number; playerCount: number }
+    { displayName: string; icons: string[]; wins: number; losses: number; playerCount: number }
   >();
   let totalPlayers = 0;
   let tournamentCount = 0;
@@ -229,10 +258,15 @@ export function computeMetaSnapshots(
     for (const p of standings) {
       const id = normalizeArchetypeId(p.deck?.id);
       const displayName = p.deck?.name ?? 'Other';
-      const e = archMap.get(id) ?? { displayName, wins: 0, losses: 0, playerCount: 0 };
+      const e = archMap.get(id) ?? { displayName, icons: [], wins: 0, losses: 0, playerCount: 0 };
       e.wins += p.record?.wins ?? 0;
       e.losses += p.record?.losses ?? 0;
       e.playerCount += 1;
+      // Icons are constant per archetype; keep the first non-empty set we see.
+      if (e.icons.length === 0) {
+        const icons = pruneIcons(p.deck?.icons);
+        if (icons.length > 0) e.icons = icons;
+      }
       archMap.set(id, e);
     }
   }
@@ -252,6 +286,7 @@ export function computeMetaSnapshots(
       wins: s.wins,
       losses: s.losses,
       playerCount: s.playerCount,
+      icons: s.icons,
       period,
       sourceNote,
     });

@@ -3,14 +3,22 @@ import { Hono } from 'hono';
 import {
   computeFieldScores,
   computeMetaSnapshots,
+  MIN_MATCHUP_GAMES,
   OTHER_ARCHETYPE_ID,
   ROTATION_PERIOD,
   type ArchetypeShare,
   type FieldScore,
+  type MatchupCell,
+  type MatchupRow,
   type StandingLite,
 } from '@pokekon/shared';
 import type { Db } from '../db/index.js';
-import { metaSnapshots, tournamentStandings, tournaments } from '../db/schema.js';
+import {
+  metaSnapshots,
+  tournamentMatchups,
+  tournamentStandings,
+  tournaments,
+} from '../db/schema.js';
 import { runMetaSync } from '../jobs/syncMeta.js';
 import { ensureMatchups } from '../lib/matchupData.js';
 import { rateLimit } from '../lib/rateLimit.js';
@@ -34,6 +42,8 @@ interface WindowAggregates {
     wins: number;
     losses: number;
     playerCount: number;
+    /** Pokémon sprite slugs (Limitless deck.icons), data-driven; [] if none. */
+    icons: string[];
   }[];
 }
 
@@ -69,6 +79,7 @@ async function loadWindowAggregates(db: Db, window: MetaWindow): Promise<WindowA
       tournamentId: tournamentStandings.tournamentId,
       archetypeId: tournamentStandings.archetypeId,
       archetypeName: tournamentStandings.archetypeName,
+      icons: tournamentStandings.icons,
       wins: tournamentStandings.wins,
       losses: tournamentStandings.losses,
     })
@@ -77,7 +88,9 @@ async function loadWindowAggregates(db: Db, window: MetaWindow): Promise<WindowA
     .where(and(...windowConditions(window)));
 
   const standings: StandingLite[] = rows.map((r) => ({
-    deck: { id: r.archetypeId, name: r.archetypeName },
+    deck: r.icons
+      ? { id: r.archetypeId, name: r.archetypeName, icons: r.icons }
+      : { id: r.archetypeId, name: r.archetypeName },
     record: { wins: r.wins, losses: r.losses },
   }));
   // One flat group instead of per-tournament arrays is fine here: shares and
@@ -97,7 +110,108 @@ async function loadWindowAggregates(db: Db, window: MetaWindow): Promise<WindowA
       wins: s.wins,
       losses: s.losses,
       playerCount: s.playerCount,
+      icons: s.icons,
     })),
+  };
+}
+
+/** Own matchup data for the window (real online-Bo1 head-to-heads from
+ *  tournament_matchups) blended with the external TrainerHill matrix as a
+ *  fallback for pairs the own data doesn't cover with enough games. */
+interface MatchupData {
+  cells: MatchupCell[]; // fed to computeFieldScores
+  rows: MatchupRow[]; // full directed rows for the matrix UI
+  /** How the blend broke down, so the UI can flag real vs approximate coverage. */
+  ownPairs: number;
+  fallbackPairs: number;
+  ownGames: number;
+  trainerHillImportedAt: Date | null;
+}
+
+/** A directed matchup row from a head-to-head count (win rate excludes ties, to
+ *  match the metashare win-rate convention; `total` counts all games incl. ties). */
+function directedRow(
+  deck1: string,
+  deck2: string,
+  wins: number,
+  losses: number,
+  ties: number,
+): MatchupRow {
+  const decisive = wins + losses;
+  return {
+    deck1,
+    deck2,
+    wins,
+    losses,
+    ties,
+    total: decisive + ties,
+    winRate: decisive > 0 ? Math.round((wins / decisive) * 1000) / 10 : 50,
+  };
+}
+
+async function loadMatchupData(db: Db, window: MetaWindow): Promise<MatchupData> {
+  const [ownRows, trainerHill] = await Promise.all([
+    db
+      .select({
+        deckA: tournamentMatchups.deckA,
+        deckB: tournamentMatchups.deckB,
+        aWins: tournamentMatchups.aWins,
+        bWins: tournamentMatchups.bWins,
+        ties: tournamentMatchups.ties,
+      })
+      .from(tournamentMatchups)
+      .innerJoin(tournaments, eq(tournamentMatchups.tournamentId, tournaments.id))
+      .where(and(...windowConditions(window))),
+    ensureMatchups(db),
+  ]);
+
+  // Sum the per-tournament rows into one aggregate per canonical pair.
+  const agg = new Map<
+    string,
+    { deckA: string; deckB: string; aWins: number; bWins: number; ties: number }
+  >();
+  for (const r of ownRows) {
+    const key = `${r.deckA}|${r.deckB}`;
+    const e = agg.get(key) ?? { deckA: r.deckA, deckB: r.deckB, aWins: 0, bWins: 0, ties: 0 };
+    e.aWins += r.aWins;
+    e.bWins += r.bWins;
+    e.ties += r.ties;
+    agg.set(key, e);
+  }
+
+  // Start from TrainerHill (fallback), then overlay own directed pairs that have
+  // enough games — so a thin own sample never shadows a rich external one.
+  const byKey = new Map<string, { row: MatchupRow; own: boolean }>();
+  for (const r of trainerHill.rows) {
+    byKey.set(`${r.deck1}|${r.deck2}`, { row: { ...r }, own: false });
+  }
+  let ownGames = 0;
+  for (const e of agg.values()) {
+    ownGames += e.aWins + e.bWins + e.ties;
+    const ab = directedRow(e.deckA, e.deckB, e.aWins, e.bWins, e.ties);
+    const ba = directedRow(e.deckB, e.deckA, e.bWins, e.aWins, e.ties);
+    if (ab.total >= MIN_MATCHUP_GAMES) byKey.set(`${e.deckA}|${e.deckB}`, { row: ab, own: true });
+    if (ba.total >= MIN_MATCHUP_GAMES) byKey.set(`${e.deckB}|${e.deckA}`, { row: ba, own: true });
+  }
+
+  const rows: MatchupRow[] = [];
+  const cells: MatchupCell[] = [];
+  let ownPairs = 0;
+  let fallbackPairs = 0;
+  for (const { row, own } of byKey.values()) {
+    rows.push(row);
+    cells.push({ deck1: row.deck1, deck2: row.deck2, total: row.total, winRate: row.winRate });
+    if (own) ownPairs += 1;
+    else fallbackPairs += 1;
+  }
+
+  return {
+    cells,
+    rows,
+    ownPairs,
+    fallbackPairs,
+    ownGames,
+    trainerHillImportedAt: trainerHill.importedAt,
   };
 }
 
@@ -106,24 +220,37 @@ async function loadWindowAggregates(db: Db, window: MetaWindow): Promise<WindowA
 async function loadFieldScores(
   db: Db,
   window: MetaWindow,
-): Promise<{ window: WindowAggregates; scores: FieldScore[]; matchupImportedAt: Date | null }> {
-  const [aggregates, matchups] = await Promise.all([
+): Promise<{ window: WindowAggregates; scores: FieldScore[]; matchup: MatchupData }> {
+  const [aggregates, matchup] = await Promise.all([
     loadWindowAggregates(db, window),
-    ensureMatchups(db),
+    loadMatchupData(db, window),
   ]);
   const shares: ArchetypeShare[] = aggregates.archetypes.map((a) => ({
     archetypeId: a.archetypeId,
     archetypeName: a.archetypeName,
     sharePct: a.sharePct,
   }));
-  const scores = computeFieldScores(shares, matchups.rows).filter(
+  // Real online-Bo1 head-to-heads (own matrix) drive the field score, with
+  // TrainerHill only filling coverage gaps (see loadMatchupData).
+  const scores = computeFieldScores(shares, matchup.cells).filter(
     (s) => s.archetypeId !== OTHER_ARCHETYPE_ID,
   );
   // Re-rank after dropping 'other' so ranks stay dense (1..n).
   scores.forEach((s, i) => {
     s.rank = i + 1;
   });
-  return { window: aggregates, scores, matchupImportedAt: matchups.importedAt };
+  return { window: aggregates, scores, matchup };
+}
+
+/** The matchup-source breakdown shape returned to clients so they can flag how
+ *  much of a field score rests on real match data vs the external approximation. */
+function matchupSourceJson(m: MatchupData) {
+  return {
+    ownPairs: m.ownPairs,
+    fallbackPairs: m.fallbackPairs,
+    ownGames: m.ownGames,
+    trainerHillImportedAt: m.trainerHillImportedAt?.toISOString() ?? null,
+  };
 }
 
 /**
@@ -154,9 +281,14 @@ export function createMetaRoutes(): Hono<ApiEnv> {
       const result = await runMetaSync(c.get('db'));
       return c.json(result);
     } catch (err) {
-      // Upstream fetch errors ("Limitless … → HTTP 503") are actionable for the
-      // user; anything else (e.g. database driver errors) stays server-side (L2).
       console.error('[meta] sync failed:', err);
+      // A Limitless rate-limit (429) is transient and self-resolving: report it as
+      // a 429 with a calm retry hint (the client localises status 429) instead of
+      // a scary 502 carrying a raw upstream URL. Other upstream fetch errors stay
+      // actionable; anything else (e.g. a DB driver error) stays server-side (L2).
+      if (err instanceof Error && err.message.includes('429')) {
+        return c.json({ error: 'Meta sync is rate-limited right now — try again shortly.' }, 429);
+      }
       const message =
         err instanceof Error && err.message.startsWith('Limitless')
           ? err.message
@@ -174,7 +306,7 @@ export function createMetaRoutes(): Hono<ApiEnv> {
     }
     const { days, online, bo1 } = parsedQuery.data;
 
-    const { window, scores, matchupImportedAt } = await loadFieldScores(c.get('db'), {
+    const { window, scores, matchup } = await loadFieldScores(c.get('db'), {
       days,
       online,
       bo1,
@@ -187,7 +319,9 @@ export function createMetaRoutes(): Hono<ApiEnv> {
       bo1,
       tournamentCount: window.tournamentCount,
       totalPlayers: window.totalPlayers,
-      matchupImportedAt: matchupImportedAt?.toISOString() ?? null,
+      // Kept for the "data date" footer; matchupSource carries the real-vs-approx blend.
+      matchupImportedAt: matchup.trainerHillImportedAt?.toISOString() ?? null,
+      matchupSource: matchupSourceJson(matchup),
       archetypes: scores.map((s) => {
         const stats = statsById.get(s.archetypeId);
         return {
@@ -198,11 +332,33 @@ export function createMetaRoutes(): Hono<ApiEnv> {
           wins: stats?.wins ?? 0,
           losses: stats?.losses ?? 0,
           playerCount: stats?.playerCount ?? 0,
+          icons: stats?.icons ?? [],
           fieldWinRatePct: s.fieldWinRatePct,
           coveragePct: s.coveragePct,
           rank: s.rank,
         };
       }),
+    });
+  });
+
+  // GET /api/meta/matchups?days&online&bo1 — the windowed head-to-head matrix:
+  // real online-Bo1 results (own data) with TrainerHill filling coverage gaps.
+  // Unlike the legacy /api/matchups (external TrainerHill batch, no window), this
+  // respects the same day/scope window as the metashare, so the matrix and the
+  // shares always describe the same field.
+  routes.get('/matchups', async (c) => {
+    const parsedQuery = metaWindowQuerySchema.safeParse(c.req.query());
+    if (!parsedQuery.success) {
+      return c.json({ error: 'Invalid query parameters', issues: parsedQuery.error.issues }, 400);
+    }
+    const { days, online, bo1 } = parsedQuery.data;
+    const matchup = await loadMatchupData(c.get('db'), { days, online, bo1 });
+    return c.json({
+      days,
+      online,
+      bo1,
+      matchupSource: matchupSourceJson(matchup),
+      rows: matchup.rows,
     });
   });
 
@@ -239,6 +395,7 @@ export function createMetaRoutes(): Hono<ApiEnv> {
           losses: tournamentStandings.losses,
           ties: tournamentStandings.ties,
           decklist: tournamentStandings.decklist,
+          matchResults: tournamentStandings.matchResults,
           tournamentId: tournaments.id,
           tournamentName: tournaments.name,
           tournamentDate: tournaments.date,
@@ -268,6 +425,7 @@ export function createMetaRoutes(): Hono<ApiEnv> {
         losses: r.losses,
         ties: r.ties,
         decklist: r.decklist,
+        matchResults: r.matchResults ?? [],
         tournament: {
           id: r.tournamentId,
           name: r.tournamentName,
@@ -290,7 +448,7 @@ export function createMetaRoutes(): Hono<ApiEnv> {
     const { days, online, bo1 } = parsedQuery.data;
     const db = c.get('db');
 
-    const { window, scores, matchupImportedAt } = await loadFieldScores(db, { days, online, bo1 });
+    const { window, scores, matchup } = await loadFieldScores(db, { days, online, bo1 });
     const score = scores.find((s) => s.archetypeId === archetypeId.data);
     const stats = window.archetypes.find((a) => a.archetypeId === archetypeId.data);
     if (!score || !stats) {
@@ -340,9 +498,15 @@ export function createMetaRoutes(): Hono<ApiEnv> {
       bo1,
       tournamentCount: window.tournamentCount,
       totalPlayers: window.totalPlayers,
-      matchupImportedAt: matchupImportedAt?.toISOString() ?? null,
+      matchupImportedAt: matchup.trainerHillImportedAt?.toISOString() ?? null,
+      matchupSource: matchupSourceJson(matchup),
       archetype: stats,
       fieldScore: score,
+      // Data-driven icons for every field archetype, so the drilldown's matchup
+      // table can render opponent icons from the source (not just a static map).
+      iconsById: Object.fromEntries(
+        window.archetypes.filter((a) => a.icons.length > 0).map((a) => [a.archetypeId, a.icons]),
+      ),
       totalRanked: scores.length,
       listsAvailable: listsRow[0]?.total ?? 0,
       trend,

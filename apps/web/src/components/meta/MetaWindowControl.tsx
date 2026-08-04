@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Info } from 'lucide-react';
 import type { MetaWindow } from '../../lib/api';
+import { QuantityStepper } from '../shared/QuantityStepper';
 import { DAY_PRESETS } from './metaWindow';
 
 /**
@@ -26,8 +27,18 @@ export function MetaWindowControl({
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2">
         <span className="text-xs font-medium text-slate-500">{t('window.lastDays')}</span>
+        {/* Free numeric input (a11y stepper) so the window is fully dynamic… */}
+        <QuantityStepper
+          value={window.days}
+          onChange={onDaysChange}
+          min={1}
+          max={180}
+          ariaLabel={t('window.daysAria')}
+          suffix={t('window.daysSuffix')}
+        />
+        {/* …plus quick-jump presets. */}
         <div className="flex gap-1">
           {DAY_PRESETS.map((d) => (
             <button
@@ -35,7 +46,7 @@ export function MetaWindowControl({
               type="button"
               onClick={() => onDaysChange(d)}
               aria-pressed={window.days === d}
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold tabular-nums transition-colors ${
+              className={`rounded-md px-2 py-1 text-xs font-semibold tabular-nums transition-colors ${
                 window.days === d
                   ? 'bg-brand-500 text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'

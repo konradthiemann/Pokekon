@@ -45,9 +45,11 @@
 }
 
 @layer components {
-  /* ── Card — a white "TCG card" floating on the playmat ─────────────────── */
+  /* ── Card — a flat, sharp data panel on the playmat ────────────────────── */
+  /* Sharp corners (rounded-md) + hairline border + minimal shadow = a data
+     panel, not a playful floating tile. The analytical/finance look. */
   .card {
-    @apply bg-white border border-slate-200 rounded-2xl p-4 shadow-card;
+    @apply bg-white border border-slate-200 rounded-md p-3 shadow-card;
   }
 
   /* Eyebrow label inside a card */
@@ -55,14 +57,15 @@
     @apply text-[11px] font-extrabold text-slate-500 uppercase tracking-widest mb-3;
   }
 
-  /* Large metric number */
+  /* Large metric number — tabular figures so columns of numbers align (a core
+     trait of number-heavy trading/finance UIs). */
   .stat-value {
-    @apply text-3xl font-black text-slate-900 tracking-tight;
+    @apply text-3xl font-black text-slate-900 tracking-tight tabular-nums;
   }
 
-  /* ── Badges — friendly pills, dark text on a soft tint ─────────────────── */
+  /* ── Badges — compact chips, dark text on a soft tint (squared, not pills) ── */
   .badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold;
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold;
   }
   .badge-win {
     @apply badge bg-emerald-100 text-emerald-800 px-2.5 py-1;
@@ -80,18 +83,13 @@
     @apply badge bg-purple-100 text-purple-800;
   }
 
-  /* ── Buttons — chunky, rounded, easy to hit (≥44px tall) ───────────────── */
+  /* ── Buttons — flat, solid, crisp (≥44px tall); no gradient/bounce ─────── */
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px]
-      rounded-xl text-sm font-bold transition-all;
+      rounded-md text-sm font-bold transition-colors;
   }
   .btn-primary {
-    @apply btn text-white shadow-pop hover:-translate-y-0.5 active:translate-y-0
-      active:scale-[0.98];
-    background-image: linear-gradient(135deg, #3b82f6, #2563eb);
-  }
-  .btn-primary:hover {
-    background-image: linear-gradient(135deg, #2563eb, #1d4ed8);
+    @apply btn bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800;
   }
   .btn-ghost {
     @apply btn bg-white text-slate-700 border border-slate-300
@@ -100,7 +98,7 @@
 
   /* ── Form controls ─────────────────────────────────────────────────────── */
   .input {
-    @apply w-full rounded-xl bg-white border border-slate-300 px-3 py-2.5 text-sm
+    @apply w-full rounded-md bg-white border border-slate-300 px-3 py-2.5 text-sm
       text-slate-900 placeholder:text-slate-400
       focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none transition-colors;
   }

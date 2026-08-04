@@ -25,6 +25,7 @@
     "loadingTournament": "Lade {{name}} ({{players}} Spieler)…",
     "savingMetaData": "Speichere Meta-Daten…",
     "unknownError": "Unbekannter Fehler",
+    "rateLimited": "Zu viele Sync-Anfragen bzw. Limitless drosselt gerade — bitte in ein paar Minuten erneut versuchen.",
     "errors": {
       "tournamentListFailed": "Turnierliste konnte nicht geladen werden: {{status}}",
       "noTournaments": "Keine Turniere mit 30+ Spielern gefunden.",

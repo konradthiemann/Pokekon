@@ -68,29 +68,10 @@
       "reasoningDeclining": "\"{{bestLabel}}\" → {{bestWr}}% WR ({{bestGames}}). \"{{worstLabel}}\" → {{worstWr}}% WR ({{worstGames}}). Your latest changes may have hurt this matchup."
     },
     "tech": {
-      "suggestion": "Add 1× {{card}}",
+      "suggestion": "Improve your {{archetype}} matchup",
       "reasoning": "You're {{wins}}W/{{losses}}L vs {{archetype}} ({{winRate}}% WR in {{games}}).",
       "localNote": "This is a key local matchup.",
-      "reasons": {
-        "dragapultEx": "Hand disruption (H regulation) slows Dragapult's setup; reduces opponent hand mid-game.",
-        "dragapultBlaziken": "Disrupts the Blaziken energy acceleration before it comes online.",
-        "dragapultDusknoir": "Resets opponent's hand to a small number before Dusknoir's Ability chain activates.",
-        "nsZoroark": "Snipes benched Zorua before it evolves, cutting off the draw engine.",
-        "lucarioHariyama": "Disrupts the bench and hand to slow Lucario's aggressive early game.",
-        "alakazamDudunsparce": "Devolves Alakazam back to Abra, removing the ability engine.",
-        "starmieFroslass": "Hand disruption breaks the Starmie / Froslass setup loop.",
-        "cynthiasGarchompEx": "Reduces hand size before Garchomp's ability chain activates.",
-        "rocketsMewtwo": "Hand disruption prevents setting up the Mewtwo attack chain.",
-        "ogerponMeganium": "Disrupts the Meganium bench, preventing energy acceleration for Ogerpon.",
-        "ragingBoltOgerpon": "Reduces damage taken from Raging Bolt's high-damage attacks.",
-        "ragingBoltEx": "Reduces damage from Raging Bolt's Ancient attacks.",
-        "grimmsnarlFroslass": "Devolves Grimmsnarl to interrupt ability-based strategies before they lock in.",
-        "rocketsHonchkrow": "Hand disruption to break Honchkrow's setup before it attacks.",
-        "okidogiBarbaracle": "Hand reset disrupts Barbaracle's lock strategy from the start.",
-        "megaVenusaur": "Bench damage knocks out the support Pokémon enabling Mega Venusaur.",
-        "greninja": "Hand disruption slows the Greninja setup chain.",
-        "slowking": "Devolves Slowking to interrupt ability-based stall strategies."
-      }
+      "dataHint": "Rather than a guessed tech card: use the List Comparison to line your list up against the most successful lists of your own archetype (deck-fit-safe, same shell) — so you see, from data, which cards top pilots run that you're missing."
     },
     "zeroWin": {
       "suggestion": "Research {{archetype}} matchup",

@@ -1,5 +1,16 @@
-const SPRITE_BASE =
-  'https://raw.githubusercontent.com/bradley-erickson/pokesprite/master/pokemon/regular';
+// Sprite sources, tried in order until one loads (see SpriteImg cascade).
+//  1. Limitless' OWN icon CDN — matches the data-driven `deck.icons` slugs
+//     exactly and carries mega/newest forms (excadrill-mega, dipplin, thwackey…)
+//     that the pokesprite mirror lacks. This is why data-driven icons "just work"
+//     for every current archetype and update automatically as the meta shifts.
+//  2. pokesprite mirror — fallback for pokesprite-style slugs in the hand-
+//     maintained map (e.g. ogerpon-teal-mask, slowking-galar) that Limitless
+//     serves under a plainer name.
+// A slug on neither source falls through to the Pokéball glyph.
+const SPRITE_BASES = [
+  'https://r2.limitlesstcg.net/pokemon/gen9',
+  'https://raw.githubusercontent.com/bradley-erickson/pokesprite/master/pokemon/regular',
+] as const;
 
 type Pair = [string, string?];
 
@@ -32,7 +43,10 @@ const ARCHETYPE_SPRITES: Record<string, Pair> = {
   'Ogerpon Box': ['ogerpon-teal-mask', 'ogerpon-wellspring-mask'],
   // Other paired decks (auto-builder handles Ogerpon via POKEMON_FORM below)
   'Flareon Noctowl': ['flareon', 'noctowl'],
-  'Festival Lead': ['ogerpon-teal-mask'],
+  // Festival Lead is a Grass/evolution deck — Limitless icons it as Dipplin + Thwackey
+  // (the old ogerpon-teal-mask mapping was wrong). Data-driven deck.icons override this.
+  'Festival Lead': ['dipplin', 'thwackey'],
+  'Mega Excadrill': ['excadrill-mega'],
   // Possessives
   "Cynthia's Garchomp ex": ['garchomp'],
   "Cynthia's Garchomp": ['garchomp'],
@@ -56,7 +70,7 @@ const SLUG_SPRITES: Record<string, Pair> = {
   'dragapult-dusknoir': ['dragapult', 'dusknoir'],
   'dragapult-ex': ['dragapult'],
   'ethanss-typhlosion': ['typhlosion'],
-  'festival-lead': ['ogerpon-teal-mask'],
+  'festival-lead': ['dipplin', 'thwackey'],
   'flareon-noctowl': ['flareon', 'noctowl'],
   'froslass-munkidori': ['froslass', 'munkidori'],
   'grimmsnarl-froslass': ['grimmsnarl', 'froslass'],
@@ -71,6 +85,7 @@ const SLUG_SPRITES: Record<string, Pair> = {
   'mega-absol-box': ['absol-mega', 'kangaskhan-mega'],
   'mega-charizard-x': ['charizard-mega-x'],
   'mega-dragonite': ['dragonite'],
+  'mega-excadrill': ['excadrill-mega'],
   'mega-lucario': ['lucario-mega'],
   'mega-starmie': ['starmie-mega'],
   'mega-venusaur': ['venusaur-mega'],
@@ -156,4 +171,11 @@ function resolve(archetype: string): Pair | undefined {
   return ARCHETYPE_SPRITES[norm] ?? SLUG_SPRITES[norm] ?? autoBuild(archetype);
 }
 
-export { resolve as resolveArchetypeSprites, SPRITE_BASE };
+/** Map a single Pokémon slug (e.g. a Limitless `deck.icons` entry) to its
+ *  competitive sprite filename, applying the form overrides (ogerpon → teal-mask
+ *  etc.). Used by the data-driven icon path in PokemonIcon. */
+export function spriteForPokemon(name: string): string {
+  return pokemonToSprite(name);
+}
+
+export { resolve as resolveArchetypeSprites, SPRITE_BASES };

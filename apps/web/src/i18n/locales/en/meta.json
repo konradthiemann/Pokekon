@@ -8,6 +8,8 @@
   },
   "window": {
     "lastDays": "Last days:",
+    "daysAria": "Number of days considered",
+    "daysSuffix": "days",
     "onlineBo1": "Online Bo1 only",
     "onlineBo1Hint": "Only online tournaments played Bo1 Swiss (ground-truth from Limitless: isOnline + Swiss mode) — the best proxy for local Bo1 Challenges & Cups. Turn off to include every recorded tournament (online + in-person, mixed format).",
     "sample": "{{tournaments}} tournaments · {{players}} players in window",
@@ -31,7 +33,17 @@
     "noResult": "Give at least one deck a weight > 0 to compute the prediction.",
     "rankingTitle": "Best decks in your field",
     "rankingHint": "Expected win rate against your local field (share × matchup WR, mirror = 50%). Click a deck for details.",
-    "coverage": "{{pct}}% coverage"
+    "coverage": "{{pct}}% coverage",
+    "perspective": "From the perspective of:",
+    "bestPositioned": "Best-positioned vs your field: {{deck}} · {{wr}}% field WR",
+    "fieldCount": "Your field ({{count}})",
+    "listsTitle": "Best lists for {{deck}}",
+    "listsHint": "This deck's most successful tournament lists in the window — a build template against your local field.",
+    "listsEmpty": "No published lists for this deck in the window yet.",
+    "listsSelectHint": "Click a list to see how it actually fared against your field.",
+    "listWhy": "This list's real games vs your local field:",
+    "noFieldGames": "No recorded games vs your field for this list yet (available after the next sync).",
+    "gameVs": "Round {{round}}"
   },
   "metaTable": {
     "empty": "No meta data yet. Click \"Sync Live Meta\" in the sidebar.",
@@ -90,6 +102,14 @@
       "gamesLabel_one": "{{count}} game",
       "gamesLabel_other": "{{count}} games"
     },
+    "matchupTable": {
+      "title": "Matchups vs the field",
+      "subtitle": "Real head-to-head win rate of this archetype against every deck in the field — favorable on top, unfavorable at the bottom.",
+      "deck": "Opponent",
+      "winRate": "Matchup WR",
+      "sample": "Games",
+      "share": "Field share"
+    },
     "trend": {
       "title": "Trend",
       "point": "{{share}}% · WR {{winRate}}%",
@@ -142,6 +162,7 @@
     "gamesShort": "{{count}}g",
     "cellTooltip": "{{row}} vs {{col}}: {{winRate}}% · {{wins}}W-{{losses}}L-{{ties}}T",
     "source": "Source: TrainerHill.com · {{date}} · Cells show win rate from row deck's perspective",
+    "sourceBlend": "Real data: {{ownGames}} online-Bo1 matches ({{ownPairs}} pairings) · {{fallback}} pairings via TrainerHill (approx.) · win rate from row deck's perspective",
     "reload": "Reload data"
   },
   "metaShareChart": {
