@@ -46,8 +46,12 @@ export function FieldScorePanel({
 
       <div className="space-y-1">
         <div className="flex items-center justify-between text-xs text-slate-600">
-          <span>{t('archetypeDetail.fieldScore.coverage', { pct: fieldScore.coveragePct })}</span>
-          <span>{t('archetypeDetail.fieldScore.mirror', { pct: fieldScore.mirrorSharePct })}</span>
+          <span>
+            {t('archetypeDetail.fieldScore.coverage', { pct: fieldScore.coveragePct.toFixed(1) })}
+          </span>
+          <span>
+            {t('archetypeDetail.fieldScore.mirror', { pct: fieldScore.mirrorSharePct.toFixed(1) })}
+          </span>
         </div>
         <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
           <div
