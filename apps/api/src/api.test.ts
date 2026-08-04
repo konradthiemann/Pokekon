@@ -1024,10 +1024,17 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
           detailsCalls.push('treject');
           return jsonResponse({ isOnline: false, platform: null, phases: [{ mode: 'BO3' }] });
         }
+        // A probe that keeps failing (Limitless 429/5xx) must NOT be recorded as a
+        // verdict — it stays "unknown" and is retried on a later run, never buried.
+        if (url.includes('/tournaments/tfail/details')) {
+          detailsCalls.push('tfail');
+          return jsonResponse(null, 500);
+        }
         // Already-classified reject: probing it is the bug this test guards against.
         if (url.includes('/tournaments/told-reject/details')) detailsCalls.push('told-reject');
         return jsonResponse([
           { id: 'tqual', name: 'Weekly Online', players: 40, date: daysAgo(1).toISOString() },
+          { id: 'tfail', name: 'Flaky Online', players: 40, date: daysAgo(1).toISOString() },
           { id: 'treject', name: 'Regional IRL', players: 40, date: daysAgo(2).toISOString() },
           { id: 'told-reject', name: 'Old Reject', players: 40, date: daysAgo(3).toISOString() },
         ]);
@@ -1036,24 +1043,27 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
 
     expect((await request('/api/meta/sync', { user: USER_B, method: 'POST' })).status).toBe(200);
 
-    // Only the two NEW events were probed; the remembered reject was skipped.
-    expect(detailsCalls.sort()).toEqual(['tqual', 'treject']);
+    // The three NEW events were probed; the already-classified reject never was.
+    expect(new Set(detailsCalls)).toEqual(new Set(['tqual', 'tfail', 'treject']));
+    expect(detailsCalls).not.toContain('told-reject');
 
     const standings = await db
       .select({ tournamentId: schema.tournamentStandings.tournamentId })
       .from(schema.tournamentStandings);
-    // Qualifying event ingested (2 standings); neither reject contributed any.
+    // Qualifying event ingested (2 standings); no reject / failed probe contributed.
     expect(standings.filter((s) => s.tournamentId === 'tqual')).toHaveLength(2);
     expect(standings.filter((s) => s.tournamentId === 'treject')).toHaveLength(0);
-    expect(standings.filter((s) => s.tournamentId === 'told-reject')).toHaveLength(0);
 
-    // The NEW reject is now REMEMBERED (header persisted with its verdict) so the
-    // next run skips it too — it is a classification-only row, not meta data.
     const all = await db.select().from(schema.tournaments);
+    // The NEW reject is REMEMBERED (header persisted with its verdict) so the next
+    // run skips it too — a classification-only row, not meta data.
     const treject = all.find((t) => t.id === 'treject');
     expect(treject?.isOnline).toBe(false);
     expect(treject?.swissMode).toBe('BO3');
     expect(treject?.pairingsSyncedAt).toBeNull();
+    // The failed probe is NOT recorded — a transient error must never bury an event
+    // as a permanent reject; it simply gets retried next run.
+    expect(all.find((t) => t.id === 'tfail')).toBeUndefined();
   });
 
   it('computes and stores the own matchup matrix from round pairings', async () => {

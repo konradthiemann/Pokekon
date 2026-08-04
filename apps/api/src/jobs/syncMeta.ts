@@ -5,7 +5,6 @@ import {
   computeMatchupsFromPairings,
   computeMetaSnapshots,
   computeStandingMatchResults,
-  isLikelyOnlineName,
   isoWeekBounds,
   isoWeekLabel,
   isPostRotation,
@@ -60,13 +59,66 @@ interface LimitlessStanding extends StandingLite {
   decklist?: unknown; // pruned to TournamentDecklist before persisting
 }
 
+// Politeness pacing + retry so a full sync never bursts past Limitless' rate
+// limit. One sync issues a list call + up to maxProbes `/details` calls + two
+// calls per ingested event; fired back-to-back that burst earns an HTTP 429
+// partway through (observed in production). Worse, a 429 on a `/details` probe
+// used to fall through to the name heuristic and be PERSISTED as a reject —
+// burying an event that had merely been throttled. Pacing keeps us under the
+// burst limit; the retry rides out a transient 429/5xx; and the loop no longer
+// records a verdict for a probe that failed.
+// Zeroed under Vitest so the suite never actually sleeps between mocked fetches.
+const MIN_REQUEST_GAP_MS = process.env.VITEST ? 0 : 180; // ≈5–6 req/s in prod
+const MAX_FETCH_ATTEMPTS = 4;
+const BACKOFF_BASE_MS = process.env.VITEST ? 0 : 500;
+
+let nextRequestAt = 0; // module-level cursor: paces across concurrent syncs too
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Reserve the next request slot so requests are at least MIN_REQUEST_GAP_MS
+ *  apart process-wide. (This runs in the API server, not the workflow sandbox,
+ *  so Date.now()/setTimeout are available.) */
+async function paceRequest(): Promise<void> {
+  const now = Date.now();
+  const scheduled = Math.max(now, nextRequestAt);
+  if (scheduled > now) await sleep(scheduled - now);
+  nextRequestAt = scheduled + MIN_REQUEST_GAP_MS;
+}
+
 async function limitlessJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${LIMITLESS_BASE}${path}`, {
-    headers: { Accept: 'application/json' },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) throw new Error(`Limitless ${path} → HTTP ${res.status}`);
-  return res.json() as Promise<T>;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
+    await paceRequest();
+    let res: Response;
+    try {
+      res = await fetch(`${LIMITLESS_BASE}${path}`, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (err) {
+      lastErr = err; // network error or the 15s timeout
+      if (attempt >= MAX_FETCH_ATTEMPTS) throw err;
+      await sleep(BACKOFF_BASE_MS * attempt);
+      continue;
+    }
+    if (res.ok) return res.json() as Promise<T>;
+    // 429 (rate limit) and 5xx are transient — back off (honouring a numeric
+    // Retry-After) and retry. Other 4xx (e.g. 404) are permanent: fail fast.
+    if ((res.status === 429 || res.status >= 500) && attempt < MAX_FETCH_ATTEMPTS) {
+      const retryAfter = Number(res.headers.get('retry-after'));
+      const backoff =
+        Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, 5000)
+          : Math.min(BACKOFF_BASE_MS * 2 ** (attempt - 1), 4000);
+      await sleep(backoff);
+      continue;
+    }
+    throw new Error(`Limitless ${path} → HTTP ${res.status}`);
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(`Limitless ${path} → retries exhausted`);
 }
 
 /** Upper bound on standings rows persisted per tournament — real events top out
@@ -345,8 +397,8 @@ export async function runMetaSync(
   const {
     days = 45,
     minPlayers = 16,
-    maxTournaments = 50,
-    maxProbes = 120,
+    maxTournaments = 40,
+    maxProbes = 60,
     onlineOnly = true,
     bo1Only = true,
   } = opts;
@@ -414,8 +466,12 @@ export async function runMetaSync(
       continue;
     }
 
-    // NEW candidate: spend one probe on /details, then record the verdict either
-    // way so a later run never probes it again.
+    // NEW candidate: spend one probe on /details. On SUCCESS, record the verdict
+    // either way so a later run never re-probes it. On FAILURE (e.g. a Limitless
+    // 429 that outlived the retries), skip WITHOUT recording anything — a failed
+    // probe is "unknown", not "rejected", so a later run retries it. Persisting a
+    // name-heuristic guess here would bury a merely-throttled qualifying event
+    // forever, which is exactly the poisoning this avoids.
     probes += 1;
     let classification: TournamentClassification;
     try {
@@ -424,12 +480,12 @@ export async function runMetaSync(
       );
       classification = classifyTournamentDetails(details);
     } catch (err) {
-      console.warn(`[syncMeta] details fetch failed for ${t.id}:`, err);
-      classification = { isOnline: isLikelyOnlineName(t.name), platform: null, swissMode: null };
+      console.warn(`[syncMeta] details probe failed for ${t.id} (retry next run):`, err);
+      continue;
     }
 
     if (!qualifies(classification)) {
-      // Remember the reject so it is skipped (not re-probed) next run.
+      // A real verdict: remember the reject so it is skipped (not re-probed) next run.
       await persistClassificationOnly(db, t, classification);
       continue;
     }
