@@ -267,11 +267,18 @@ read queries hit these finished aggregates instead of re-parsing.
 The server-side counterpart of the IndexedDB `metaSnapshots` table — **global**
 (not user-scoped), so the meta sync produces one shared view for all users.
 Columns mirror the client shape (`archetype`, `frequency_pct`, `win_rate_pct`
-nullable, `wins`, `losses`, `player_count`, `period`, `source_note`,
-`created_at`) with a unique index on `(period, archetype)` and an `archetype`
-index. `archetype_id` (nullable) holds the Limitless deck slug — the join key
-for the archetype drilldown; rows synced before the column existed carry null
-until the next sync backfills them.
+nullable, `wins`, `losses`, `ties` (integer, `NOT NULL DEFAULT 0`, migration
+`0010`), `player_count`, `period`, `source_note`, `created_at`) with a unique
+index on `(period, archetype)` and an `archetype` index. `archetype_id`
+(nullable) holds the Limitless deck slug — the join key for the archetype
+drilldown; rows synced before the column existed carry null until the next
+sync backfills them. `win_rate_pct` uses the official tournament formula (a
+tie counts as a third of a win, `tournamentWinRatePct` in `@pokekon/shared`)
+and is `null` only when there were no games at all in the period — **not**
+when there were no decisive games (a semantic change from the earlier
+`wins/(wins+losses)`, plan §6 risk 3). Rows synced before this change keep
+their old value until touched by `job:backfill-winrates` (see
+[features.md](./features.md) §2).
 
 ### Tables: `tournaments` + `tournament_standings` (raw Limitless data, plan §5.2)
 
@@ -312,6 +319,17 @@ when the table is empty; updated via `POST /api/matchups/import` or the
 `(archetype, event_date)` compound) to serve the parametrised 1/2/3/4-week
 analytics queries.
 
+### Column: `opponent_logs.best_of` (migration `0011`)
+
+`text` enum (`BEST_OF_VALUES` in `@pokekon/shared`: `'BO1' | 'BO3'`), nullable
++ a `CHECK` constraint (`best_of IN ('BO1','BO3')`, NULL always passes).
+`NULL` = "format unknown" — the state of every row written before this column
+existed; it is never silently mapped to a default. Required (hard 400 without
+it) on `POST /api/logs`; `PATCH /api/logs/:id` may set it but never reset it
+back to `NULL`. Drives the Bo1-equivalent personal win rate
+(`bo1EquivalentWinRate`, `@pokekon/shared`) — see
+[features.md](./features.md) §1/§6.
+
 ### Table: `user_ai_settings`
 
 Per-user LLM-analysis settings (BYOK). The API key is stored **AES-256-GCM
@@ -331,5 +349,9 @@ is only decrypted server-side for the analysis call — never returned to client
 Generated with `npm run db:generate -w @pokekon/api`: `0002_*` adds
 `match_log_parsed` + `meta_snapshots` + the `event_date` index; `0003_*` adds
 `user_ai_settings`; `0005_*` adds `tournaments`, `tournament_standings`,
-`matchup_matrix` and `meta_snapshots.archetype_id`. The PGlite test harness
-applies the real migration SQL, so the generated schema is exercised in CI.
+`matchup_matrix` and `meta_snapshots.archetype_id`; `0010_*` adds
+`meta_snapshots.ties`; `0011_*` adds `opponent_logs.best_of` + its `CHECK`
+constraint. Both `0010` and `0011` are purely additive (new nullable/defaulted
+columns, no rewrite of existing rows) so they are safe to apply before the
+matching code deploys (plan §5). The PGlite test harness applies the real
+migration SQL, so the generated schema is exercised in CI.

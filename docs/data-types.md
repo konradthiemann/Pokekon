@@ -25,13 +25,20 @@ A more granular classification than `CardType`. The role is **inferred** during 
 ```typescript
 type EventType = 'LC' | 'LCup' | 'Regional' | 'Worlds' | 'Online';
 ```
-The type of event where a match was played. `LC` = League Challenge, `LCup` = League Cup.
+The type of event where a match was played. `LC` = League Challenge, `LCup` = League Cup. **Not** the match format — see `BestOf` below; `EventType` only feeds `BestOf`'s *default* (Regional/Worlds → Bo3, else Bo1) in the log form, it is never used to infer the format for an already-logged match.
+
+### `BestOf` (`@pokekon/shared`)
+```typescript
+const BEST_OF_VALUES = ['BO1', 'BO3'] as const;
+type BestOf = (typeof BEST_OF_VALUES)[number];
+```
+Whether a logged match was single-game (Bo1) or best-of-three (Bo3). Lives on `OpponentLog.bestOf` as `BestOf | undefined` — `undefined` means "format unknown" (a log written before this field existed), never a silently-assumed default. Used to convert a Bo3 win rate back to its Bo1 equivalent (`bo1ToBo3WinRate`/`bo3ToBo1WinRate`, closed-form inverse of `P_Bo3 = 3p² − 2p³`) so a mixed Bo1/Bo3 personal record can be compared to the Bo1-only meta baseline (`bo1EquivalentWinRate`).
 
 ### `MatchResult`
 ```typescript
 type MatchResult = 'W' | 'L' | 'T';
 ```
-Win, Loss, or Tie. Ties are tracked but excluded from win-rate calculations (`winRate = wins / (wins + losses)`).
+Win, Loss, or Tie. **Semantic change:** meta snapshots, the matchup matrix and `ArchetypeStats.winRate` now weight a tie as **a third of a win** (`tournamentWinRatePct = (wins + ties/3) / (wins + losses + ties)`, `@pokekon/shared`) — the official tournament scoring — instead of excluding ties entirely. A handful of other, deliberately unchanged personal-analytics views (`deckAnalytics.ts`'s `WinRateBlock`, `deckPerformanceStats.ts`, `useRecommendations.ts`) still use the older "decided games only" semantic; that inconsistency is out of scope here (Spec 4).
 
 ---
 
@@ -101,6 +108,7 @@ interface OpponentLog {
   deckId?: number;
   archetype: string;
   eventType: EventType;
+  bestOf?: BestOf;
   eventDate: string;
   result: MatchResult;
   notes: string;
@@ -112,6 +120,7 @@ interface OpponentLog {
 ```
 One row per match played. This is the primary personal-data table. Key fields:
 - `archetype`: The opponent's deck archetype. This is entered manually and must match the names used in `metaSnapshots` for win-rate correlation to work.
+- `bestOf`: Bo1 or Bo3 (see `BestOf` above). Required on new logs; `undefined` on logs written before this field existed ("format unknown" — shown as a badge, excluded from the Bo1-equivalent comparison but still counted in `winRate`).
 - `deckSnapshotId`: Optional. When set, it links this match to the deck version that was played. This is what powers the "version comparison" recommendations.
 - `battleLog`: The raw text copied from TCG Live's battle protocol (in German). Optional — only present when the user pastes it in.
 - `analysis`: `JSON.stringify(BattleAnalysis)` — the result of the server-side LLM analyzing the battle log. Only present after the user triggers analysis.
@@ -227,15 +236,16 @@ interface MetaSnapshot {
   id?: number;
   archetype: string;
   frequencyPct: number;
-  winRatePct: number;
+  winRatePct: number | null;
   wins: number;
   losses: number;
+  ties: number;
   playerCount: number;
   period: string;
   sourceNote: string;
 }
 ```
-One archetype's stats for one week. The `period` field uses the ISO week format `YYYY-Www` (e.g., `"2026-W15"`). The `sourceNote` is auto-generated during sync and describes which tournaments and how many players were included.
+One archetype's stats for one week. The `period` field uses the ISO week format `YYYY-Www` (e.g., `"2026-W15"`). The `sourceNote` is auto-generated during sync and describes which tournaments and how many players were included. `winRatePct` is the tie-weighted tournament win rate (see `MatchResult` above) — `null` only when the archetype had zero games in the period, not merely zero decisive games.
 
 ### `RecentTournament`
 ```typescript
@@ -266,9 +276,15 @@ interface ArchetypeStats {
   winRate: number;
   frequencyPct: number;
   metaWinRate: number;
+  bo1EquivalentWinRate: number | null;
+  bo1Games: number;
+  bo3Games: number;
+  unknownFormatGames: number;
 }
 ```
 Per-archetype summary combining personal match history and meta data. Computed by `getArchetypeStats()` in `queries.ts`. The `frequencyPct` and `metaWinRate` come from the latest `metaSnapshots`; everything else comes from `opponentLogs`. Sorted by `frequencyPct` descending, then by `encounters` descending.
+- `winRate`: tie-weighted across **all** logs (`tournamentWinRatePct`), `0` when there are no logs at all.
+- `bo1EquivalentWinRate`/`bo1Games`/`bo3Games`/`unknownFormatGames`: the Bo1-comparable personal win rate (`bo1EquivalentWinRate` from `@pokekon/shared`) — Bo3 logs converted back via `bo3ToBo1WinRate`, logs with unknown `bestOf` counted but excluded from the rate itself. `null` only when there are zero Bo1/Bo3-tagged logs (i.e. every log for this archetype has an unknown format, or there are no logs at all).
 
 ### `MetaTrendPoint`
 ```typescript
