@@ -10,3 +10,4 @@ export * from './matchupCsv.js';
 export * from './matchupPairings.js';
 export * from './winRate.js';
 export * from './bestOf.js';
+export * from './matchupConflict.js';
