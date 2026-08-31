@@ -329,6 +329,19 @@ export function MatchupMatrix({
                 date: source?.trainerHillImportedAt?.slice(0, 10) ?? '—',
               })}
         </span>
+        {source && source.conflictCount > 0 && (
+          <span
+            className="text-amber-700"
+            title={source.conflicts
+              .map(
+                (c) =>
+                  `${formatDeckName(c.deck1)} vs ${formatDeckName(c.deck2)}: ${c.ownWinRate}% (own) vs ${c.fallbackWinRate}% (TrainerHill), Δ${c.deltaPp}pp`,
+              )
+              .join('\n')}
+          >
+            {t('matchupMatrix.conflictNote', { count: source.conflictCount })}
+          </span>
+        )}
         <button
           onClick={loadData}
           className="ml-auto text-slate-400 hover:text-brand-700 transition-colors"

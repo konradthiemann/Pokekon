@@ -163,6 +163,8 @@
     "cellTooltip": "{{row}} vs {{col}}: {{winRate}}% · {{wins}}W-{{losses}}L-{{ties}}T",
     "source": "Source: TrainerHill.com · {{date}} · Cells show win rate from row deck's perspective",
     "sourceBlend": "Real data: {{ownGames}} online-Bo1 matches ({{ownPairs}} pairings) · {{fallback}} pairings via TrainerHill (approx.) · win rate from row deck's perspective",
+    "conflictNote_one": "· {{count}} pairing disagrees with TrainerHill by >15pp",
+    "conflictNote_other": "· {{count}} pairings disagree with TrainerHill by >15pp",
     "reload": "Reload data"
   },
   "metaShareChart": {

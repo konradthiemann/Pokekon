@@ -491,11 +491,27 @@ export interface FieldAnalysisArchetype {
 /** How much of the matchup data behind a field score is real vs. approximate:
  *  `ownPairs`/`ownGames` come from real online-Bo1 matches, `fallbackPairs` from
  *  the external TrainerHill matrix filling coverage gaps. */
+/** One matchup pair where our own data and the TrainerHill fallback disagree
+ *  by more than the conflict threshold — a hint, not an auto-fix; the number
+ *  actually shown is always the own value. */
+export interface MatchupConflict {
+  deck1: string;
+  deck2: string;
+  ownWinRate: number;
+  fallbackWinRate: number;
+  deltaPp: number;
+  ownGames: number;
+  fallbackGames: number;
+}
+
 export interface MatchupSource {
   ownPairs: number;
   fallbackPairs: number;
   ownGames: number;
   trainerHillImportedAt: string | null;
+  /** Total number of conflicting pairs; `conflicts` is capped to the top 25. */
+  conflictCount: number;
+  conflicts: MatchupConflict[];
 }
 
 export interface FieldAnalysis extends MetaWindow {
