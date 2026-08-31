@@ -3,6 +3,8 @@ import { Hono } from 'hono';
 import {
   computeFieldScores,
   computeMetaSnapshots,
+  detectMatchupConflicts,
+  MATCHUP_CONFLICT_THRESHOLD_PP,
   MIN_MATCHUP_GAMES,
   OTHER_ARCHETYPE_ID,
   ROTATION_PERIOD,
@@ -10,6 +12,7 @@ import {
   type ArchetypeShare,
   type FieldScore,
   type MatchupCell,
+  type MatchupConflict,
   type MatchupRow,
   type StandingLite,
 } from '@pokekon/shared';
@@ -130,6 +133,11 @@ interface MatchupData {
   fallbackPairs: number;
   ownGames: number;
   trainerHillImportedAt: Date | null;
+  /** Pairs where our own data (which overrode the fallback) and TrainerHill
+   *  disagree by more than the conflict threshold — a hint, not an auto-fix
+   *  (plan §3.3). The displayed `rows[]` win rate is unaffected either way. */
+  conflicts: MatchupConflict[];
+  conflictCount: number;
 }
 
 /** A directed matchup row from a head-to-head count. Win rate uses the shared
@@ -190,10 +198,12 @@ async function loadMatchupData(db: Db, window: MetaWindow): Promise<MatchupData>
     byKey.set(`${r.deck1}|${r.deck2}`, { row: { ...r }, own: false });
   }
   let ownGames = 0;
+  const ownDirectedRows: MatchupRow[] = [];
   for (const e of agg.values()) {
     ownGames += e.aWins + e.bWins + e.ties;
     const ab = directedRow(e.deckA, e.deckB, e.aWins, e.bWins, e.ties);
     const ba = directedRow(e.deckB, e.deckA, e.bWins, e.aWins, e.ties);
+    ownDirectedRows.push(ab, ba);
     if (ab.total >= MIN_MATCHUP_GAMES) byKey.set(`${e.deckA}|${e.deckB}`, { row: ab, own: true });
     if (ba.total >= MIN_MATCHUP_GAMES) byKey.set(`${e.deckB}|${e.deckA}`, { row: ba, own: true });
   }
@@ -209,6 +219,15 @@ async function loadMatchupData(db: Db, window: MetaWindow): Promise<MatchupData>
     else fallbackPairs += 1;
   }
 
+  // Compared against the untouched TrainerHill rows (before the overlay above
+  // could shadow a pair) — a conflict never changes what `rows[]` displays.
+  const allConflicts = detectMatchupConflicts(ownDirectedRows, trainerHill.rows);
+  if (allConflicts.length > 0) {
+    console.warn(
+      `[meta] ${allConflicts.length} matchup conflicts > ${MATCHUP_CONFLICT_THRESHOLD_PP}pp between own data and TrainerHill`,
+    );
+  }
+
   return {
     cells,
     rows,
@@ -216,6 +235,8 @@ async function loadMatchupData(db: Db, window: MetaWindow): Promise<MatchupData>
     fallbackPairs,
     ownGames,
     trainerHillImportedAt: trainerHill.importedAt,
+    conflicts: allConflicts.slice(0, 25),
+    conflictCount: allConflicts.length,
   };
 }
 
@@ -254,6 +275,8 @@ function matchupSourceJson(m: MatchupData) {
     fallbackPairs: m.fallbackPairs,
     ownGames: m.ownGames,
     trainerHillImportedAt: m.trainerHillImportedAt?.toISOString() ?? null,
+    conflictCount: m.conflictCount,
+    conflicts: m.conflicts,
   };
 }
 
