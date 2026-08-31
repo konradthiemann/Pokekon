@@ -13,10 +13,17 @@ import {
   RefreshCw,
   BarChart2,
 } from 'lucide-react';
-import type { OpponentLog, BattleAnalysis, BattleAnalysisPlay, DeckCard } from '../../types';
+import type {
+  OpponentLog,
+  BattleAnalysis,
+  BattleAnalysisPlay,
+  DeckCard,
+  BestOf,
+} from '../../types';
 import { updateOpponentLog, getDeckSnapshotById, parseDeckSnapshot } from '../../db/queries';
 import { analyzeBattleLogViaApi, getAiSettings, updateAiSettings } from '../../lib/api';
-import { parseBattleLog } from '@pokekon/shared';
+import { isBestOfHintDismissed, dismissBestOfHint } from '../../lib/preferences';
+import { BEST_OF_VALUES, parseBattleLog } from '@pokekon/shared';
 import { MatchStatsTab } from './MatchStatsTab';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { authClient } from '../../lib/authClient';
@@ -221,6 +228,32 @@ export function MatchDetailModal({ log, onClose }: Props) {
   const [logDirty, setLogDirty] = useState(false);
   const [savingLog, setSavingLog] = useState(false);
 
+  // bestOf (plan §3.7): tracked locally so a fix-up applied in this modal shows
+  // immediately, without waiting for the parent list's next full reload.
+  const [bestOf, setBestOfState] = useState(log.bestOf);
+  const [bestOfHintDismissed, setBestOfHintDismissed] = useState(isBestOfHintDismissed);
+  const [savingBestOf, setSavingBestOf] = useState(false);
+
+  const applyBestOf = useCallback(
+    async (value: BestOf) => {
+      if (log.id == null) return;
+      setSavingBestOf(true);
+      try {
+        await updateOpponentLog(log.id, { bestOf: value });
+        setBestOfState(value);
+        refresh();
+      } finally {
+        setSavingBestOf(false);
+      }
+    },
+    [log.id, refresh],
+  );
+
+  const handleDismissBestOfHint = useCallback(() => {
+    dismissBestOfHint();
+    setBestOfHintDismissed(true);
+  }, []);
+
   // The LLM key lives server-side (encrypted, BYOK). `apiKey` is only the value being
   // entered now; `hasApiKey` reflects whether a key is already stored on the server.
   const [apiKey, setApiKey] = useState('');
@@ -369,12 +402,49 @@ export function MatchDetailModal({ log, onClose }: Props) {
               <span className={log.eventType === 'LC' ? 'badge-lc' : 'badge-lcup'}>
                 {log.eventType}
               </span>
+              {bestOf === undefined ? (
+                <span
+                  className="text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5"
+                  title={t('bestOf.hint')}
+                >
+                  {t('bestOf.unknown')}
+                </span>
+              ) : (
+                <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">
+                  {t(`bestOf.${bestOf === 'BO1' ? 'bo1' : 'bo3'}`)}
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-500 mt-1">
               {log.eventDate}
               {log.round ? ` · ${t('matchDetail.roundLabel', { round: log.round })}` : ''}
               {log.notes ? ` · ${log.notes}` : ''}
             </p>
+            {/* One-time nudge to fill in the match format on a legacy log
+                (plan §3.7) — the "unknown" badge above stays either way. */}
+            {bestOf === undefined && !bestOfHintDismissed && (
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-slate-500">{t('bestOf.hint')}</span>
+                {BEST_OF_VALUES.map((format) => (
+                  <button
+                    key={format}
+                    type="button"
+                    disabled={savingBestOf}
+                    onClick={() => void applyBestOf(format)}
+                    className="text-xs font-bold px-2 py-0.5 rounded-lg border border-brand-200 text-brand-700 hover:bg-brand-100 disabled:opacity-50"
+                  >
+                    {t(`bestOf.${format === 'BO1' ? 'bo1' : 'bo3'}`)}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={handleDismissBestOfHint}
+                  className="text-xs text-slate-400 hover:text-slate-600"
+                >
+                  {t('bestOf.dismiss')}
+                </button>
+              </div>
+            )}
           </div>
           <button
             onClick={onClose}

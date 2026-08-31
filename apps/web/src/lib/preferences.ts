@@ -5,6 +5,7 @@ const KEYS = {
   localMetaField: 'tcg-local-meta-field-v1',
   deckArchSlug: 'tcg-deck-arch-slug-v1',
   activeDeckId: 'tcg-active-deck-id-v3',
+  bestOfHint: 'tcg-bestof-hint-dismissed-v1',
 } as const;
 
 export function getLocalMeta(): string[] {
@@ -65,4 +66,15 @@ export function getActiveDeckId(): number | null {
 export function setActiveDeckId(id: number | null): void {
   if (id === null) localStorage.removeItem(KEYS.activeDeckId);
   else localStorage.setItem(KEYS.activeDeckId, String(id));
+}
+
+/** Whether the one-time "this log predates the match-format field" hint
+ *  (plan §3.7) has been dismissed — once true, only the "Format unbekannt"
+ *  badge itself is shown, never the hint again. */
+export function isBestOfHintDismissed(): boolean {
+  return localStorage.getItem(KEYS.bestOfHint) !== null;
+}
+
+export function dismissBestOfHint(): void {
+  localStorage.setItem(KEYS.bestOfHint, '1');
 }
