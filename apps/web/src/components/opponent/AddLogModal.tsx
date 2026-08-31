@@ -81,6 +81,14 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
   const [archetype, setArchetype] = useState('');
   const [customArch, setCustomArch] = useState('');
   const [eventType, setEventType] = useState<EventType>('Online');
+  // Typed `BestOf | null` (not just `BestOf`) purely defensively: the initial
+  // value and every update below always come from `defaultBestOfForEventType`
+  // or an explicit user pick, so `bestOf` never actually becomes `null` today.
+  // The `=== null` checks around this state (disabled-button guards, the
+  // early return in handleSave) exist so that if a future refactor changes
+  // how the default is derived and a real "no format chosen yet" case
+  // reappears, saving stays blocked instead of silently sending an invalid
+  // value — not because it currently fires.
   const [bestOf, setBestOf] = useState<BestOf | null>(() => defaultBestOfForEventType('Online'));
   const [bestOfTouched, setBestOfTouched] = useState(false);
   // Tracks the eventType the bestOf default was last derived from, so a

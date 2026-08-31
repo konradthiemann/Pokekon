@@ -12,6 +12,15 @@ describe('BEST_OF_VALUES', () => {
   });
 });
 
+// `bo3ToBo1WinRate`'s implementation rounds its `asin`/`sin` result to 1e12
+// (12 decimal places), not the 1e-9 (9 decimal places) tolerance the tests
+// below assert with. It has to be strictly finer than the test tolerance:
+// snapping to exactly 1e-9 would let the rounding itself silently swallow up
+// to 1e-9 of genuine error, so a real precision regression right at that
+// boundary could pass `toBeCloseTo(p, 9)` for the wrong reason. 1e12 only
+// removes the trigonometric floating-point dust at the fixed points (e.g.
+// ~5.5e-17 instead of exactly 0, see the implementation comment) while
+// leaving many more significant digits than any assertion here relies on.
 describe('bo1ToBo3WinRate / bo3ToBo1WinRate', () => {
   it('share the fixed points 0, 0.5 and 1', () => {
     for (const p of [0, 0.5, 1]) {
