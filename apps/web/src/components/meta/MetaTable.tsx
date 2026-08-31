@@ -151,7 +151,10 @@ export function MetaTable({ stats }: Props) {
                     {s.ties || '—'}
                   </td>
                   <td className="px-4 py-2.5 text-right">
-                    <WinRateBadge rate={winRatePct1(s.wins, s.losses)} encounters={s.encounters} />
+                    <WinRateBadge
+                      rate={winRatePct1(s.wins, s.losses, s.ties)}
+                      encounters={s.encounters}
+                    />
                   </td>
                 </tr>
               ))}

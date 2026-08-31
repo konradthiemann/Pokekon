@@ -259,7 +259,7 @@ function MetaTable({
                         {a.wins}-{a.losses}
                       </td>
                       <td className="px-3 py-1.5 text-right">
-                        <WinRateBadge pct={winRatePct1(a.wins, a.losses)} />
+                        <WinRateBadge pct={winRatePct1(a.wins, a.losses, a.ties)} />
                       </td>
                       <td className="px-3 py-1.5 text-right whitespace-nowrap">
                         {a.fieldWinRatePct !== null ? (

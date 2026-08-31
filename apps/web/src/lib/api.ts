@@ -422,6 +422,7 @@ interface MetaSnapshotRow {
   winRatePct: number | null;
   wins: number;
   losses: number;
+  ties: number;
   playerCount: number;
   period: string;
   sourceNote: string;
@@ -437,6 +438,7 @@ function toMetaSnapshot(row: MetaSnapshotRow): MetaSnapshot {
     winRatePct: row.winRatePct,
     wins: row.wins,
     losses: row.losses,
+    ties: row.ties,
     playerCount: row.playerCount,
     period: row.period,
     sourceNote: row.sourceNote,
@@ -475,6 +477,7 @@ export interface FieldAnalysisArchetype {
   winRatePct: number | null;
   wins: number;
   losses: number;
+  ties: number;
   playerCount: number;
   /** Data-driven Pokémon sprite slugs (Limitless deck.icons); [] when none. */
   icons: string[];
@@ -536,6 +539,7 @@ export interface ArchetypeAnalysis extends MetaWindow {
     winRatePct: number | null;
     wins: number;
     losses: number;
+    ties: number;
     playerCount: number;
     icons: string[];
   };

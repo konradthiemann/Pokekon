@@ -4,8 +4,12 @@ export type CardType = 'Pokemon' | 'Trainer' | 'Energy';
 export type CardRole = 'attacker' | 'supporter' | 'item' | 'stadium' | 'energy' | 'tech';
 export type EventType = 'LC' | 'LCup' | 'Regional' | 'Worlds' | 'Online';
 /**
- * Outcome of a single match. Ties are recorded but excluded from win-rate calculations
- * throughout the app — only W and L count toward decisive game percentages.
+ * Outcome of a single match. Meta snapshots, the matchup matrix and the personal
+ * win rate (`ArchetypeStats.winRate`) count a tie as a third of a win (the
+ * official tournament weighting, see `@pokekon/shared`'s `tournamentWinRatePct`).
+ * A handful of other, deliberately unchanged personal-analytics views (e.g.
+ * `deckAnalytics.ts`'s `WinRateBlock`, `useRecommendations.ts`) still use a
+ * "decided games" semantic that excludes ties — that scope is Spec 4, not this one.
  */
 export type MatchResult = 'W' | 'L' | 'T';
 
@@ -121,11 +125,12 @@ export interface MetaSnapshot {
    *  before the column existed; the next sync backfills it. */
   archetypeId: string | null;
   frequencyPct: number; // 0–100
-  /** Tournament win rate 0–100. `null` means every game in the sample ended in a tie
-   *  or the archetype had no recorded decisive games — it does NOT imply 50%. */
-  winRatePct: number | null; // 0–100, null if no decisive games
+  /** Official tournament win rate 0–100 (a tie counts as a third of a win).
+   *  `null` only when there were no games at all — it does NOT imply 50%. */
+  winRatePct: number | null;
   wins: number; // raw win count across all fetched tournaments
   losses: number; // raw loss count
+  ties: number; // raw tie count across all fetched tournaments
   playerCount: number; // how many players ran this archetype
   period: string; // e.g. "2026-W15"
   sourceNote: string;
