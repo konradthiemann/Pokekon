@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { ChevronRight } from 'lucide-react';
 import type { ArchetypeStats } from '../../types';
 import { PokemonIcon } from '../shared/PokemonIcon';
-import { winRatePct1 } from './winRateColor';
 
 interface Props {
   stats: ArchetypeStats[];
@@ -13,21 +12,54 @@ interface Props {
 const ICON_BOX = 54;
 const PAGE_SIZE = 10;
 
-function WinRateBadge({ rate, encounters }: { rate: number | null; encounters: number }) {
+/** `encounters` is the sample the win rate itself is based on (Bo1-comparable
+ *  games only); `unknownGames` are logs excluded from that number because
+ *  their match format is unknown — surfaced as a footnote, not folded in. */
+function WinRateBadge({
+  rate,
+  encounters,
+  unknownGames = 0,
+}: {
+  rate: number | null;
+  encounters: number;
+  unknownGames?: number;
+}) {
   const { t } = useTranslation('meta');
-  if (encounters === 0 || rate === null) return <span className="text-slate-400 text-xs">—</span>;
+  const unknownNote =
+    unknownGames > 0 ? (
+      <span className="block text-[10px] text-slate-400 font-medium">
+        {t('myMatchups.unknownFormat', { count: unknownGames })}
+      </span>
+    ) : null;
+
+  if (encounters === 0 || rate === null) {
+    return (
+      <>
+        <span className="text-slate-400 text-xs">—</span>
+        {unknownNote}
+      </>
+    );
+  }
   if (encounters < 5) {
     return (
-      <span className="text-slate-500 font-bold">
-        {rate.toFixed(1)}%{' '}
-        <span className="text-slate-400 font-medium">
-          {t('myMatchups.sampleSize', { count: encounters })}
+      <>
+        <span className="text-slate-500 font-bold">
+          {rate.toFixed(1)}%{' '}
+          <span className="text-slate-400 font-medium">
+            {t('myMatchups.sampleSize', { count: encounters })}
+          </span>
         </span>
-      </span>
+        {unknownNote}
+      </>
     );
   }
   const color = rate >= 60 ? 'text-emerald-700' : rate >= 40 ? 'text-amber-700' : 'text-red-700';
-  return <span className={`font-bold ${color}`}>{rate.toFixed(1)}%</span>;
+  return (
+    <>
+      <span className={`font-bold ${color}`}>{rate.toFixed(1)}%</span>
+      {unknownNote}
+    </>
+  );
 }
 
 export function MetaTable({ stats }: Props) {
@@ -152,8 +184,9 @@ export function MetaTable({ stats }: Props) {
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <WinRateBadge
-                      rate={winRatePct1(s.wins, s.losses, s.ties)}
-                      encounters={s.encounters}
+                      rate={s.bo1EquivalentWinRate}
+                      encounters={s.bo1Games + s.bo3Games}
+                      unknownGames={s.unknownFormatGames}
                     />
                   </td>
                 </tr>

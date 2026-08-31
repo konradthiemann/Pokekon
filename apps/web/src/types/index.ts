@@ -161,9 +161,19 @@ export interface ArchetypeStats {
   wins: number;
   losses: number;
   ties: number;
-  winRate: number; // 0–100, personal win rate
+  /** 0–100, personal win rate across ALL logs (tie-weighted, see
+   *  `tournamentWinRatePct`), 0 when there are no logs at all. */
+  winRate: number;
   frequencyPct: number; // meta share from latest snapshot
   metaWinRate: number; // overall win rate from meta data (0 if unknown)
+  /** Bo1-comparable personal win rate (Bo3 logs converted back, unknown-format
+   *  logs excluded); null when there are no Bo1/Bo3-tagged logs at all. */
+  bo1EquivalentWinRate: number | null;
+  bo1Games: number;
+  bo3Games: number;
+  /** Logs with no known bestOf (pre-dating the field) — excluded from
+   *  `bo1EquivalentWinRate`, only counted here. */
+  unknownFormatGames: number;
 }
 
 export interface MetaTrendPoint {

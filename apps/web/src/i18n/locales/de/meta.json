@@ -189,6 +189,8 @@
       "winRate": "WR"
     },
     "sampleSize": "(n={{count}})",
+    "unknownFormat_one": "+{{count}} Format unbekannt",
+    "unknownFormat_other": "+{{count}} Format unbekannt",
     "showTop": "Top {{count}} anzeigen",
     "showAll": "Alle {{count}} Decks anzeigen"
   },
@@ -198,6 +200,8 @@
     "winRate": "Winrate",
     "tooltipValue_one": "{{value}}% ({{count}} Spiel)",
     "tooltipValue_other": "{{value}}% ({{count}} Spiele)",
+    "tooltipUnknown_one": "· {{count}} ausgeschlossen (Format unbekannt)",
+    "tooltipUnknown_other": "· {{count}} ausgeschlossen (Format unbekannt)",
     "legend": "Grün = vorteilhaft (60%+)   Orange = ausgeglichen (40–60%)   Rot = unvorteilhaft (<40%)"
   }
 }

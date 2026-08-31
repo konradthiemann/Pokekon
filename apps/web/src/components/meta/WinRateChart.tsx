@@ -18,12 +18,15 @@ interface Props {
 
 /** Minimal shape of the Recharts tooltip item used by the formatter below. */
 interface TooltipItem {
-  payload?: { encounters?: number };
+  payload?: { encounters?: number; unknownGames?: number };
 }
 
 export function WinRateChart({ stats }: Props) {
   const { t } = useTranslation('meta');
-  const withData = stats.filter((s) => s.encounters > 0);
+  // Bo1-comparable games only (bo1Games + bo3Games) — an archetype with only
+  // unknown-format logs has no bo1EquivalentWinRate and is excluded, same as
+  // "no logs at all" would be.
+  const withData = stats.filter((s) => s.bo1EquivalentWinRate !== null);
 
   if (withData.length === 0) {
     return (
@@ -34,11 +37,12 @@ export function WinRateChart({ stats }: Props) {
   }
 
   const data = [...withData]
-    .sort((a, b) => a.winRate - b.winRate)
+    .sort((a, b) => (a.bo1EquivalentWinRate ?? 0) - (b.bo1EquivalentWinRate ?? 0))
     .map((s) => ({
       name: s.archetype,
-      winRate: s.winRate,
-      encounters: s.encounters,
+      winRate: s.bo1EquivalentWinRate ?? 0,
+      encounters: s.bo1Games + s.bo3Games,
+      unknownGames: s.unknownFormatGames,
     }));
 
   return (
@@ -74,13 +78,20 @@ export function WinRateChart({ stats }: Props) {
             }}
             labelStyle={{ color: '#0f172a', fontWeight: 800 }}
             itemStyle={{ color: '#334155', fontWeight: 700 }}
-            formatter={(value, _name, props) => [
-              t('winRateChart.tooltipValue', {
+            formatter={(value, _name, props) => {
+              const payload = (props as TooltipItem).payload;
+              const unknownGames = payload?.unknownGames ?? 0;
+              const base = t('winRateChart.tooltipValue', {
                 value: value ?? 0,
-                count: (props as TooltipItem).payload?.encounters ?? 0,
-              }),
-              t('winRateChart.winRate'),
-            ]}
+                count: payload?.encounters ?? 0,
+              });
+              return [
+                unknownGames > 0
+                  ? `${base} ${t('winRateChart.tooltipUnknown', { count: unknownGames })}`
+                  : base,
+                t('winRateChart.winRate'),
+              ];
+            }}
           />
           <Bar dataKey="winRate" radius={[0, 4, 4, 0]}>
             {data.map((entry, i) => (
