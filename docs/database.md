@@ -337,12 +337,22 @@ guessed default. Drives the Bo1-equivalent personal win rate
 
 `user_id` (PK, FK → `user.id`, `onDelete: cascade`) + `imported_at`
 (timestamptz, default `now()`). A row's mere presence means "this account has
-already run the legacy-Dexie import" — `POST /api/logs/import` checks it
-before accepting a batch and 409s any further attempt, then inserts the row
-itself once the batch succeeds. Without this, `bestOf: null` (otherwise
+already run the legacy-Dexie import". Without this, `bestOf: null` (otherwise
 impossible to write via the API) would be a permanently open second path
 around the hard-required-on-create guarantee, not a one-time migration
 exception. Same per-user companion-table shape as `user_ai_settings` above.
+
+`POST /api/logs/import` **claims** this row FIRST, inside one
+`db.transaction(...)` together with the ownership checks and the batch
+insert: `INSERT ... ON CONFLICT (user_id) DO NOTHING RETURNING` — 0 rows back
+means already-imported (or lost a race against a concurrent call for the
+same account) and rolls the whole transaction back with `409`, before a
+single log is written. A check-then-insert-at-the-end version of this route
+had a real, deliberately-triggerable race (N concurrent requests all pass a
+pre-check `SELECT` before any of them commits the flag, so all of them write
+their full batch); claim-first-in-one-transaction closes that and gives the
+batch atomicity for free (a failure partway through rolls back everything,
+so a retry never duplicates).
 
 ### Table: `user_ai_settings`
 

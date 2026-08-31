@@ -536,6 +536,41 @@ describe('opponent logs: best-of format (plan §3.6)', () => {
       expect(logs[0]?.id).toBe(firstLogs[0]?.id);
       expect(logs[0]?.archetype).toBe('gardevoir');
     });
+
+    // The sequential test above (await first, then second) does not exercise
+    // the actual race: a SELECT-then-insert-the-flag-at-the-end implementation
+    // lets N concurrent requests all pass the pre-check before any of them
+    // commits the flag, so every one of them writes its full batch before only
+    // the LAST claim trips the unique constraint — a client can trigger this
+    // deliberately. Only a real once-per-account CLAIM before any log insert
+    // (atomically, in one transaction) closes that.
+    it('rejects a genuinely concurrent second import attempt, with only one batch ever landing', async () => {
+      await createUser('user-import-concurrent');
+
+      const [resA, resB] = await Promise.all([
+        request('/api/logs/import', {
+          user: 'user-import-concurrent',
+          method: 'POST',
+          body: [{ ...validLog, archetype: 'concurrent-batch-a', bestOf: null }],
+        }),
+        request('/api/logs/import', {
+          user: 'user-import-concurrent',
+          method: 'POST',
+          body: [{ ...validLog, archetype: 'concurrent-batch-b', bestOf: 'BO1' }],
+        }),
+      ]);
+
+      // Exactly one request wins the claim (201), the other is rejected (409)
+      // — never both succeeding, never both being rejected.
+      expect([resA.status, resB.status].sort()).toEqual([201, 409]);
+
+      const listed = await request('/api/logs?limit=200', { user: 'user-import-concurrent' });
+      const logs = (await listed.json()) as { archetype: string }[];
+      // Exactly one of the two batches is actually in the database — the
+      // losing request must not have written anything at all.
+      expect(logs).toHaveLength(1);
+      expect(['concurrent-batch-a', 'concurrent-batch-b']).toContain(logs[0]?.archetype);
+    });
   });
 });
 

@@ -16,17 +16,15 @@ import type { z } from 'zod';
 
 type LogCreateBody = z.infer<typeof logBodySchema> | z.infer<typeof logImportEntrySchema>;
 
-/** Postgres unique_violation (23505) — the race-safety net for the
- *  legacy-import one-time flag: two concurrent requests could both pass the
- *  pre-check SELECT, but only one can win the INSERT into
- *  `legacy_import_state` (its `user_id` is the primary key). */
-function isUniqueViolation(err: unknown): boolean {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    'code' in err &&
-    (err as { code?: unknown }).code === '23505'
-  );
+/** Thrown inside the `/import` transaction to abort it (drizzle rolls back on
+ *  any thrown error, see `db.transaction`) while still carrying enough
+ *  information to answer with the right HTTP status once it propagates. */
+class ImportRejected extends Error {
+  constructor(
+    public readonly reason: 'deck-not-found' | 'snapshot-not-found' | 'already-imported',
+  ) {
+    super(reason);
+  }
 }
 
 /** Shared insert + parse-on-write, used by both the regular create route and
@@ -131,23 +129,24 @@ export function createLogsRoutes(): Hono<ApiEnv> {
   //
   // Genuinely single-use per account (security review addendum): without
   // that, this would be a permanently open second path around the
-  // hard-required guarantee. `legacy_import_state` (one row per account,
-  // written once this call succeeds) is checked up front — a second attempt
-  // is rejected with 409 regardless of its body. Batched (one array, one
-  // request) rather than per-log: a per-log endpoint could only ever let a
-  // single legacy log through per account under this rule.
+  // hard-required guarantee. `legacy_import_state` (one row per account) is
+  // the flag — but a SELECT-then-INSERT-at-the-end check/write (the first
+  // version of this route) has a real race: N concurrent requests for the
+  // same account all pass the pre-check before any of them commits the flag,
+  // so every one of them would insert its full (up to `logImportBodySchema`'s
+  // max) batch before only the LAST claim hits the unique constraint — a
+  // client can trigger this deliberately, not just by accident. Fixed by
+  // *claiming the flag first*, atomically, inside one transaction with the
+  // batch insert: `INSERT ... ON CONFLICT DO NOTHING RETURNING` either wins
+  // the claim (0 rows back = already imported, roll back, 409) or the
+  // transaction proceeds — no request can ever get past the ownership checks
+  // or the log inserts without already holding the one-and-only claim. This
+  // also gives the batch atomicity for free: a failure partway through rolls
+  // back the whole transaction (claim included), so a retry starts clean
+  // instead of duplicating whatever had already been inserted.
   routes.post('/import', async (c) => {
     const db = c.get('db');
     const userId = c.get('user').id;
-
-    const alreadyImported = await db
-      .select({ userId: legacyImportState.userId })
-      .from(legacyImportState)
-      .where(eq(legacyImportState.userId, userId))
-      .limit(1);
-    if (alreadyImported.length > 0) {
-      return c.json({ error: 'Legacy import already completed for this account' }, 409);
-    }
 
     const parsed = logImportBodySchema.safeParse(await readJson(c));
     if (!parsed.success) {
@@ -155,38 +154,52 @@ export function createLogsRoutes(): Hono<ApiEnv> {
     }
     const entries = parsed.data;
 
-    for (const body of entries) {
-      if (body.deckId != null && !(await userOwnsDeck(db, userId, body.deckId))) {
-        return c.json({ error: 'Deck not found' }, 404);
-      }
-      if (
-        body.deckSnapshotId != null &&
-        !(await userOwnsSnapshot(db, userId, body.deckSnapshotId))
-      ) {
-        return c.json({ error: 'Snapshot not found' }, 404);
-      }
-    }
-
-    const logs = [];
-    for (const body of entries) {
-      const log = await insertLog(db, userId, body);
-      if (log !== undefined) logs.push(log);
-    }
-
     try {
-      await db.insert(legacyImportState).values({ userId });
+      const logs = await db.transaction(async (tx) => {
+        // Claim the one-time flag FIRST, atomically. 0 rows back means either
+        // this account already imported, or it lost a race against a
+        // concurrent /import call for the same account — either way, nothing
+        // below this point may run, so the whole transaction rolls back.
+        const claimed = await tx
+          .insert(legacyImportState)
+          .values({ userId })
+          .onConflictDoNothing({ target: legacyImportState.userId })
+          .returning({ userId: legacyImportState.userId });
+        if (claimed.length === 0) {
+          throw new ImportRejected('already-imported');
+        }
+
+        for (const body of entries) {
+          if (body.deckId != null && !(await userOwnsDeck(tx, userId, body.deckId))) {
+            throw new ImportRejected('deck-not-found');
+          }
+          if (
+            body.deckSnapshotId != null &&
+            !(await userOwnsSnapshot(tx, userId, body.deckSnapshotId))
+          ) {
+            throw new ImportRejected('snapshot-not-found');
+          }
+        }
+
+        const inserted = [];
+        for (const body of entries) {
+          const log = await insertLog(tx, userId, body);
+          if (log !== undefined) inserted.push(log);
+        }
+        return inserted;
+      });
+
+      return c.json(logs, 201);
     } catch (err) {
-      if (isUniqueViolation(err)) {
-        // Lost a race against a concurrent import call for the same account.
-        // The logs above are already written (no transaction — see module
-        // doc); an exceedingly unlikely edge case for a one-time,
-        // human-triggered migration action, traded for simplicity here.
+      if (err instanceof ImportRejected) {
+        if (err.reason === 'deck-not-found') return c.json({ error: 'Deck not found' }, 404);
+        if (err.reason === 'snapshot-not-found') {
+          return c.json({ error: 'Snapshot not found' }, 404);
+        }
         return c.json({ error: 'Legacy import already completed for this account' }, 409);
       }
       throw err;
     }
-
-    return c.json(logs, 201);
   });
 
   routes.patch('/:id', async (c) => {

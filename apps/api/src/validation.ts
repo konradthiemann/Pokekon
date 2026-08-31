@@ -93,7 +93,14 @@ export const logImportEntrySchema = z.object({
   notes: z.string().default(''),
 });
 
-export const logImportBodySchema = z.array(logImportEntrySchema).min(1).max(2000);
+// 20000: generous headroom over any realistic personal TCG match history —
+// even several games a day, every day, for multiple years of active play
+// stays well under this. Deliberately NOT a multi-batch/resumable-import
+// design (over-engineering for a solo-hobby project, CLAUDE.md "kein
+// over-engineering"): the import is genuinely once-per-account (see the
+// route), so the cap only needs to comfortably exceed real usage, not
+// accommodate an unbounded number of batches.
+export const logImportBodySchema = z.array(logImportEntrySchema).min(1).max(20_000);
 
 export const logPatchSchema = z
   .object(logFields)
