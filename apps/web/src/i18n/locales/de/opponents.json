@@ -11,6 +11,7 @@
     "loss": "Niederlage",
     "tie": "Unentschieden",
     "eventType": "Event-Typ",
+    "matchFormat": "Match-Format",
     "eventDate": "Datum",
     "round": "Runde",
     "moreOptions": "Mehr Optionen (Notizen, Deck-Version, Kampfprotokoll)",
@@ -33,6 +34,13 @@
     "LCup": "League Cup",
     "Regional": "Regional",
     "Worlds": "Worlds"
+  },
+  "bestOf": {
+    "bo1": "Bo1",
+    "bo3": "Bo3",
+    "unknown": "Format unbekannt",
+    "hint": "Dieses Match wurde geloggt, bevor es das Format-Feld gab. War es Bo1 oder Bo3?",
+    "dismiss": "Nicht mehr anzeigen"
   },
   "matchDetail": {
     "versus": "vs. {{archetype}}",

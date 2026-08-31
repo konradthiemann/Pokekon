@@ -123,6 +123,7 @@ interface OpponentLogRow {
   eventType: OpponentLog['eventType'];
   eventDate: string;
   result: OpponentLog['result'];
+  bestOf: OpponentLog['bestOf'] | null;
   notes: string;
   round: number | null;
   deckSnapshotId: number | null;
@@ -202,6 +203,7 @@ function toOpponentLog(row: OpponentLogRow): OpponentLog {
     eventType: row.eventType,
     eventDate: row.eventDate,
     result: row.result,
+    bestOf: row.bestOf ?? undefined,
     notes: row.notes,
     round: row.round ?? undefined,
     deckSnapshotId: row.deckSnapshotId ?? undefined,

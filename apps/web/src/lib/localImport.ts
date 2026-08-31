@@ -134,6 +134,16 @@ export async function importLocalData(
       eventType: log.eventType,
       eventDate: log.eventDate,
       result: log.result,
+      // Legacy Dexie logs predate the bestOf field entirely (plan §0/§3.7), but
+      // POST /api/logs hard-requires it (plan §3.6, decision #3) — there is no
+      // "send as unknown" option on this single write path. Falling back to the
+      // same eventType-based default the log form uses is the least-bad choice
+      // available without either breaking every import or adding a second,
+      // unvalidated write path; it is NOT the same as the "Format unbekannt"
+      // badge a genuinely NULL bestOf would show. Flagged as a plan gap in the
+      // implementer's report — worth a deliberate decision later, not silently
+      // resolved as final.
+      bestOf: log.eventType === 'Regional' || log.eventType === 'Worlds' ? 'BO3' : 'BO1',
       notes: log.notes,
       round: log.round,
       deckSnapshotId:

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, CheckCircle2 } from 'lucide-react';
+import { BEST_OF_VALUES, type BestOf } from '@pokekon/shared';
 import type { EventType, MatchResult } from '../../types';
 import { addOpponentLog } from '../../db/queries';
 import { useDashboardStore } from '../../store/dashboardStore';
@@ -40,6 +41,13 @@ const RESULT_BUTTONS = [
 
 const EVENT_TYPES: EventType[] = ['Online', 'LC', 'LCup', 'Regional', 'Worlds'];
 
+/** Default match format per event type (plan §3.7): Regional/Worlds are
+ *  typically Bo3, everything else Bo1. Only the *initial* pick per event type —
+ *  once the user touches the picker directly, the default no longer applies. */
+function defaultBestOfForEventType(eventType: EventType): BestOf {
+  return eventType === 'Regional' || eventType === 'Worlds' ? 'BO3' : 'BO1';
+}
+
 interface Props {
   onClose: () => void;
   /** Pre-select a specific deck (overrides activeDeckId default) */
@@ -73,6 +81,17 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
   const [archetype, setArchetype] = useState('');
   const [customArch, setCustomArch] = useState('');
   const [eventType, setEventType] = useState<EventType>('Online');
+  const [bestOf, setBestOf] = useState<BestOf | null>(() => defaultBestOfForEventType('Online'));
+  const [bestOfTouched, setBestOfTouched] = useState(false);
+  // Tracks the eventType the bestOf default was last derived from, so a
+  // change can be detected and applied during render (React's documented
+  // pattern for "adjust state when a prop/state changes") instead of in an
+  // effect, which would cause an extra, avoidable render pass.
+  const [lastEventTypeForDefault, setLastEventTypeForDefault] = useState(eventType);
+  if (eventType !== lastEventTypeForDefault) {
+    setLastEventTypeForDefault(eventType);
+    if (!bestOfTouched) setBestOf(defaultBestOfForEventType(eventType));
+  }
   const [eventDate, setEventDate] = useState(today);
   const [result, setResult] = useState<MatchResult | null>(null);
   const [round, setRound] = useState<number | ''>('');
@@ -119,7 +138,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
    * fields reset, and the round number auto-increments.
    */
   const handleSave = async (keepOpen: boolean) => {
-    if (!finalArchetype.trim() || result === null) return;
+    if (!finalArchetype.trim() || result === null || bestOf === null) return;
     setSaving(true);
     setSaveError(null);
     try {
@@ -128,6 +147,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
         eventType,
         eventDate,
         result,
+        bestOf,
         notes: notes.trim(),
         round: round === '' ? undefined : Number(round),
         deckSnapshotId: deckSnapshotId === '' ? undefined : Number(deckSnapshotId),
@@ -280,6 +300,31 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
             </div>
           </div>
 
+          {/* Match format — Bo1/Bo3, defaulted from event type until touched */}
+          <div>
+            <label className="block text-xs text-slate-600 mb-2">{t('addLog.matchFormat')}</label>
+            <div className="grid grid-cols-2 gap-2">
+              {BEST_OF_VALUES.map((format) => (
+                <button
+                  key={format}
+                  type="button"
+                  onClick={() => {
+                    setBestOf(format);
+                    setBestOfTouched(true);
+                  }}
+                  className={`py-2 rounded-xl border-2 text-sm font-bold transition-all ${
+                    bestOf === format
+                      ? 'bg-brand-100 border-brand-200 text-brand-800'
+                      : 'bg-slate-100 border-slate-300 text-slate-700 hover:border-slate-400'
+                  }`}
+                  aria-pressed={bestOf === format}
+                >
+                  {t(`bestOf.${format === 'BO1' ? 'bo1' : 'bo3'}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Event type, date, and round — always visible, 3-column grid */}
           <div className="grid grid-cols-3 gap-2">
             <div>
@@ -388,7 +433,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
           </button>
           <button
             onClick={() => void handleSave(true)}
-            disabled={!finalArchetype.trim() || result === null || saving}
+            disabled={!finalArchetype.trim() || result === null || bestOf === null || saving}
             className="btn-ghost flex-1 justify-center py-3 text-sm font-bold border border-brand-200 text-brand-700 hover:bg-brand-100 disabled:opacity-50"
             title={t('addLog.saveAndNext')}
           >
@@ -396,7 +441,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
           </button>
           <button
             onClick={() => void handleSave(false)}
-            disabled={!finalArchetype.trim() || result === null || saving}
+            disabled={!finalArchetype.trim() || result === null || bestOf === null || saving}
             className="btn-primary flex-1 justify-center py-3 text-base font-bold disabled:opacity-50"
           >
             {saving ? t('saving', { ns: 'common' }) : t('addLog.saveAndClose')}

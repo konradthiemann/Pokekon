@@ -1,5 +1,8 @@
 // ─── Core domain types ───────────────────────────────────────────────────────
 
+import type { BestOf } from '@pokekon/shared';
+export type { BestOf };
+
 export type CardType = 'Pokemon' | 'Trainer' | 'Energy';
 export type CardRole = 'attacker' | 'supporter' | 'item' | 'stadium' | 'energy' | 'tech';
 export type EventType = 'LC' | 'LCup' | 'Regional' | 'Worlds' | 'Online';
@@ -69,6 +72,8 @@ export interface OpponentLog {
   eventType: EventType;
   eventDate: string; // YYYY-MM-DD
   result: MatchResult;
+  /** undefined = format unknown (logged before this field existed). */
+  bestOf?: BestOf;
   notes: string;
   round?: number;
   deckSnapshotId?: number; // which deck version was piloted
