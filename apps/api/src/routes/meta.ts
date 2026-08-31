@@ -6,6 +6,7 @@ import {
   MIN_MATCHUP_GAMES,
   OTHER_ARCHETYPE_ID,
   ROTATION_PERIOD,
+  tournamentWinRatePct,
   type ArchetypeShare,
   type FieldScore,
   type MatchupCell,
@@ -41,6 +42,7 @@ interface WindowAggregates {
     winRatePct: number | null;
     wins: number;
     losses: number;
+    ties: number;
     playerCount: number;
     /** Pokémon sprite slugs (Limitless deck.icons), data-driven; [] if none. */
     icons: string[];
@@ -82,6 +84,7 @@ async function loadWindowAggregates(db: Db, window: MetaWindow): Promise<WindowA
       icons: tournamentStandings.icons,
       wins: tournamentStandings.wins,
       losses: tournamentStandings.losses,
+      ties: tournamentStandings.ties,
     })
     .from(tournamentStandings)
     .innerJoin(tournaments, eq(tournamentStandings.tournamentId, tournaments.id))
@@ -91,7 +94,7 @@ async function loadWindowAggregates(db: Db, window: MetaWindow): Promise<WindowA
     deck: r.icons
       ? { id: r.archetypeId, name: r.archetypeName, icons: r.icons }
       : { id: r.archetypeId, name: r.archetypeName },
-    record: { wins: r.wins, losses: r.losses },
+    record: { wins: r.wins, losses: r.losses, ties: r.ties },
   }));
   // One flat group instead of per-tournament arrays is fine here: shares and
   // records don't depend on the grouping, and the only field that does
@@ -109,6 +112,7 @@ async function loadWindowAggregates(db: Db, window: MetaWindow): Promise<WindowA
       winRatePct: s.winRatePct,
       wins: s.wins,
       losses: s.losses,
+      ties: s.ties,
       playerCount: s.playerCount,
       icons: s.icons,
     })),
@@ -128,8 +132,9 @@ interface MatchupData {
   trainerHillImportedAt: Date | null;
 }
 
-/** A directed matchup row from a head-to-head count (win rate excludes ties, to
- *  match the metashare win-rate convention; `total` counts all games incl. ties). */
+/** A directed matchup row from a head-to-head count. Win rate uses the shared
+ *  tournament formula (a tie counts as a third of a win); `total` counts all
+ *  games incl. ties. Falls back to 50 when there is no game at all. */
 function directedRow(
   deck1: string,
   deck2: string,
@@ -137,15 +142,14 @@ function directedRow(
   losses: number,
   ties: number,
 ): MatchupRow {
-  const decisive = wins + losses;
   return {
     deck1,
     deck2,
     wins,
     losses,
     ties,
-    total: decisive + ties,
-    winRate: decisive > 0 ? Math.round((wins / decisive) * 1000) / 10 : 50,
+    total: wins + losses + ties,
+    winRate: tournamentWinRatePct(wins, losses, ties, 1) ?? 50,
   };
 }
 
@@ -331,6 +335,7 @@ export function createMetaRoutes(): Hono<ApiEnv> {
           winRatePct: stats?.winRatePct ?? null,
           wins: stats?.wins ?? 0,
           losses: stats?.losses ?? 0,
+          ties: stats?.ties ?? 0,
           playerCount: stats?.playerCount ?? 0,
           icons: stats?.icons ?? [],
           fieldWinRatePct: s.fieldWinRatePct,

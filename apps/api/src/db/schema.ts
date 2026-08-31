@@ -249,9 +249,10 @@ export const metaSnapshots = pgTable(
     // carry no slug; the sync upsert backfills it on the next run.
     archetypeId: text('archetype_id'),
     frequencyPct: real('frequency_pct').notNull(),
-    winRatePct: integer('win_rate_pct'), // nullable: no decided games yet
+    winRatePct: integer('win_rate_pct'), // nullable: no games at all yet
     wins: integer('wins').notNull(),
     losses: integer('losses').notNull(),
+    ties: integer('ties').notNull().default(0),
     playerCount: integer('player_count').notNull(),
     // Pokémon sprite slugs from Limitless `deck.icons` (data-driven archetype
     // icons); null for rows synced before this column existed — the frontend
