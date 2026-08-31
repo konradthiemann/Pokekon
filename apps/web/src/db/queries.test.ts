@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as api from '../lib/api';
-import { getArchetypeStats } from './queries';
-import type { ArchetypeStats, OpponentLog } from '../types';
+import { getArchetypeStats, getDeckVariantStats } from './queries';
+import type { ArchetypeStats, Deck, OpponentLog } from '../types';
 
 // getArchetypeStats only touches the API layer (listAllLogs, getMeta) — the
 // whole module is auto-mocked so no network/IndexedDB is ever hit.
@@ -68,5 +68,40 @@ describe('getArchetypeStats', () => {
     // Must never equal the naive wins/(wins+losses) over ALL 4 logs incl. the
     // unknown-format one (75 %) — unknown games must not enter this number.
     expect(gard?.bo1EquivalentWinRate).not.toBe(75);
+  });
+});
+
+describe('getDeckVariantStats', () => {
+  const deck: Deck = {
+    id: 1,
+    archetype: 'char',
+    archetypeName: 'Charizard',
+    variant: 'Standard',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('counts ties as a third of a win, matching getArchetypeStats (AC 6W/4L/2T -> 55.6 -> 56)', async () => {
+    const entries: { result: 'W' | 'L' | 'T' }[] = [
+      ...Array.from({ length: 6 }, () => ({ result: 'W' as const })),
+      ...Array.from({ length: 4 }, () => ({ result: 'L' as const })),
+      ...Array.from({ length: 2 }, () => ({ result: 'T' as const })),
+    ];
+    const logs = entries.map((e, i) => ({
+      id: i + 1,
+      deckId: deck.id,
+      archetype: 'Gardevoir',
+      eventType: 'Online' as const,
+      eventDate: '2026-06-01',
+      result: e.result,
+      notes: '',
+    }));
+    vi.mocked(api.listAllLogs).mockResolvedValue(logs as OpponentLog[]);
+    vi.mocked(api.getMeta).mockResolvedValue([]);
+
+    const [stats] = await getDeckVariantStats([deck]);
+    // Old formula: wins/(wins+losses) = 6/10 = 60. New tie-weighted formula:
+    // (6 + 2/3) / 12 ≈ 55.6 % → rounds to 56 — same formula as ArchetypeStats.
+    expect(stats?.winRate).toBe(56);
+    expect(stats?.matchupBreakdown[0]?.winRate).toBe(56);
   });
 });

@@ -339,6 +339,10 @@ export async function getArchetypeStats(): Promise<ArchetypeStats[]> {
  * The `metaScore` denominator is the total meta frequency of ALL archetypes with meta
  * data, not just the ones the deck has encountered — untested matchups rightfully drag
  * the score down, preventing inflation from a narrow sample.
+ *
+ * `winRate` (overall and per-archetype in `matchupBreakdown`) uses the same
+ * tie-weighted `tournamentWinRatePct` as `getArchetypeStats` — a tie counts as
+ * a third of a win, not excluded from the calculation.
  */
 export async function getDeckVariantStats(decks: Deck[]): Promise<DeckVariantStats[]> {
   const deckIds = new Set(decks.map((d) => d.id!).filter(Boolean));
@@ -360,23 +364,19 @@ export async function getDeckVariantStats(decks: Deck[]): Promise<DeckVariantSta
         statsMap.set(log.archetype, cur);
       }
 
-      const matchupBreakdown = [...statsMap.entries()].map(([archetype, s]) => {
-        const decisive = s.wins + s.losses;
-        return {
-          archetype,
-          wins: s.wins,
-          losses: s.losses,
-          ties: s.ties,
-          winRate: decisive > 0 ? Math.round((s.wins / decisive) * 100) : 0,
-          metaFreq: freqMap.get(archetype.toLowerCase()) ?? 0,
-        };
-      });
+      const matchupBreakdown = [...statsMap.entries()].map(([archetype, s]) => ({
+        archetype,
+        wins: s.wins,
+        losses: s.losses,
+        ties: s.ties,
+        winRate: tournamentWinRatePct(s.wins, s.losses, s.ties, 0) ?? 0,
+        metaFreq: freqMap.get(archetype.toLowerCase()) ?? 0,
+      }));
 
       const wins = logs.filter((l) => l.result === 'W').length;
       const losses = logs.filter((l) => l.result === 'L').length;
       const ties = logs.filter((l) => l.result === 'T').length;
-      const decisive = wins + losses;
-      const winRate = decisive > 0 ? Math.round((wins / decisive) * 100) : 0;
+      const winRate = tournamentWinRatePct(wins, losses, ties, 0) ?? 0;
 
       // Meta-weighted score: Σ(metaFreq * WR) / Σ(metaFreq of ALL meta archetypes)
       // Using all archetypes with meta data as denominator correctly penalises gaps
