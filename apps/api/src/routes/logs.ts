@@ -60,6 +60,7 @@ export function createLogsRoutes(): Hono<ApiEnv> {
         eventType: body.eventType,
         eventDate: body.eventDate,
         result: body.result,
+        bestOf: body.bestOf,
         notes: body.notes,
         round: body.round ?? null,
         deckSnapshotId: body.deckSnapshotId ?? null,
@@ -114,6 +115,7 @@ export function createLogsRoutes(): Hono<ApiEnv> {
     if (body.eventType !== undefined) updates.eventType = body.eventType;
     if (body.eventDate !== undefined) updates.eventDate = body.eventDate;
     if (body.result !== undefined) updates.result = body.result;
+    if (body.bestOf !== undefined) updates.bestOf = body.bestOf;
     if (body.notes !== undefined) updates.notes = body.notes;
     if (body.round !== undefined) updates.round = body.round;
     if (body.deckSnapshotId !== undefined) updates.deckSnapshotId = body.deckSnapshotId;

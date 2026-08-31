@@ -13,7 +13,7 @@ import {
   date,
   check,
 } from 'drizzle-orm/pg-core';
-import { SWISS_MODE_VALUES } from '@pokekon/shared';
+import { BEST_OF_VALUES, SWISS_MODE_VALUES } from '@pokekon/shared';
 import type {
   ParsedTurn,
   PrizePoint,
@@ -218,6 +218,9 @@ export const opponentLogs = pgTable(
     eventType: text('event_type', { enum: eventTypeValues }).notNull(),
     eventDate: date('event_date', { mode: 'string' }).notNull(),
     result: text('result', { enum: matchResultValues }).notNull(),
+    // NULLABLE = "format unknown" for logs written before this column existed;
+    // required at the API layer (validation.ts) for new logs going forward.
+    bestOf: text('best_of', { enum: BEST_OF_VALUES }),
     notes: text('notes').default('').notNull(),
     round: integer('round'),
     deckSnapshotId: integer('deck_snapshot_id').references(() => deckSnapshots.id, {
@@ -232,6 +235,9 @@ export const opponentLogs = pgTable(
     index('opponent_logs_archetype_eventDate_idx').on(table.archetype, table.eventDate),
     // Plain event_date index for the 1/2/3/4-week time-window analytics queries (plan §5.4).
     index('opponent_logs_eventDate_idx').on(table.eventDate),
+    // Defence-in-depth: validation.ts already constrains bestOf, but the DB
+    // enforces the enum too (NULL passes — the column is nullable).
+    check('opponent_logs_best_of_chk', sql`${table.bestOf} in ('BO1', 'BO3')`),
   ],
 );
 

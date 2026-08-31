@@ -277,6 +277,7 @@ describe('opponent logs', () => {
     eventType: 'Regional',
     eventDate: '2026-06-01',
     result: 'W',
+    bestOf: 'BO3',
     notes: 'close game',
   };
 
@@ -453,6 +454,7 @@ describe('battle-log parse-on-write pipeline', () => {
     eventType: 'Online',
     eventDate: '2026-06-10',
     result: 'W',
+    bestOf: 'BO1',
     notes: '',
   };
 
@@ -565,7 +567,7 @@ describe('GET /api/analytics/deck/:id', () => {
 
   async function seedDeckWithLogs(): Promise<number> {
     const deckId = await createDeck(USER_A);
-    const base = { archetype: 'charizard', eventType: 'Online', notes: '' };
+    const base = { archetype: 'charizard', eventType: 'Online', bestOf: 'BO1', notes: '' };
     // In-window: a went-first win, a went-second loss, and an unparsed win.
     await request('/api/logs', {
       user: USER_A,

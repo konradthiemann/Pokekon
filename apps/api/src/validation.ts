@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ARCHETYPE_SLUG_PATTERN } from '@pokekon/shared';
+import { ARCHETYPE_SLUG_PATTERN, BEST_OF_VALUES } from '@pokekon/shared';
 import {
   aiProviderValues,
   cardTypeValues,
@@ -59,6 +59,7 @@ const logFields = {
   eventType: z.enum(eventTypeValues),
   eventDate: isoDate,
   result: z.enum(matchResultValues),
+  bestOf: z.enum(BEST_OF_VALUES),
   notes: z.string(),
   round: z.number().int().positive().nullish(),
   deckSnapshotId: z.number().int().positive().nullish(),

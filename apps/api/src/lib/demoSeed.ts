@@ -871,6 +871,11 @@ export async function seedDemoData(db: Db, userId: string): Promise<{ seeded: bo
   const snapId = (k: SnapKey): number | null =>
     k === 'v1' ? snapV1Id : k === 'v2' ? snapV2Id : null;
 
+  // Same default rule the log form uses (plan §3.7): Regional/Worlds events are
+  // Bo3, everything else Bo1. Demo logs always get a value (plan §6, decision 4).
+  const defaultBestOf = (eventType: SeedMatch['eventType']): 'BO1' | 'BO3' =>
+    eventType === 'Regional' || eventType === 'Worlds' ? 'BO3' : 'BO1';
+
   // ── Matches (insert, then parse-on-write for the ones with a battle log) ────
   const allMatches: { deckId: number; match: SeedMatch }[] = [
     ...DECK_A_MATCHES.map((m) => ({ deckId: deckAId, match: m })),
@@ -888,6 +893,7 @@ export async function seedDemoData(db: Db, userId: string): Promise<{ seeded: bo
           eventType: match.eventType,
           eventDate: daysAgoStr(match.daysAgo),
           result: match.result,
+          bestOf: defaultBestOf(match.eventType),
           notes: match.notes,
           deckSnapshotId: snapId(match.snapshot),
           battleLog: match.log ?? null,
