@@ -326,7 +326,10 @@ analytics queries.
 `NULL` = "format unknown" — the state of every row written before this column
 existed; it is never silently mapped to a default. Required (hard 400 without
 it) on `POST /api/logs`; `PATCH /api/logs/:id` may set it but never reset it
-back to `NULL`. Drives the Bo1-equivalent personal win rate
+back to `NULL`. The sole exception is `POST /api/logs/import` (used only by
+`localImport.ts`'s one-time legacy-Dexie migration), which requires an
+*explicit* `bestOf: null` for logs that genuinely predate the field — never a
+guessed default. Drives the Bo1-equivalent personal win rate
 (`bo1EquivalentWinRate`, `@pokekon/shared`) — see
 [features.md](./features.md) §1/§6.
 

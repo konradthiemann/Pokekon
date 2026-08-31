@@ -425,6 +425,58 @@ describe('opponent logs: best-of format (plan §3.6)', () => {
     expect(patched.status).toBe(200);
     expect((await patched.json()) as { bestOf: string | null }).toMatchObject({ bestOf: 'BO1' });
   });
+
+  it('rejects an explicit bestOf: null on the regular create endpoint (still hard-required)', async () => {
+    const res = await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: { ...validLog, bestOf: null },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  // Migration-only path (coordinator decision, addendum to plan §3.6): legacy
+  // Dexie logs genuinely have no bestOf and must import as "format unknown"
+  // (null), not a guessed default — guessing would undermine the "no
+  // inferring from eventType" rule the hard-required POST is built on. Since
+  // POST /api/logs itself must stay hard-required for the interactive
+  // AddLogModal flow, the one-time migration writes through a dedicated
+  // import endpoint instead.
+  describe('POST /api/logs/import (legacy Dexie migration only)', () => {
+    it('accepts an explicit bestOf: null and stores it as "format unknown"', async () => {
+      const created = await request('/api/logs/import', {
+        user: USER_A,
+        method: 'POST',
+        body: { ...validLog, bestOf: null },
+      });
+      expect(created.status).toBe(201);
+      const log = (await created.json()) as { id: number; bestOf: string | null };
+      expect(log.bestOf).toBeNull();
+
+      const listed = await request('/api/logs?limit=200', { user: USER_A });
+      const logs = (await listed.json()) as { id: number; bestOf: string | null }[];
+      expect(logs.find((l) => l.id === log.id)?.bestOf).toBeNull();
+    });
+
+    it('still accepts a known bestOf value', async () => {
+      const created = await request('/api/logs/import', {
+        user: USER_A,
+        method: 'POST',
+        body: { ...validLog, bestOf: 'BO1' },
+      });
+      expect(created.status).toBe(201);
+      expect((await created.json()) as { bestOf: string | null }).toMatchObject({ bestOf: 'BO1' });
+    });
+
+    it('still rejects a missing bestOf key (must be explicit null or a value)', async () => {
+      const res = await request('/api/logs/import', {
+        user: USER_A,
+        method: 'POST',
+        body: { ...validLog },
+      });
+      expect(res.status).toBe(400);
+    });
+  });
 });
 
 const SAMPLE_BATTLE_LOG = `Vorbereitung

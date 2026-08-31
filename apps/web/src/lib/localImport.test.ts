@@ -82,7 +82,7 @@ describe('importLocalData id remapping', () => {
     mockedApi.createDeck.mockResolvedValue(wireDeck(101));
     mockedApi.replaceDeckCards.mockResolvedValue([]);
     mockedApi.createDeckSnapshot.mockResolvedValue(wireSnapshot(201, 101));
-    mockedApi.createLog.mockResolvedValue(wireLog(301));
+    mockedApi.createImportedLog.mockResolvedValue(wireLog(301));
 
     const progress: { done: number; total: number }[] = [];
     await importLocalData((p) => progress.push({ ...p }));
@@ -104,13 +104,18 @@ describe('importLocalData id remapping', () => {
       cards: '[]',
     });
 
-    // Log references translated through both id maps.
-    expect(mockedApi.createLog).toHaveBeenCalledTimes(1);
-    expect(mockedApi.createLog.mock.calls[0][0]).toMatchObject({
+    // Log references translated through both id maps, imported through the
+    // legacy-migration endpoint (not the regular hard-required createLog).
+    expect(mockedApi.createImportedLog).toHaveBeenCalledTimes(1);
+    expect(mockedApi.createLog).not.toHaveBeenCalled();
+    expect(mockedApi.createImportedLog.mock.calls[0][0]).toMatchObject({
       deckId: 101,
       deckSnapshotId: 201,
       archetype: 'gholdengo',
       result: 'W',
+      // Legacy Dexie logs predate bestOf entirely — imported as explicit
+      // "format unknown" (null), never a guessed default.
+      bestOf: null,
     });
 
     // Progress reaches total: deck + cards + snapshot + log = 4 steps.
@@ -138,11 +143,11 @@ describe('importLocalData id remapping', () => {
     });
 
     mockedApi.createDeck.mockResolvedValue(wireDeck(55));
-    mockedApi.createLog.mockResolvedValue(wireLog(301));
+    mockedApi.createImportedLog.mockResolvedValue(wireLog(301));
 
     await importLocalData();
 
-    const sent = mockedApi.createLog.mock.calls[0][0];
+    const sent = mockedApi.createImportedLog.mock.calls[0][0];
     expect(sent.deckId).toBe(55);
     expect(sent.deckSnapshotId).toBeUndefined();
   });

@@ -122,7 +122,12 @@ Records the result of each game played. Fields:
   ("format unknown"): shown as a badge in the log list and match detail, they
   count toward the personal win rate but are excluded from the Bo1-equivalent
   comparison (§1) until backfilled via the one-time hint in the match detail
-  modal (dismissable, `preferences.ts`).
+  modal (dismissable, `preferences.ts`). `bestOf` is hard-required on
+  `POST /api/logs` (400 without it) so this can never be guessed for a
+  newly-logged match; the **one exception** is the one-time legacy-Dexie
+  migration (`localImport.ts`), which writes through a dedicated
+  `POST /api/logs/import` endpoint that explicitly accepts (and requires)
+  `bestOf: null` — the only place a client may send `null` for this field.
 - Event date
 - Result (W / L / T)
 - Round number (optional)

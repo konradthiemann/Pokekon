@@ -9,6 +9,7 @@ import type {
   TournamentDecklist,
 } from '@pokekon/shared';
 import type {
+  BestOf,
   CardRole,
   CardType,
   Deck,
@@ -324,6 +325,21 @@ export async function createLog(log: LogWriteBody): Promise<OpponentLog> {
   const row = await request<OpponentLogRow>('/api/logs', {
     method: 'POST',
     // JSON.stringify drops `undefined` optionals — exactly what the API expects.
+    body: JSON.stringify({ ...log, notes: log.notes ?? '' }),
+  });
+  return toOpponentLog(row);
+}
+
+/** Body for POST /api/logs/import — the one-time legacy-Dexie migration path
+ *  ONLY (`localImport.ts`). Unlike `LogWriteBody`, `bestOf` is explicit and
+ *  nullable here: legacy logs genuinely predate the field, so they import as
+ *  `null` ("format unknown") rather than a guessed default. The regular
+ *  create path (`createLog`) stays hard-required and never accepts `null`. */
+export type LogImportBody = Omit<LogWriteBody, 'bestOf'> & { bestOf: BestOf | null };
+
+export async function createImportedLog(log: LogImportBody): Promise<OpponentLog> {
+  const row = await request<OpponentLogRow>('/api/logs/import', {
+    method: 'POST',
     body: JSON.stringify({ ...log, notes: log.notes ?? '' }),
   });
   return toOpponentLog(row);

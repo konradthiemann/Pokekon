@@ -1,10 +1,64 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import type { Db } from '../db/index.js';
 import { opponentLogs } from '../db/schema.js';
 import type { ApiEnv } from '../middleware/session.js';
-import { logBodySchema, logPatchSchema, logsQuerySchema } from '../validation.js';
+import {
+  logBodySchema,
+  logImportBodySchema,
+  logPatchSchema,
+  logsQuerySchema,
+} from '../validation.js';
 import { syncParsedLog } from '../lib/matchLogPipeline.js';
 import { parseId, readJson, userOwnsDeck, userOwnsSnapshot } from './shared.js';
+import type { z } from 'zod';
+
+type LogCreateBody = z.infer<typeof logBodySchema> | z.infer<typeof logImportBodySchema>;
+
+/** Shared insert + parse-on-write, used by both the regular create route and
+ *  the legacy-import route below — they differ only in which schema
+ *  validated `body` (whether `bestOf: null` is allowed), not in what happens
+ *  with a validated body. */
+async function insertLog(
+  db: Db,
+  userId: string,
+  body: LogCreateBody,
+): Promise<typeof opponentLogs.$inferSelect | undefined> {
+  const [log] = await db
+    .insert(opponentLogs)
+    .values({
+      userId,
+      deckId: body.deckId ?? null,
+      archetype: body.archetype,
+      eventType: body.eventType,
+      eventDate: body.eventDate,
+      result: body.result,
+      bestOf: body.bestOf,
+      notes: body.notes,
+      round: body.round ?? null,
+      deckSnapshotId: body.deckSnapshotId ?? null,
+      battleLog: body.battleLog ?? null,
+      analysis: body.analysis ?? null,
+    })
+    .returning();
+
+  // Parse-on-write: persist the structured battle log. Best-effort — a parser
+  // failure must never block saving the log itself.
+  if (log !== undefined) {
+    try {
+      await syncParsedLog(db, {
+        opponentLogId: log.id,
+        userId,
+        battleLog: log.battleLog,
+        playerName: body.playerName,
+      });
+    } catch (err) {
+      console.warn(`syncParsedLog failed for log ${log.id}:`, err);
+    }
+  }
+
+  return log;
+}
 
 /**
  * /api/logs — opponent match logs. References to decks/snapshots are verified
@@ -51,39 +105,33 @@ export function createLogsRoutes(): Hono<ApiEnv> {
       return c.json({ error: 'Snapshot not found' }, 404);
     }
 
-    const [log] = await db
-      .insert(opponentLogs)
-      .values({
-        userId,
-        deckId: body.deckId ?? null,
-        archetype: body.archetype,
-        eventType: body.eventType,
-        eventDate: body.eventDate,
-        result: body.result,
-        bestOf: body.bestOf,
-        notes: body.notes,
-        round: body.round ?? null,
-        deckSnapshotId: body.deckSnapshotId ?? null,
-        battleLog: body.battleLog ?? null,
-        analysis: body.analysis ?? null,
-      })
-      .returning();
+    const log = await insertLog(db, userId, body);
+    return c.json(log, 201);
+  });
 
-    // Parse-on-write: persist the structured battle log. Best-effort — a parser
-    // failure must never block saving the log itself.
-    if (log !== undefined) {
-      try {
-        await syncParsedLog(db, {
-          opponentLogId: log.id,
-          userId,
-          battleLog: log.battleLog,
-          playerName: body.playerName,
-        });
-      } catch (err) {
-        console.warn(`syncParsedLog failed for log ${log.id}:`, err);
-      }
+  // POST /api/logs/import — the ONLY place a client may write `bestOf: null`.
+  // Reserved for the one-time legacy-Dexie migration (`localImport.ts`):
+  // those logs genuinely predate the field, so importing them as "format
+  // unknown" is correct — guessing a default from eventType would undermine
+  // the hard-required, no-inferring rule the regular create route enforces.
+  routes.post('/import', async (c) => {
+    const parsed = logImportBodySchema.safeParse(await readJson(c));
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
     }
 
+    const db = c.get('db');
+    const userId = c.get('user').id;
+    const body = parsed.data;
+
+    if (body.deckId != null && !(await userOwnsDeck(db, userId, body.deckId))) {
+      return c.json({ error: 'Deck not found' }, 404);
+    }
+    if (body.deckSnapshotId != null && !(await userOwnsSnapshot(db, userId, body.deckSnapshotId))) {
+      return c.json({ error: 'Snapshot not found' }, 404);
+    }
+
+    const log = await insertLog(db, userId, body);
     return c.json(log, 201);
   });
 

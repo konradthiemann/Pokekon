@@ -72,6 +72,21 @@ const logFields = {
 
 export const logBodySchema = z.object({ ...logFields, notes: z.string().default('') });
 
+/**
+ * POST /api/logs/import ONLY (the one-time legacy-Dexie migration path,
+ * `localImport.ts`) — the single, narrow exception to `bestOf` being
+ * hard-required. Legacy logs genuinely have no known format; importing them
+ * requires an *explicit* `bestOf: null` ("format unknown"), never a guessed
+ * default (that would undermine the whole point of hard-requiring the field
+ * on the regular, interactive create path below). The key must still be
+ * present — omitting it entirely is rejected, same as on `logBodySchema`.
+ */
+export const logImportBodySchema = z.object({
+  ...logFields,
+  bestOf: z.enum(BEST_OF_VALUES).nullable(),
+  notes: z.string().default(''),
+});
+
 export const logPatchSchema = z
   .object(logFields)
   .partial()

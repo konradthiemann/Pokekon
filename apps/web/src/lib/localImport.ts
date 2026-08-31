@@ -128,22 +128,20 @@ export async function importLocalData(
 
   // 3) Logs — translate both references; unresolved ones are sent without.
   for (const log of logs) {
-    await api.createLog({
+    // Legacy Dexie logs predate the bestOf field entirely (plan §0/§3.7) and
+    // import as explicit "format unknown" (null) — never a guessed default,
+    // which would undermine the whole point of hard-requiring the field on
+    // new logs (coordinator decision, addendum to plan §3.6). This is the
+    // one-time migration path (`createImportedLog` → POST /api/logs/import),
+    // deliberately distinct from the interactive `createLog` used by
+    // AddLogModal, which stays hard-required and never accepts null.
+    await api.createImportedLog({
       deckId: log.deckId != null ? deckIdMap.get(log.deckId) : undefined,
       archetype: log.archetype,
       eventType: log.eventType,
       eventDate: log.eventDate,
       result: log.result,
-      // Legacy Dexie logs predate the bestOf field entirely (plan §0/§3.7), but
-      // POST /api/logs hard-requires it (plan §3.6, decision #3) — there is no
-      // "send as unknown" option on this single write path. Falling back to the
-      // same eventType-based default the log form uses is the least-bad choice
-      // available without either breaking every import or adding a second,
-      // unvalidated write path; it is NOT the same as the "Format unbekannt"
-      // badge a genuinely NULL bestOf would show. Flagged as a plan gap in the
-      // implementer's report — worth a deliberate decision later, not silently
-      // resolved as final.
-      bestOf: log.eventType === 'Regional' || log.eventType === 'Worlds' ? 'BO3' : 'BO1',
+      bestOf: null,
       notes: log.notes,
       round: log.round,
       deckSnapshotId:
