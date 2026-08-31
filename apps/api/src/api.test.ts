@@ -72,6 +72,13 @@ async function request(
   });
 }
 
+/** Inserts a throwaway user row — needed whenever a test wants an account
+ *  isolated from USER_A/USER_B (e.g. per-user one-time-use flags, where
+ *  reusing a shared constant across tests would cross-contaminate state). */
+async function createUser(id: string): Promise<void> {
+  await db.insert(schema.user).values({ id, name: id, email: `${id}@example.com` });
+}
+
 async function createDeck(user: string, overrides: Record<string, unknown> = {}): Promise<number> {
   const res = await request('/api/decks', {
     user,
@@ -440,41 +447,94 @@ describe('opponent logs: best-of format (plan §3.6)', () => {
   // (null), not a guessed default — guessing would undermine the "no
   // inferring from eventType" rule the hard-required POST is built on. Since
   // POST /api/logs itself must stay hard-required for the interactive
-  // AddLogModal flow, the one-time migration writes through a dedicated
-  // import endpoint instead.
-  describe('POST /api/logs/import (legacy Dexie migration only)', () => {
-    it('accepts an explicit bestOf: null and stores it as "format unknown"', async () => {
+  // AddLogModal flow, the one-time migration writes through a dedicated,
+  // batched (one request for the whole export) import endpoint instead.
+  //
+  // Security-review addendum: this endpoint is the ONLY place a client may
+  // write bestOf: null, so it must be genuinely single-use per account —
+  // otherwise it would be a permanently open second path around the
+  // hard-required guarantee (accidental re-calls, a stale bundle, or a
+  // scripted client could otherwise create unlimited "format unknown" logs).
+  // `legacy_import_state` (one row per account once used) enforces that: a
+  // second attempt is rejected with 409 regardless of its body.
+  describe('POST /api/logs/import (legacy Dexie migration only, one-time per account)', () => {
+    it('accepts a batch with an explicit bestOf: null and stores it as "format unknown"', async () => {
+      await createUser('user-import-null');
       const created = await request('/api/logs/import', {
-        user: USER_A,
+        user: 'user-import-null',
         method: 'POST',
-        body: { ...validLog, bestOf: null },
+        body: [{ ...validLog, bestOf: null }],
       });
       expect(created.status).toBe(201);
-      const log = (await created.json()) as { id: number; bestOf: string | null };
-      expect(log.bestOf).toBeNull();
+      const logs = (await created.json()) as { id: number; bestOf: string | null }[];
+      expect(logs).toHaveLength(1);
+      expect(logs[0]?.bestOf).toBeNull();
 
-      const listed = await request('/api/logs?limit=200', { user: USER_A });
-      const logs = (await listed.json()) as { id: number; bestOf: string | null }[];
-      expect(logs.find((l) => l.id === log.id)?.bestOf).toBeNull();
+      const listed = await request('/api/logs?limit=200', { user: 'user-import-null' });
+      const listedLogs = (await listed.json()) as { id: number; bestOf: string | null }[];
+      expect(listedLogs.find((l) => l.id === logs[0]?.id)?.bestOf).toBeNull();
     });
 
-    it('still accepts a known bestOf value', async () => {
+    it('accepts a mix of null and known bestOf values in one batch', async () => {
+      await createUser('user-import-mixed');
       const created = await request('/api/logs/import', {
-        user: USER_A,
+        user: 'user-import-mixed',
         method: 'POST',
-        body: { ...validLog, bestOf: 'BO1' },
+        body: [
+          { ...validLog, bestOf: null },
+          { ...validLog, bestOf: 'BO1' },
+        ],
       });
       expect(created.status).toBe(201);
-      expect((await created.json()) as { bestOf: string | null }).toMatchObject({ bestOf: 'BO1' });
+      const logs = (await created.json()) as { id: number; bestOf: string | null }[];
+      expect(logs.map((l) => l.bestOf).sort()).toEqual(['BO1', null].sort());
     });
 
-    it('still rejects a missing bestOf key (must be explicit null or a value)', async () => {
+    it('rejects a missing bestOf key on any entry (must be explicit null or a value)', async () => {
+      await createUser('user-import-missing-bestof');
       const res = await request('/api/logs/import', {
-        user: USER_A,
+        user: 'user-import-missing-bestof',
         method: 'POST',
-        body: { ...validLog },
+        body: [{ ...validLog }],
       });
       expect(res.status).toBe(400);
+    });
+
+    it('rejects an empty batch', async () => {
+      await createUser('user-import-empty');
+      const res = await request('/api/logs/import', {
+        user: 'user-import-empty',
+        method: 'POST',
+        body: [],
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a second import attempt for the same account with 409, without touching the first', async () => {
+      await createUser('user-import-once');
+      const first = await request('/api/logs/import', {
+        user: 'user-import-once',
+        method: 'POST',
+        body: [{ ...validLog, bestOf: null }],
+      });
+      expect(first.status).toBe(201);
+      const firstLogs = (await first.json()) as { id: number; bestOf: string | null }[];
+
+      // Second attempt: different content, still rejected outright — this is
+      // an account-level flag, not a content/idempotency check.
+      const second = await request('/api/logs/import', {
+        user: 'user-import-once',
+        method: 'POST',
+        body: [{ ...validLog, archetype: 'lugia', bestOf: 'BO3' }],
+      });
+      expect(second.status).toBe(409);
+
+      // The first import's data is untouched — no new rows, no mutation.
+      const listed = await request('/api/logs?limit=200', { user: 'user-import-once' });
+      const logs = (await listed.json()) as { id: number; archetype: string }[];
+      expect(logs).toHaveLength(1);
+      expect(logs[0]?.id).toBe(firstLogs[0]?.id);
+      expect(logs[0]?.archetype).toBe('gardevoir');
     });
   });
 });

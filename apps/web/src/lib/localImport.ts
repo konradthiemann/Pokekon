@@ -65,9 +65,11 @@ export interface ImportProgress {
  * - snapshots are POSTed under the remapped deck id; an old→new snapshot-id
  *   map is built (the snapshot's JSON `cards` string is parsed server-bound
  *   inside api.createDeckSnapshot)
- * - logs are POSTed with `deckId`/`deckSnapshotId` translated through the two
- *   maps; references that cannot be resolved locally anymore are dropped from
- *   the payload (the log itself is still imported)
+ * - logs are sent in ONE batched POST /api/logs/import request (the server
+ *   enforces once-per-account use of that endpoint), with `deckId`/
+ *   `deckSnapshotId` translated through the two maps; references that cannot
+ *   be resolved locally anymore are dropped from the payload (the log itself
+ *   is still imported)
  *
  * Throws on the first failed request — the caller shows the error, keeps the
  * flag unset and offers a retry. Local data is never modified.
@@ -127,28 +129,35 @@ export async function importLocalData(
   }
 
   // 3) Logs — translate both references; unresolved ones are sent without.
-  for (const log of logs) {
-    // Legacy Dexie logs predate the bestOf field entirely (plan §0/§3.7) and
-    // import as explicit "format unknown" (null) — never a guessed default,
-    // which would undermine the whole point of hard-requiring the field on
-    // new logs (coordinator decision, addendum to plan §3.6). This is the
-    // one-time migration path (`createImportedLog` → POST /api/logs/import),
-    // deliberately distinct from the interactive `createLog` used by
-    // AddLogModal, which stays hard-required and never accepts null.
-    await api.createImportedLog({
-      deckId: log.deckId != null ? deckIdMap.get(log.deckId) : undefined,
-      archetype: log.archetype,
-      eventType: log.eventType,
-      eventDate: log.eventDate,
-      result: log.result,
-      bestOf: null,
-      notes: log.notes,
-      round: log.round,
-      deckSnapshotId:
-        log.deckSnapshotId != null ? snapshotIdMap.get(log.deckSnapshotId) : undefined,
-      battleLog: log.battleLog,
-      analysis: log.analysis,
-    });
-    step();
+  // Legacy Dexie logs predate the bestOf field entirely (plan §0/§3.7) and
+  // import as explicit "format unknown" (null) — never a guessed default,
+  // which would undermine the whole point of hard-requiring the field on new
+  // logs (coordinator decision, addendum to plan §3.6). This is the one-time
+  // migration path (`createImportedLogs` → POST /api/logs/import),
+  // deliberately distinct from the interactive `createLog` used by
+  // AddLogModal, which stays hard-required and never accepts null.
+  //
+  // Sent as ONE batched request, not one call per log: the server enforces a
+  // genuine once-per-account use of this endpoint (409 on a second call,
+  // security review addendum) — a per-log call pattern would only ever let a
+  // single legacy log through per account under that rule.
+  if (logs.length > 0) {
+    await api.createImportedLogs(
+      logs.map((log) => ({
+        deckId: log.deckId != null ? deckIdMap.get(log.deckId) : undefined,
+        archetype: log.archetype,
+        eventType: log.eventType,
+        eventDate: log.eventDate,
+        result: log.result,
+        bestOf: null,
+        notes: log.notes,
+        round: log.round,
+        deckSnapshotId:
+          log.deckSnapshotId != null ? snapshotIdMap.get(log.deckSnapshotId) : undefined,
+        battleLog: log.battleLog,
+        analysis: log.analysis,
+      })),
+    );
+    logs.forEach(() => step());
   }
 }

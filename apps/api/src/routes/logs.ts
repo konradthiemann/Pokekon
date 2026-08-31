@@ -1,11 +1,12 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Db } from '../db/index.js';
-import { opponentLogs } from '../db/schema.js';
+import { legacyImportState, opponentLogs } from '../db/schema.js';
 import type { ApiEnv } from '../middleware/session.js';
 import {
   logBodySchema,
   logImportBodySchema,
+  logImportEntrySchema,
   logPatchSchema,
   logsQuerySchema,
 } from '../validation.js';
@@ -13,7 +14,20 @@ import { syncParsedLog } from '../lib/matchLogPipeline.js';
 import { parseId, readJson, userOwnsDeck, userOwnsSnapshot } from './shared.js';
 import type { z } from 'zod';
 
-type LogCreateBody = z.infer<typeof logBodySchema> | z.infer<typeof logImportBodySchema>;
+type LogCreateBody = z.infer<typeof logBodySchema> | z.infer<typeof logImportEntrySchema>;
+
+/** Postgres unique_violation (23505) — the race-safety net for the
+ *  legacy-import one-time flag: two concurrent requests could both pass the
+ *  pre-check SELECT, but only one can win the INSERT into
+ *  `legacy_import_state` (its `user_id` is the primary key). */
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code?: unknown }).code === '23505'
+  );
+}
 
 /** Shared insert + parse-on-write, used by both the regular create route and
  *  the legacy-import route below — they differ only in which schema
@@ -114,25 +128,65 @@ export function createLogsRoutes(): Hono<ApiEnv> {
   // those logs genuinely predate the field, so importing them as "format
   // unknown" is correct — guessing a default from eventType would undermine
   // the hard-required, no-inferring rule the regular create route enforces.
+  //
+  // Genuinely single-use per account (security review addendum): without
+  // that, this would be a permanently open second path around the
+  // hard-required guarantee. `legacy_import_state` (one row per account,
+  // written once this call succeeds) is checked up front — a second attempt
+  // is rejected with 409 regardless of its body. Batched (one array, one
+  // request) rather than per-log: a per-log endpoint could only ever let a
+  // single legacy log through per account under this rule.
   routes.post('/import', async (c) => {
+    const db = c.get('db');
+    const userId = c.get('user').id;
+
+    const alreadyImported = await db
+      .select({ userId: legacyImportState.userId })
+      .from(legacyImportState)
+      .where(eq(legacyImportState.userId, userId))
+      .limit(1);
+    if (alreadyImported.length > 0) {
+      return c.json({ error: 'Legacy import already completed for this account' }, 409);
+    }
+
     const parsed = logImportBodySchema.safeParse(await readJson(c));
     if (!parsed.success) {
       return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
     }
+    const entries = parsed.data;
 
-    const db = c.get('db');
-    const userId = c.get('user').id;
-    const body = parsed.data;
-
-    if (body.deckId != null && !(await userOwnsDeck(db, userId, body.deckId))) {
-      return c.json({ error: 'Deck not found' }, 404);
+    for (const body of entries) {
+      if (body.deckId != null && !(await userOwnsDeck(db, userId, body.deckId))) {
+        return c.json({ error: 'Deck not found' }, 404);
+      }
+      if (
+        body.deckSnapshotId != null &&
+        !(await userOwnsSnapshot(db, userId, body.deckSnapshotId))
+      ) {
+        return c.json({ error: 'Snapshot not found' }, 404);
+      }
     }
-    if (body.deckSnapshotId != null && !(await userOwnsSnapshot(db, userId, body.deckSnapshotId))) {
-      return c.json({ error: 'Snapshot not found' }, 404);
+
+    const logs = [];
+    for (const body of entries) {
+      const log = await insertLog(db, userId, body);
+      if (log !== undefined) logs.push(log);
     }
 
-    const log = await insertLog(db, userId, body);
-    return c.json(log, 201);
+    try {
+      await db.insert(legacyImportState).values({ userId });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        // Lost a race against a concurrent import call for the same account.
+        // The logs above are already written (no transaction — see module
+        // doc); an exceedingly unlikely edge case for a one-time,
+        // human-triggered migration action, traded for simplicity here.
+        return c.json({ error: 'Legacy import already completed for this account' }, 409);
+      }
+      throw err;
+    }
+
+    return c.json(logs, 201);
   });
 
   routes.patch('/:id', async (c) => {

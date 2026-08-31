@@ -487,3 +487,18 @@ export const userAiSettings = pgTable('user_ai_settings', {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
 });
+
+// ─── Legacy Dexie import, one-time-use flag (security review, plan §3.6 addendum) ──
+// POST /api/logs/import is the ONLY place a client may write `bestOf: null` —
+// otherwise the hard-required-on-create guarantee would be a dead letter for
+// any client that just calls this route instead of the regular one. A row
+// here means "this account has already run the legacy import once"; the
+// route 409s any further attempt. Presence-of-row (not a boolean/nullable
+// column) so a unique-constraint violation is the race-safety net for free.
+
+export const legacyImportState = pgTable('legacy_import_state', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  importedAt: timestamp('imported_at', { withTimezone: true }).defaultNow().notNull(),
+});

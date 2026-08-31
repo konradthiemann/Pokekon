@@ -334,15 +334,19 @@ export async function createLog(log: LogWriteBody): Promise<OpponentLog> {
  *  ONLY (`localImport.ts`). Unlike `LogWriteBody`, `bestOf` is explicit and
  *  nullable here: legacy logs genuinely predate the field, so they import as
  *  `null` ("format unknown") rather than a guessed default. The regular
- *  create path (`createLog`) stays hard-required and never accepts `null`. */
-export type LogImportBody = Omit<LogWriteBody, 'bestOf'> & { bestOf: BestOf | null };
-
-export async function createImportedLog(log: LogImportBody): Promise<OpponentLog> {
-  const row = await request<OpponentLogRow>('/api/logs/import', {
+ *  create path (`createLog`) stays hard-required and never accepts `null`.
+ *
+ * Batched: the server enforces a genuine once-per-account use of this
+ * endpoint (409 on a second call, security review addendum) — one request
+ * for the whole local export, not one call per log. */
+export async function createImportedLogs(
+  logs: (Omit<LogWriteBody, 'bestOf'> & { bestOf: BestOf | null })[],
+): Promise<OpponentLog[]> {
+  const rows = await request<OpponentLogRow[]>('/api/logs/import', {
     method: 'POST',
-    body: JSON.stringify({ ...log, notes: log.notes ?? '' }),
+    body: JSON.stringify(logs.map((log) => ({ ...log, notes: log.notes ?? '' }))),
   });
-  return toOpponentLog(row);
+  return rows.map(toOpponentLog);
 }
 
 export async function updateLog(id: number, patch: Partial<LogWriteBody>): Promise<OpponentLog> {

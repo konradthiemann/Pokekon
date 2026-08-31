@@ -125,9 +125,13 @@ Records the result of each game played. Fields:
   modal (dismissable, `preferences.ts`). `bestOf` is hard-required on
   `POST /api/logs` (400 without it) so this can never be guessed for a
   newly-logged match; the **one exception** is the one-time legacy-Dexie
-  migration (`localImport.ts`), which writes through a dedicated
-  `POST /api/logs/import` endpoint that explicitly accepts (and requires)
-  `bestOf: null` — the only place a client may send `null` for this field.
+  migration (`localImport.ts`), which sends the whole local export as ONE
+  batch to a dedicated `POST /api/logs/import` endpoint that explicitly
+  accepts (and requires) `bestOf: null` — the only place a client may send
+  `null` for this field. That endpoint is genuinely single-use per account
+  (`legacy_import_state`, [database.md](./database.md)): a second attempt at
+  any time returns `409`, so it can never become a standing second path
+  around the hard-required guarantee above.
 - Event date
 - Result (W / L / T)
 - Round number (optional)

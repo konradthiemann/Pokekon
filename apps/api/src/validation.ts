@@ -80,12 +80,20 @@ export const logBodySchema = z.object({ ...logFields, notes: z.string().default(
  * default (that would undermine the whole point of hard-requiring the field
  * on the regular, interactive create path below). The key must still be
  * present — omitting it entirely is rejected, same as on `logBodySchema`.
+ *
+ * Batched (one array, one request) rather than one call per log: the route
+ * enforces a true once-per-user usage (`legacy_import_state`, 409 on a
+ * second attempt) — a per-log endpoint would either only ever let a SINGLE
+ * legacy log through per account, or need a separate "session" concept. One
+ * request for the whole local Dexie export sidesteps both.
  */
-export const logImportBodySchema = z.object({
+export const logImportEntrySchema = z.object({
   ...logFields,
   bestOf: z.enum(BEST_OF_VALUES).nullable(),
   notes: z.string().default(''),
 });
+
+export const logImportBodySchema = z.array(logImportEntrySchema).min(1).max(2000);
 
 export const logPatchSchema = z
   .object(logFields)

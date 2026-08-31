@@ -333,6 +333,17 @@ guessed default. Drives the Bo1-equivalent personal win rate
 (`bo1EquivalentWinRate`, `@pokekon/shared`) — see
 [features.md](./features.md) §1/§6.
 
+### Table: `legacy_import_state` (migration `0012`, security review addendum)
+
+`user_id` (PK, FK → `user.id`, `onDelete: cascade`) + `imported_at`
+(timestamptz, default `now()`). A row's mere presence means "this account has
+already run the legacy-Dexie import" — `POST /api/logs/import` checks it
+before accepting a batch and 409s any further attempt, then inserts the row
+itself once the batch succeeds. Without this, `bestOf: null` (otherwise
+impossible to write via the API) would be a permanently open second path
+around the hard-required-on-create guarantee, not a one-time migration
+exception. Same per-user companion-table shape as `user_ai_settings` above.
+
 ### Table: `user_ai_settings`
 
 Per-user LLM-analysis settings (BYOK). The API key is stored **AES-256-GCM
@@ -354,7 +365,9 @@ Generated with `npm run db:generate -w @pokekon/api`: `0002_*` adds
 `user_ai_settings`; `0005_*` adds `tournaments`, `tournament_standings`,
 `matchup_matrix` and `meta_snapshots.archetype_id`; `0010_*` adds
 `meta_snapshots.ties`; `0011_*` adds `opponent_logs.best_of` + its `CHECK`
-constraint. Both `0010` and `0011` are purely additive (new nullable/defaulted
-columns, no rewrite of existing rows) so they are safe to apply before the
-matching code deploys (plan §5). The PGlite test harness applies the real
-migration SQL, so the generated schema is exercised in CI.
+constraint; `0012_*` adds `legacy_import_state` (security review addendum,
+closing the `POST /api/logs/import` once-per-account gap). All four are
+purely additive (new tables or new nullable/defaulted columns, no rewrite of
+existing rows) so they are safe to apply before the matching code deploys
+(plan §5). The PGlite test harness applies the real migration SQL, so the
+generated schema is exercised in CI.
