@@ -1,5 +1,6 @@
 // Pure tournament-meta aggregation, shared by the server sync job (producer) and
 // the web meta views (consumer contract). No I/O here — callers fetch standings.
+import { tournamentWinRatePct } from './winRate.js';
 
 /** A tournament standing row, as far as meta aggregation cares. `deck.icons`
  *  are the Pokémon sprite slugs Limitless attaches to the archetype (e.g.
@@ -100,9 +101,10 @@ export interface MetaSnapshotData {
   /** Limitless deck id (slug, e.g. "n-zoroark"); "other" for unidentified decks. */
   archetypeId: string;
   frequencyPct: number; // 0–100, one decimal
-  winRatePct: number | null; // 0–100, null when no decisive games
+  winRatePct: number | null; // 0–100, null only when no games at all were played
   wins: number;
   losses: number;
+  ties: number;
   playerCount: number;
   /** Pokémon sprite slugs for the archetype (Limitless `deck.icons`), pruned;
    *  empty when the source published none. Data-driven icons (see `pruneIcons`). */
@@ -235,7 +237,8 @@ export interface MetaSyncResult {
 /**
  * Aggregate per-tournament standings into archetype meta snapshots for one period.
  * Archetypes with fewer than `minPlayerCount` pilots are dropped as noise. Win rate
- * is wins/(wins+losses) (ties excluded), null when no decisive games. Frequency is
+ * is the official tournament weighting (a tie counts as a third of a win, see
+ * `tournamentWinRatePct`), null only when no games at all were played. Frequency is
  * the archetype's share of all counted players.
  */
 export function computeMetaSnapshots(
@@ -246,7 +249,14 @@ export function computeMetaSnapshots(
 ): { snapshots: MetaSnapshotData[]; totalPlayers: number; tournamentCount: number } {
   const archMap = new Map<
     string,
-    { displayName: string; icons: string[]; wins: number; losses: number; playerCount: number }
+    {
+      displayName: string;
+      icons: string[];
+      wins: number;
+      losses: number;
+      ties: number;
+      playerCount: number;
+    }
   >();
   let totalPlayers = 0;
   let tournamentCount = 0;
@@ -258,9 +268,17 @@ export function computeMetaSnapshots(
     for (const p of standings) {
       const id = normalizeArchetypeId(p.deck?.id);
       const displayName = p.deck?.name ?? 'Other';
-      const e = archMap.get(id) ?? { displayName, icons: [], wins: 0, losses: 0, playerCount: 0 };
+      const e = archMap.get(id) ?? {
+        displayName,
+        icons: [],
+        wins: 0,
+        losses: 0,
+        ties: 0,
+        playerCount: 0,
+      };
       e.wins += p.record?.wins ?? 0;
       e.losses += p.record?.losses ?? 0;
+      e.ties += p.record?.ties ?? 0;
       e.playerCount += 1;
       // Icons are constant per archetype; keep the first non-empty set we see.
       if (e.icons.length === 0) {
@@ -276,8 +294,7 @@ export function computeMetaSnapshots(
     if (s.playerCount < minPlayerCount) continue;
     const frequencyPct =
       totalPlayers > 0 ? parseFloat(((s.playerCount / totalPlayers) * 100).toFixed(1)) : 0;
-    const decisive = s.wins + s.losses;
-    const winRatePct = decisive > 0 ? Math.round((s.wins / decisive) * 100) : null;
+    const winRatePct = tournamentWinRatePct(s.wins, s.losses, s.ties, 0);
     snapshots.push({
       archetype: s.displayName,
       archetypeId,
@@ -285,6 +302,7 @@ export function computeMetaSnapshots(
       winRatePct,
       wins: s.wins,
       losses: s.losses,
+      ties: s.ties,
       playerCount: s.playerCount,
       icons: s.icons,
       period,
