@@ -63,31 +63,50 @@ export function RecommendationsPage() {
         </p>
       </div>
 
-      {/* Data source notice */}
-      <div className="flex items-start gap-3 bg-slate-100 border border-slate-200 rounded-xl p-4">
-        <Info className="w-4 h-4 text-slate-600 mt-0.5 shrink-0" />
-        <div className="text-sm text-slate-600 space-y-1">
-          <div>
-            <Trans
-              t={t}
-              i18nKey="page.basedOn"
-              count={activeLogs.length}
-              components={{ bold: <span className="text-slate-900 font-medium" /> }}
-            />{' '}
-            {activeLogs.length < 10 && (
-              <span className="text-amber-700">{t('page.logMoreHint')}</span>
+      {/* Meta works without logs (plan personal-data-role-rework §3.8): a
+          zero-log account should not read as "broken" — the same static
+          thresholds as OverviewPage, in place of the usual "based on N logs"
+          line. The pre-existing "log 10+ matches" hint stays untouched for
+          the "some, but few logs" case below. */}
+      {activeLogs.length === 0 ? (
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+          <p className="text-sm font-semibold text-slate-800 mb-1">
+            {t('page.metaWorksWithoutLogs.title')}
+          </p>
+          <p className="text-xs text-slate-600 mb-2">{t('page.metaWorksWithoutLogs.body')}</p>
+          <ul className="text-xs text-slate-600 list-disc list-inside space-y-0.5">
+            <li>{t('page.metaWorksWithoutLogs.items.matchups')}</li>
+            <li>{t('page.metaWorksWithoutLogs.items.playQuality')}</li>
+            <li>{t('page.metaWorksWithoutLogs.items.versionComparison')}</li>
+          </ul>
+        </div>
+      ) : (
+        /* Data source notice */
+        <div className="flex items-start gap-3 bg-slate-100 border border-slate-200 rounded-xl p-4">
+          <Info className="w-4 h-4 text-slate-600 mt-0.5 shrink-0" />
+          <div className="text-sm text-slate-600 space-y-1">
+            <div>
+              <Trans
+                t={t}
+                i18nKey="page.basedOn"
+                count={activeLogs.length}
+                components={{ bold: <span className="text-slate-900 font-medium" /> }}
+              />{' '}
+              {activeLogs.length < 10 && (
+                <span className="text-amber-700">{t('page.logMoreHint')}</span>
+              )}
+            </div>
+            {localMeta.length > 0 && (
+              <div className="flex items-center gap-1.5 text-amber-700">
+                <MapPin className="w-3 h-3 shrink-0" />
+                <span className="text-xs">
+                  {t('page.localMetaNotice', { archetypes: localMeta.join(', ') })}
+                </span>
+              </div>
             )}
           </div>
-          {localMeta.length > 0 && (
-            <div className="flex items-center gap-1.5 text-amber-700">
-              <MapPin className="w-3 h-3 shrink-0" />
-              <span className="text-xs">
-                {t('page.localMetaNotice', { archetypes: localMeta.join(', ') })}
-              </span>
-            </div>
-          )}
         </div>
-      </div>
+      )}
 
       {/* Priority summary */}
       {recommendations.length > 0 && (

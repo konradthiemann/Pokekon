@@ -11,6 +11,15 @@
     "basedOn_other": "Basierend auf <bold>{{count}} geloggten Matches</bold> und aktuellen Meta-Daten.",
     "logMoreHint": "Logge 10+ Matches für verlässlichere Vorschläge.",
     "localMetaNotice": "Lokales Meta ({{archetypes}}) wird gegenüber dem allgemeinen Meta priorisiert.",
+    "metaWorksWithoutLogs": {
+      "title": "Meta-Analyse funktioniert auch ohne eigene Daten",
+      "body": "Empfehlungen hier basieren auf deinen eigenen Logs — Matches loggen schaltet zusätzlich frei:",
+      "items": {
+        "matchups": "≥ 5 Begegnungen pro Archetyp → Matchup-Schwächen",
+        "playQuality": "≥ 3 Spiele mit Kampfprotokoll → Zug-Qualität",
+        "versionComparison": "≥ 2 Deck-Versionen + ≥ 4 Logs → Versionsvergleich"
+      }
+    },
     "summary": {
       "high": "hohe Priorität",
       "medium": "mittlere Priorität",

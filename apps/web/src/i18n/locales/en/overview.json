@@ -22,5 +22,14 @@
       "metaShare": "{{pct}}% meta share",
       "noData": "No data"
     }
+  },
+  "metaWorksWithoutLogs": {
+    "title": "Meta analysis works without your own data",
+    "body": "The meta table above is built from real tournament results — no logs needed. Log your own matches to unlock more:",
+    "items": {
+      "matchups": "5+ encounters per archetype → matchup weaknesses",
+      "playQuality": "3+ games with a battle log → play quality",
+      "versionComparison": "2+ deck versions + 4+ logs → version comparison"
+    }
   }
 }

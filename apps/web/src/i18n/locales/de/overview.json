@@ -22,5 +22,14 @@
       "metaShare": "{{pct}}% Meta-Anteil",
       "noData": "Keine Daten"
     }
+  },
+  "metaWorksWithoutLogs": {
+    "title": "Meta-Analyse funktioniert auch ohne eigene Daten",
+    "body": "Die Meta-Tabelle oben basiert auf echten Turnierergebnissen — ganz ohne eigene Logs. Eigene Matches loggen schaltet zusätzlich frei:",
+    "items": {
+      "matchups": "≥ 5 Begegnungen pro Archetyp → Matchup-Schwächen",
+      "playQuality": "≥ 3 Spiele mit Kampfprotokoll → Zug-Qualität",
+      "versionComparison": "≥ 2 Deck-Versionen + ≥ 4 Logs → Versionsvergleich"
+    }
   }
 }

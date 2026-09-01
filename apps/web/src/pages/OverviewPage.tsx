@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { tournamentWinRatePct } from '@pokekon/shared';
 import { useDashboardStore } from '../store/dashboardStore';
 import { StatCard } from '../components/layout/StatCard';
 import { MetaTable } from '../components/meta/MetaTable';
@@ -14,8 +15,10 @@ export function OverviewPage() {
   const wins = deckLogs.filter((l) => l.result === 'W').length;
   const losses = deckLogs.filter((l) => l.result === 'L').length;
   const ties = deckLogs.filter((l) => l.result === 'T').length;
-  const decisive = wins + losses;
-  const winRate = decisive > 0 ? Math.round((wins / decisive) * 100) : 0;
+  // Tie-weighted (a tie counts as a third of a win), not wins/(wins+losses) —
+  // the last of the five Personal-Analytics spots Spec 2 deferred to Spec 4
+  // (plan personal-data-role-rework §0.7/§6 decision 1).
+  const winRate = tournamentWinRatePct(wins, losses, ties, 0) ?? 0;
   const totalCards = deckCards.reduce((s, c) => s + c.count, 0);
   const topMeta =
     metaSnapshots.length > 0
@@ -90,6 +93,24 @@ export function OverviewPage() {
           color="purple"
         />
       </div>
+
+      {/* Meta works without logs (plan personal-data-role-rework §3.8): the
+          table below is real tournament data, not personal — a zero-log
+          account should not read as "broken", and the static thresholds
+          motivate logging without duplicating the 14-rule engine. */}
+      {opponentLogs.length === 0 && (
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+          <p className="text-sm font-semibold text-slate-800 mb-1">
+            {t('metaWorksWithoutLogs.title')}
+          </p>
+          <p className="text-xs text-slate-600 mb-2">{t('metaWorksWithoutLogs.body')}</p>
+          <ul className="text-xs text-slate-600 list-disc list-inside space-y-0.5">
+            <li>{t('metaWorksWithoutLogs.items.matchups')}</li>
+            <li>{t('metaWorksWithoutLogs.items.playQuality')}</li>
+            <li>{t('metaWorksWithoutLogs.items.versionComparison')}</li>
+          </ul>
+        </div>
+      )}
 
       <MetaTable stats={archetypeStats} />
     </div>
