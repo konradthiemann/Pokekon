@@ -63,3 +63,32 @@ describe('DeckAnalyticsPanel — win rate (plan personal-data-role-rework §6 de
     expect(screen.queryByText('67%')).not.toBeInTheDocument();
   });
 });
+
+// 9W/1L/20T: tie-weighted winRate = (9 + 20*(1/3)) / 30 ≈ 52 %, but the old
+// ciLower still computed the Wilson lower bound off wins/(wins+losses) only
+// (9/10, n=10) ≈ 60 % — a "95 % CI lower bound" above the win rate it's
+// supposed to bound. ciLower must be derived from the same tie-weighted
+// basis as winRate so it never exceeds it.
+const TIE_HEAVY_LOGS: OpponentLog[] = [
+  ...Array.from({ length: 9 }, () => log({ result: 'W' })),
+  log({ result: 'L' }),
+  ...Array.from({ length: 20 }, () => log({ result: 'T' })),
+];
+
+describe('DeckAnalyticsPanel — CI lower bound (tie-weighted, not decisive-only)', () => {
+  it('never shows a CI lower bound above the win rate it is meant to bound', () => {
+    const { container } = render(
+      <DeckAnalyticsPanel
+        decks={[DECK]}
+        allLogs={TIE_HEAVY_LOGS}
+        metaSnapshots={[]}
+        activeDeckId={1}
+      />,
+    );
+    const winRateEl = container.querySelector('.text-2xl.font-bold');
+    const ciLowerEl = screen.getByText(/^≥\d+% \(95% CI\)$/);
+    const winRateValue = Number(winRateEl?.textContent?.replace('%', ''));
+    const ciLowerValue = Number(ciLowerEl.textContent?.match(/\d+/)?.[0]);
+    expect(ciLowerValue).toBeLessThanOrEqual(winRateValue);
+  });
+});

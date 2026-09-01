@@ -40,10 +40,15 @@ function stdDev(values: number[]): number {
   return Math.sqrt(values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length);
 }
 
-// Simple Wilson confidence interval lower bound (95%)
-function wilsonLower(wins: number, n: number): number {
+// Simple Wilson confidence interval lower bound (95%), tie-weighted on the
+// same basis as `wr()` — a tie counts as a third of a win, and all games
+// (not just decisive ones) go into `n`. Using wins/(wins+losses) here while
+// `winRate` above is tie-weighted let the bound exceed the point estimate
+// it's supposed to be a lower bound for on tie-heavy records.
+function wilsonLower(wins: number, losses: number, ties: number): number {
+  const n = wins + losses + ties;
   if (n === 0) return 0;
-  const p = wins / n;
+  const p = (wins + ties / 3) / n;
   const z = 1.96;
   const denom = 1 + (z * z) / n;
   return Math.round(
@@ -137,7 +142,6 @@ function computeDeckStats(
   const wins = deckLogs.filter((l) => l.result === 'W').length;
   const losses = deckLogs.filter((l) => l.result === 'L').length;
   const ties = deckLogs.filter((l) => l.result === 'T').length;
-  const decisive = wins + losses;
   const winRate = wr(wins, losses, ties);
 
   // Meta-weighted score
@@ -167,7 +171,7 @@ function computeDeckStats(
     losses,
     ties,
     winRate,
-    ciLower: wilsonLower(wins, decisive),
+    ciLower: wilsonLower(wins, losses, ties),
     metaScore,
     recentForm,
     recentWR,
