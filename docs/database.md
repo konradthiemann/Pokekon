@@ -313,6 +313,12 @@ remain as history). Seeded lazily from the CSV bundled at `apps/api/data/`
 when the table is empty; updated via `POST /api/matchups/import` or the
 `importMatchups` job. `win_rate` is directional (deck1's perspective).
 
+**Spec 3 (confidence-aware matchups) deliberately adds no column here or
+anywhere else.** Its 95 % Wilson confidence bands are computed at read time
+from the `wins`/`losses`/`ties`/`total` already stored in this table,
+`tournament_matchups` and `tournament_standings` — nothing new is persisted,
+so don't go looking for a `low_pct`/`high_pct` column.
+
 ### Indexes for time-window analytics
 
 `opponent_logs` gains a plain `event_date` index (alongside the existing

@@ -123,6 +123,21 @@ The sync always clears all existing meta snapshots before writing new ones. The 
 >   own data overriding the fallback → flagged), exposed as
 >   `matchupSource.conflictCount`/`conflicts` and logged server-side. The
 >   displayed win rate is always the own value — a conflict never changes it.
+> - **Confidence bands, computed at read time, nothing persisted (Spec 3,
+>   `confidence-aware-matchups.md`):** every raw record needed for a Wilson
+>   interval (`wins`/`losses`/`ties`/`total`) already lives in
+>   `matchup_matrix`, `tournament_matchups` and `tournament_standings` — no
+>   migration, no new column, no backfill job. `apps/api/src/routes/meta.ts`
+>   passes those raw counts straight into the `MatchupCell`s it feeds
+>   `computeFieldScores` (`@pokekon/shared`), which computes the band
+>   (`fieldWinRateLowPct`/`HighPct`, `threats[]`/`freeWins[].lowPct/highPct/
+>   significant`) fresh on every `/field-analysis` and `/archetypes/:id/analysis`
+>   request. The web client repeats the same computation client-side in
+>   `PredictionPanel.tsx` (it calls `computeFieldScores` directly over the
+>   fetched `MatchupRow[]`) — the same pure function, not a second
+>   implementation. Nothing about this is cached or written back to the
+>   database; a re-request with the same inputs always recomputes the same
+>   band.
 
 ---
 

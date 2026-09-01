@@ -247,6 +247,47 @@ interface MetaSnapshot {
 ```
 One archetype's stats for one week. The `period` field uses the ISO week format `YYYY-Www` (e.g., `"2026-W15"`). The `sourceNote` is auto-generated during sync and describes which tournaments and how many players were included. `winRatePct` is the tie-weighted tournament win rate (see `MatchResult` above) — `null` only when the archetype had zero games in the period, not merely zero decisive games.
 
+### `WilsonInterval` (Spec 3 — `packages/shared/src/wilsonInterval.ts`)
+```typescript
+interface WilsonInterval {
+  pct: number;        // tie-weighted point estimate in percent, unrounded
+  lowPct: number;      // lower bound, clamped to [0, 100]
+  highPct: number;     // upper bound, clamped to [0, 100]
+  widthPct: number;    // highPct - lowPct
+  n: number;            // wins + losses + ties
+  significant: boolean; // true when the interval excludes 50 %
+}
+```
+The 95 % Wilson score interval (score-test inversion — **not** the Wald/normal approximation, which collapses to zero width at `p̂ ∈ {0, 1}`) for a tie-weighted `wins/losses/ties` record. `null` when `n === 0`. **Ties are a deliberately conservative approximation:** the score used is `wins + ties/3` (the same tie-weighted value as `tournamentWinRate`), evaluated with the standard binomial Wilson formula, which slightly overstates the true trinomial variance — the interval comes out a few percent too wide, never too narrow. `zForConfidence` is table-backed (80/90/95/98/99 % — no numeric approximation) and throws for any other level. `combineIndependentIntervals` propagates a share-weighted sum of independent Wilson intervals via `Var(Σ wᵢXᵢ) = Σ wᵢ²Var(Xᵢ)`, reading each term's asymmetric standard error back from its own bounds; a term whose bounds equal its point estimate (e.g. the definitional 50 % mirror) contributes zero variance. `matchupCellInterval` resolves one `MatchupCell`'s interval by precedence: explicit `lowPct`/`highPct` on the cell, then raw `wins`/`losses`/`ties` (only if they sum to at least one game — an all-zero placeholder record falls through), then a reconstruction from `total`/`winRate`. This is the **only** place the Wilson formula is implemented in the repo; nothing else re-derives it.
+
+**Independence caveat:** real matchup cells in one row share players/tournaments (mild correlation) and the `sharePct` weights are themselves estimates treated as exact here — both effects make the combined band tend to be **too narrow**, not too wide, partially offsetting the ties approximation above. Accepted for now (plan `confidence-aware-matchups.md` §6 risk 3); not a correctness bug, a documented approximation.
+
+### `MatchupCell` / `WeightedMatchup` / `FieldScore` (Spec 3 — `packages/shared/src/fieldWinRate.ts`)
+```typescript
+interface MatchupCell {
+  deck1: string; deck2: string; total: number; winRate: number;
+  wins?: number; losses?: number; ties?: number;      // raw record (preferred)
+  lowPct?: number; highPct?: number;                    // precomputed bounds (win over raw record)
+}
+
+interface WeightedMatchup {
+  archetypeId: string; archetypeName: string; sharePct: number;
+  winRatePct: number; games: number; weightPct: number;
+  lowPct: number; highPct: number; significant: boolean;
+}
+
+interface FieldScore {
+  archetypeId: string; archetypeName: string; sharePct: number;
+  fieldWinRatePct: number | null;
+  fieldWinRateLowPct: number | null; fieldWinRateHighPct: number | null;
+  coveragePct: number; mirrorSharePct: number; rank: number;
+  threats: WeightedMatchup[]; freeWins: WeightedMatchup[];
+}
+```
+`computeFieldScores(shares, matchups, opts?)` computes the meta-weighted field win rate for every archetype. **Spec 3 change:** the previous hard `MIN_MATCHUP_GAMES` (10) sample-size cutoff is gone — a cell is skipped only when it is missing or has `total <= 0` (no data at all); a 1-game cell now counts fully, with its uncertainty expressed as `fieldWinRateLowPct`/`fieldWinRateHighPct` (full error propagation via `combineIndependentIntervals`, weight = opponent `sharePct`) instead of vanishing. The point estimate is still the raw `cell.winRate` — no shrinkage toward the Wilson centre (a deliberate choice: shrinking would decouple the displayed matrix number from the field-score input for the same cell; candidate for a later spec). `opts.minGamesPerPair` was **removed** (no in-repo caller used it); `opts.confidence` was added instead. `threats`/`freeWins` now sort by significance first, then by `weightPct` — a non-significant matchup no longer disappears, it just sorts behind significant ones at the same weight.
+
+**`coveragePct` changed meaning:** it used to mean "share of the field covered by a cell with ≥10 games", it now means "share of the field with **any** matchup data at all". This number typically goes up under the new contract and no longer implies the score is reliable — that question moved into the band. `LOW_COVERAGE_PCT` (40, in `FieldScorePanel.tsx`) is unchanged and still shown alongside the band, not replaced by it — coverage and confidence are two separate questions.
+
 ### `RecentTournament`
 ```typescript
 interface RecentTournament {
