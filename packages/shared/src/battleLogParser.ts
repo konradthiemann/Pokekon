@@ -452,9 +452,19 @@ export function parseBattleLog(log: string, myPlayerName: string): ParsedBattleL
   }
 
   // ── Winner ────────────────────────────────────────────────────────────────
+  // The "X hat gewonnen" sentence can be preceded by another sentence on the
+  // same line — e.g. a concession: "Du hast aufgegeben. Gtmap hat gewonnen."
+  // (verbatim tail of Konrad's own reference log, demoSeed.ts:224). Anchoring
+  // only to the start of the line would silently drop the winner for every
+  // conceded game, which is the common case online. The sentence-boundary
+  // prefix (start of string, or `.`/`!`/`?` + whitespace) still excludes a
+  // coin-toss win line ("X hat den Münzwurf gewonnen"), since that phrase has
+  // no "gewonnen" directly after the player name.
+  // Plan personal-data-role-rework §3.4, Entscheidung 5 — the ONE sanctioned
+  // exception to this plan's "battleLogParser.ts is out of scope" boundary.
   let winner: string | null = null;
   for (const line of lines) {
-    const m = line.match(/^(\S+) hat gewonnen/);
+    const m = line.match(/(?:^|[.!?]\s+)(\S+) hat gewonnen/);
     if (m) {
       winner = m[1];
       break;

@@ -162,4 +162,32 @@ describe('parseBattleLog', () => {
     // Turn 5 only attacks (actionsCount 0) but deals damage → not a dead turn.
     expect(parsed.deadTurns).toBe(0);
   });
+
+  // ── Winner detection on conceded games (plan personal-data-role-rework §3.4,
+  //    Entscheidung 5 — battleLogParser.ts:457, the ONE sanctioned exception to
+  //    the "parser is out of scope" rule for this plan) ───────────────────────
+  //
+  // The regex must keep matching a plain "X hat gewonnen!" line, but ALSO match
+  // when that sentence is preceded by another sentence on the same line (the
+  // concession case) — see the verbatim table in the plan §3.4.
+  describe('winner detection on conceded games (plan §3.4)', () => {
+    it('detects the winner from a plain "X hat gewonnen!" line', () => {
+      const parsed = parseBattleLog('Gtmap hat gewonnen!', 'Gtmap');
+      expect(parsed.winner).toBe('Gtmap');
+    });
+
+    it('detects the winner when the loser conceded first — real log tail from demoSeed.ts:224', () => {
+      // Verbatim final line of Konrad's own reference log (LOG_NZOROARK_WIN),
+      // apps/api/src/lib/demoSeed.ts:224. Today this returns null (empirically
+      // verified false match) because the regex is anchored to the start of
+      // the line; the "Du hast aufgegeben. " prefix breaks the `^` anchor.
+      const parsed = parseBattleLog('Du hast aufgegeben. Gtmap hat gewonnen.', 'Gtmap');
+      expect(parsed.winner).toBe('Gtmap');
+    });
+
+    it('does NOT treat a coin-toss win as a game winner', () => {
+      const parsed = parseBattleLog('Gtmap hat den Münzwurf gewonnen.', 'Gtmap');
+      expect(parsed.winner).toBeNull();
+    });
+  });
 });
