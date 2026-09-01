@@ -6,6 +6,7 @@ export * from './battleAnalysis.js';
 export * from './season.js';
 export * from './meta.js';
 export * from './fieldWinRate.js';
+export * from './wilsonInterval.js';
 export * from './matchupCsv.js';
 export * from './matchupPairings.js';
 export * from './winRate.js';
