@@ -48,6 +48,13 @@ export const snapshotBodySchema = z.object({
 
 // ─── Opponent logs ────────────────────────────────────────────────────────────
 
+/**
+ * ~2x the largest realistic PTCG-Live log. Guards the primary paste path
+ * (plan personal-data-role-rework §3.7/§0.8) — wired into both
+ * `logFields.battleLog` and `analyzeLogSchema.battleLog` below.
+ */
+export const MAX_BATTLE_LOG_CHARS = 200_000;
+
 const isoDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected an ISO date (YYYY-MM-DD)')
@@ -63,7 +70,7 @@ const logFields = {
   notes: z.string(),
   round: z.number().int().positive().nullish(),
   deckSnapshotId: z.number().int().positive().nullish(),
-  battleLog: z.string().nullish(),
+  battleLog: z.string().max(MAX_BATTLE_LOG_CHARS).nullish(),
   analysis: z.string().nullish(),
   // Not persisted on opponent_logs — used only to pin "me" when the battle log
   // is parsed server-side (the local player's exact in-game name).
@@ -185,7 +192,7 @@ export const aiSettingsPutSchema = z
  * When omitted, the server falls back to the caller's stored, encrypted key.
  */
 export const analyzeLogSchema = z.object({
-  battleLog: z.string().min(1),
+  battleLog: z.string().min(1).max(MAX_BATTLE_LOG_CHARS),
   playerName: z.string().min(1).max(100),
   apiKey: z.string().max(400).optional(),
   provider: z.enum(aiProviderValues).optional(),

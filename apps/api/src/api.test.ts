@@ -14,6 +14,7 @@ import { createApp } from './app.js';
 import type { Db } from './db/index.js';
 import * as schema from './db/schema.js';
 import { backfillMetaWinRates } from './jobs/backfillMetaWinRates.js';
+import { MAX_BATTLE_LOG_CHARS } from './validation.js';
 
 // ─── Test harness ─────────────────────────────────────────────────────────────
 // Runs the real routes against an in-memory Postgres (PGlite) created from the
@@ -680,6 +681,99 @@ describe('battle-log parse-on-write pipeline', () => {
     const del = await request(`/api/logs/${log.id}`, { user: USER_A, method: 'DELETE' });
     expect(del.status).toBe(204);
     expect(await parsedRowFor(log.id)).toBeUndefined();
+  });
+});
+
+// ── battleLog length limit (plan personal-data-role-rework §3.7/§0.8) ────────
+// The paste-first flow makes `battleLog` the PRIMARY user input; today neither
+// `logFields.battleLog` nor `analyzeLogSchema.battleLog` has a `.max()`, so an
+// arbitrarily large payload is currently accepted (400 expected, none happens).
+describe('battleLog length limit (plan §3.7)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const oversizedLog = 'A'.repeat(MAX_BATTLE_LOG_CHARS + 1);
+  const validLog = {
+    archetype: 'charizard',
+    eventType: 'Online',
+    eventDate: '2026-06-10',
+    result: 'W',
+    bestOf: 'BO1',
+    notes: '',
+  };
+
+  it('rejects POST /api/logs with a battleLog over MAX_BATTLE_LOG_CHARS with 400', async () => {
+    const res = await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: { ...validLog, battleLog: oversizedLog },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('accepts POST /api/logs with a battleLog exactly at MAX_BATTLE_LOG_CHARS', async () => {
+    const res = await request('/api/logs', {
+      user: USER_A,
+      method: 'POST',
+      body: { ...validLog, battleLog: 'A'.repeat(MAX_BATTLE_LOG_CHARS) },
+    });
+    expect(res.status).toBe(201);
+  });
+
+  it('rejects PATCH /api/logs/:id with a battleLog over MAX_BATTLE_LOG_CHARS with 400', async () => {
+    const create = await request('/api/logs', { user: USER_A, method: 'POST', body: validLog });
+    const log = (await create.json()) as { id: number };
+
+    const res = await request(`/api/logs/${log.id}`, {
+      user: USER_A,
+      method: 'PATCH',
+      body: { battleLog: oversizedLog },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects POST /api/analysis/log with a battleLog over MAX_BATTLE_LOG_CHARS with 400', async () => {
+    // Never hit the real provider: without the length cap this request would
+    // otherwise sail past validation into the real fetch() call below,
+    // making the test's outcome depend on network access.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    playerName: 'Konrad',
+                    opponentName: 'GegnerX',
+                    summary: '',
+                    keyMoments: [],
+                    playMistakes: [],
+                    cardNotes: [],
+                    deckSuggestions: [],
+                    analyzedAt: '2026-06-17T00:00:00.000Z',
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+
+    const res = await request('/api/analysis/log', {
+      user: USER_A,
+      method: 'POST',
+      // Ephemeral `apiKey` bypasses the "no stored key configured" 400 entirely
+      // (analysis.ts: `if (ephemeralKey) { ... }`), so this deterministically
+      // exercises the schema's length check instead of an unrelated 400.
+      body: { battleLog: oversizedLog, playerName: 'Konrad', apiKey: 'ghp_ephemeral_test' },
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { issues?: { path: (string | number)[] }[] };
+    // Distinguishes this from the (also-400) "No API key configured" case.
+    expect(body.issues?.some((i) => i.path.includes('battleLog'))).toBe(true);
   });
 });
 
