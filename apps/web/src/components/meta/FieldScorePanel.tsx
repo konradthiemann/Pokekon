@@ -42,6 +42,18 @@ export function FieldScorePanel({
         </span>
       </div>
 
+      {score !== null && (
+        <p
+          className="text-xs text-slate-500 font-mono"
+          title={t('archetypeDetail.fieldScore.intervalHint')}
+        >
+          {t('archetypeDetail.fieldScore.interval', {
+            low: fieldScore.fieldWinRateLowPct?.toFixed(1) ?? '—',
+            high: fieldScore.fieldWinRateHighPct?.toFixed(1) ?? '—',
+          })}
+        </p>
+      )}
+
       <p className="text-xs text-slate-500">{t('archetypeDetail.fieldScore.explanation')}</p>
 
       <div className="space-y-1">

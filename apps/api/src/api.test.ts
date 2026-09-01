@@ -1749,6 +1749,117 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
     expect(invalid.status).toBe(400);
   });
 
+  // Spec 3 (confidence-aware matchups, plan §3.5, Slice B step 7): a pairing
+  // with fewer than the old MIN_MATCHUP_GAMES=10 threshold must now count in
+  // full, and the wire response must carry the propagated Wilson band.
+  it('exposes Wilson confidence bands on /field-analysis, counting a thin (sub-cutoff) pairing in full (plan §3.5)', async () => {
+    await clearTournamentData();
+    await seedTournament('t-field-ci', daysAgo(1), 4, [
+      standing('aa', { placing: 1 }),
+      standing('aa', { placing: 2 }),
+      standing('bb', { placing: 3 }),
+      standing('bb', { placing: 4 }),
+    ]);
+    // Only 6 games — well below the old cutoff, which would have dropped this
+    // pair from coverage entirely (mirror-only coveragePct would be 50).
+    const importedAt = new Date();
+    await db.insert(schema.matchupMatrix).values([
+      {
+        deck1: 'aa',
+        deck2: 'bb',
+        wins: 5,
+        losses: 1,
+        ties: 0,
+        total: 6,
+        winRate: 83.3,
+        importedAt,
+      },
+      {
+        deck1: 'bb',
+        deck2: 'aa',
+        wins: 1,
+        losses: 5,
+        ties: 0,
+        total: 6,
+        winRate: 16.7,
+        importedAt,
+      },
+    ]);
+
+    const res = await request('/api/meta/field-analysis?days=7', { user: USER_A });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      archetypes: {
+        archetypeId: string;
+        coveragePct: number;
+        fieldWinRatePct: number;
+        fieldWinRateLowPct?: number;
+        fieldWinRateHighPct?: number;
+      }[];
+    };
+    const aa = body.archetypes.find((a) => a.archetypeId === 'aa')!;
+    expect(aa.coveragePct).toBe(100); // NOT 50 — the thin pair is no longer dropped
+    expect(typeof aa.fieldWinRateLowPct).toBe('number');
+    expect(typeof aa.fieldWinRateHighPct).toBe('number');
+    expect(aa.fieldWinRateLowPct!).toBeLessThan(aa.fieldWinRatePct);
+    expect(aa.fieldWinRatePct).toBeLessThan(aa.fieldWinRateHighPct!);
+  });
+
+  it('exposes lowPct/highPct/significant on field-score threats and free wins (plan §3.5)', async () => {
+    await clearTournamentData();
+    await seedTournament('t-ana-ci', daysAgo(1), 4, [
+      standing('aa', { placing: 1 }),
+      standing('aa', { placing: 2 }),
+      standing('bb', { placing: 3 }),
+      standing('bb', { placing: 4 }),
+    ]);
+    const importedAt = new Date();
+    await db.insert(schema.matchupMatrix).values([
+      {
+        deck1: 'aa',
+        deck2: 'bb',
+        wins: 2,
+        losses: 4,
+        ties: 0,
+        total: 6,
+        winRate: 33.3,
+        importedAt,
+      },
+      {
+        deck1: 'bb',
+        deck2: 'aa',
+        wins: 4,
+        losses: 2,
+        ties: 0,
+        total: 6,
+        winRate: 66.7,
+        importedAt,
+      },
+    ]);
+
+    const res = await request('/api/meta/archetypes/aa/analysis?days=7', { user: USER_A });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      fieldScore: {
+        fieldWinRateLowPct?: number;
+        fieldWinRateHighPct?: number;
+        threats: {
+          archetypeId: string;
+          lowPct?: number;
+          highPct?: number;
+          significant?: boolean;
+        }[];
+      };
+    };
+    expect(typeof body.fieldScore.fieldWinRateLowPct).toBe('number');
+    expect(typeof body.fieldScore.fieldWinRateHighPct).toBe('number');
+    const bb = body.fieldScore.threats.find((t) => t.archetypeId === 'bb');
+    expect(bb).toBeDefined();
+    expect(typeof bb!.lowPct).toBe('number');
+    expect(typeof bb!.highPct).toBe('number');
+    expect(typeof bb!.significant).toBe('boolean');
+  });
+
   it('lazily seeds the matchup matrix from the bundled CSV and accepts new imports', async () => {
     await clearTournamentData();
 

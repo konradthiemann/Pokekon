@@ -35,7 +35,7 @@
     "rankingHint": "Expected win rate against your local field (share × matchup WR, mirror = 50%). Click a deck for details.",
     "coverage": "{{pct}}% coverage",
     "perspective": "From the perspective of:",
-    "bestPositioned": "Best-positioned vs your field: {{deck}} · {{wr}}% field WR",
+    "bestPositionedInterval": "Best-positioned vs your field: {{deck}} · {{range}} field WR",
     "fieldCount": "Your field ({{count}})",
     "listsTitle": "Best lists for {{deck}}",
     "listsHint": "This deck's most successful tournament lists in the window — a build template against your local field.",
@@ -89,7 +89,9 @@
       "lowCoverage": "Low data coverage — interpret the score with care.",
       "mirror": "Mirror probability: {{pct}} %",
       "matchupSource": "Matchup data: TrainerHill · as of {{date}} · mixed Bo1/Bo3 format, treat as approximate",
-      "noMatchups": "No matchup data imported — the score rests on the mirror only."
+      "noMatchups": "No matchup data imported — the score rests on the mirror only.",
+      "interval": "95 % confidence interval: {{low}}–{{high}} %",
+      "intervalHint": "Two separate questions: coverage says how much of the field has data at all; this interval says how sure we are about the number for the part that does."
     },
     "threats": {
       "title": "What you must be prepared for",
@@ -100,7 +102,8 @@
       "shareLabel": "{{pct}}% field",
       "winRateLabel": "{{pct}}% WR",
       "gamesLabel_one": "{{count}} game",
-      "gamesLabel_other": "{{count}} games"
+      "gamesLabel_other": "{{count}} games",
+      "unreliable": "unreliable — interval includes 50 %"
     },
     "matchupTable": {
       "title": "Matchups vs the field",
@@ -108,7 +111,8 @@
       "deck": "Opponent",
       "winRate": "Matchup WR",
       "sample": "Games",
-      "share": "Field share"
+      "share": "Field share",
+      "interval": "95 % interval"
     },
     "trend": {
       "title": "Trend",
@@ -153,6 +157,7 @@
     "loadError": "Matchup data could not be loaded.",
     "minGames": "Min. games",
     "perspectiveNote": "Win rate from row deck's perspective.",
+    "confidenceLegend": "Colour intensity = sample confidence",
     "expandNames": "Expand deck names",
     "collapseNames": "Collapse deck names",
     "names": "Names",
@@ -160,7 +165,8 @@
     "gamesTooltip_one": "{{count}} game",
     "gamesTooltip_other": "{{count}} games",
     "gamesShort": "{{count}}g",
-    "cellTooltip": "{{row}} vs {{col}}: {{winRate}}% · {{wins}}W-{{losses}}L-{{ties}}T",
+    "cellTooltip": "{{row}} vs {{col}}: {{winRate}}% ({{low}}–{{high}}%) · {{wins}}W-{{losses}}L-{{ties}}T",
+    "mirrorTooltip": "Mirror — 50 % by definition",
     "source": "Source: TrainerHill.com · {{date}} · Cells show win rate from row deck's perspective",
     "sourceBlend": "Real data: {{ownGames}} online-Bo1 matches ({{ownPairs}} pairings) · {{fallback}} pairings via TrainerHill (approx.) · win rate from row deck's perspective",
     "conflictNote_one": "· {{count}} pairing disagrees with TrainerHill by >15pp",

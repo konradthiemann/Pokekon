@@ -17,6 +17,7 @@ import {
 import { getLocalMetaField, setLocalMetaField, type LocalFieldEntry } from '../../lib/preferences';
 import { PokemonIcon } from '../shared/PokemonIcon';
 import { QuantityStepper } from '../shared/QuantityStepper';
+import { formatWithInterval } from './confidence';
 import { DecklistCard } from './DecklistCard';
 import { FieldScorePanel } from './FieldScorePanel';
 import { ListFieldPerformance } from './ListFieldPerformance';
@@ -286,9 +287,13 @@ export function PredictionPanel({ archetypes, window }: PredictionPanelProps) {
                 {best && best.fieldWinRatePct !== null && (
                   <p className="flex items-center gap-1.5 text-xs text-slate-600">
                     <Trophy className="h-3.5 w-3.5 text-amber-600" aria-hidden="true" />
-                    {t('prediction.bestPositioned', {
+                    {t('prediction.bestPositionedInterval', {
                       deck: best.archetypeName,
-                      wr: best.fieldWinRatePct.toFixed(1),
+                      range: formatWithInterval(
+                        best.fieldWinRatePct,
+                        best.fieldWinRateLowPct,
+                        best.fieldWinRateHighPct,
+                      ),
                     })}
                   </p>
                 )}

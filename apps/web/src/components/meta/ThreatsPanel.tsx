@@ -18,7 +18,14 @@ function WeightedMatchupRow({
     <div className="flex items-center gap-2">
       <PokemonIcon archetype={m.archetypeName} size="sm" dual />
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-slate-800 truncate">{m.archetypeName}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs font-medium text-slate-800 truncate">{m.archetypeName}</p>
+          {!m.significant && (
+            <span className="shrink-0 rounded bg-slate-100 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-500">
+              {t('archetypeDetail.threats.unreliable')}
+            </span>
+          )}
+        </div>
         <div className="h-1 bg-slate-100 rounded-full overflow-hidden mt-0.5">
           <div
             className={`h-full rounded-full ${bad ? 'bg-red-400' : 'bg-emerald-400'}`}
@@ -29,11 +36,13 @@ function WeightedMatchupRow({
       <span className="text-xs text-slate-500 tabular-nums shrink-0">
         {t('archetypeDetail.threats.shareLabel', { pct: m.sharePct.toFixed(1) })}
       </span>
-      <span
-        className="w-14 text-right shrink-0"
-        title={t('archetypeDetail.threats.gamesLabel', { count: m.games })}
-      >
-        <WinRateBadge pct={m.winRatePct} />
+      <span className="w-20 text-right shrink-0">
+        <span title={t('archetypeDetail.threats.gamesLabel', { count: m.games })}>
+          <WinRateBadge pct={m.winRatePct} />
+        </span>
+        <span className="block text-[10px] tabular-nums text-slate-400">
+          {m.lowPct.toFixed(0)}–{m.highPct.toFixed(0)}%
+        </span>
       </span>
     </div>
   );
