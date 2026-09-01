@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Layers,
 } from 'lucide-react';
+import { tournamentWinRatePct } from '@pokekon/shared';
 import type { Deck, OpponentLog, MetaSnapshot, MatchResult } from '../../types';
 import { PokemonIcon } from '../shared/PokemonIcon';
 import { DeckTurnQualityPanel } from './DeckTurnQualityPanel';
@@ -24,8 +25,13 @@ interface Props {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function wr(wins: number, losses: number): number {
-  return wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
+// Tie-weighted (a tie counts as a third of a win), not wins/(wins+losses) —
+// plan personal-data-role-rework.md §6 decision 1. Found as a sixth,
+// previously overlooked spot (not part of Spec 2's original five) while
+// implementing that decision — same category of miss as the
+// `loadWindowAggregates` spot Spec 2 itself found.
+function wr(wins: number, losses: number, ties = 0): number {
+  return tournamentWinRatePct(wins, losses, ties, 0) ?? 0;
 }
 
 function stdDev(values: number[]): number {
@@ -34,10 +40,15 @@ function stdDev(values: number[]): number {
   return Math.sqrt(values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length);
 }
 
-// Simple Wilson confidence interval lower bound (95%)
-function wilsonLower(wins: number, n: number): number {
+// Simple Wilson confidence interval lower bound (95%), tie-weighted on the
+// same basis as `wr()` — a tie counts as a third of a win, and all games
+// (not just decisive ones) go into `n`. Using wins/(wins+losses) here while
+// `winRate` above is tie-weighted let the bound exceed the point estimate
+// it's supposed to be a lower bound for on tie-heavy records.
+function wilsonLower(wins: number, losses: number, ties: number): number {
+  const n = wins + losses + ties;
   if (n === 0) return 0;
-  const p = wins / n;
+  const p = (wins + ties / 3) / n;
   const z = 1.96;
   const denom = 1 + (z * z) / n;
   return Math.round(
@@ -110,7 +121,7 @@ function computeDeckStats(
 
   const matchups = [...statsMap.entries()]
     .map(([archetype, s]) => {
-      const rate = wr(s.wins, s.losses);
+      const rate = wr(s.wins, s.losses, s.ties);
       return {
         archetype,
         wins: s.wins,
@@ -131,8 +142,7 @@ function computeDeckStats(
   const wins = deckLogs.filter((l) => l.result === 'W').length;
   const losses = deckLogs.filter((l) => l.result === 'L').length;
   const ties = deckLogs.filter((l) => l.result === 'T').length;
-  const decisive = wins + losses;
-  const winRate = wr(wins, losses);
+  const winRate = wr(wins, losses, ties);
 
   // Meta-weighted score
   const metaMatchups = matchups.filter((m) => m.metaFreq > 0 && m.wins + m.losses >= 2);
@@ -146,7 +156,8 @@ function computeDeckStats(
   const recentForm = deckLogs.slice(0, 10).map((l) => l.result as MatchResult);
   const recentWins = recentForm.filter((r) => r === 'W').length;
   const recentLosses = recentForm.filter((r) => r === 'L').length;
-  const recentWR = wr(recentWins, recentLosses);
+  const recentTies = recentForm.filter((r) => r === 'T').length;
+  const recentWR = wr(recentWins, recentLosses, recentTies);
 
   // Consistency (low std dev = consistent)
   const matchupWRs = matchups.filter((m) => m.wins + m.losses >= 2).map((m) => m.winRate);
@@ -160,7 +171,7 @@ function computeDeckStats(
     losses,
     ties,
     winRate,
-    ciLower: wilsonLower(wins, decisive),
+    ciLower: wilsonLower(wins, losses, ties),
     metaScore,
     recentForm,
     recentWR,
@@ -252,7 +263,9 @@ function VariantComparison({ variants }: { variants: DeckStats[] }) {
             </tr>
             {allMatchups.map((arch) => {
               const cells = variants.map((v) => v.matchups.find((m) => m.archetype === arch));
-              const rates = cells.map((c) => (c ? wr(c.wins, c.losses) : -1)).filter((r) => r >= 0);
+              // `c.winRate` is already the tie-weighted rate computed once in
+              // `computeDeckStats` above — reuse it instead of recomputing.
+              const rates = cells.map((c) => (c ? c.winRate : -1)).filter((r) => r >= 0);
               const maxRate = Math.max(...rates);
               const minRate = Math.min(...rates);
               const spread = maxRate - minRate;
@@ -527,7 +540,7 @@ export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId
       losses,
       ties,
       games,
-      winRate: wr(wins, losses),
+      winRate: wr(wins, losses, ties),
       bestVariant,
     };
   }, [activeStats, archetypeGroups]);

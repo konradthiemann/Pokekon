@@ -23,9 +23,10 @@
   "page": {
     "tabs": {
       "deckList": "Deckliste",
-      "analytics": "Analysen",
-      "matchLog": "Match-Log"
+      "analytics": "Analysen"
     },
+    "matchLogSection": "Match-Log ({{count}})",
+    "logMatch": "Match loggen",
     "tooManyCards": "Deck hat {{count}} Karten — {{excess}} zu viele (max. 60)",
     "tooFewCards": "Deck hat nur {{count}}/60 Karten",
     "selectDeckPrompt": "Wähle oben ein Deck aus, um Details zu sehen."

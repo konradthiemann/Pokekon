@@ -262,6 +262,14 @@ read queries hit these finished aggregates instead of re-parsing.
 | `dead_turns` | int | materialised turn-quality field |
 | `created_at` | timestamptz | |
 
+**`playerName` fix is not retroactive (plan `personal-data-role-rework.md` §0.6/§5
+decision 4):** the web client only started sending `playerName` on log create with
+this feature — rows written before it can still have `turns` attributed to the
+heuristically-guessed side rather than the correct one. No backfill/re-parse job
+was added for this (the `parser_version` mechanism above exists and would make one
+possible, but it is deliberately out of scope here — a genuine re-parse would need
+a stored, verified `playerName` per historical row, which most rows never had).
+
 ### Table: `meta_snapshots` (server)
 
 The server-side counterpart of the IndexedDB `metaSnapshots` table — **global**

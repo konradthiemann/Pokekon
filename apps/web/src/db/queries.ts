@@ -178,7 +178,7 @@ export async function getOpponentLogs(deckId?: number): Promise<OpponentLog[]> {
   return api.listAllLogs(deckId);
 }
 
-export async function addOpponentLog(log: Omit<OpponentLog, 'id'>): Promise<number> {
+export async function addOpponentLog(log: api.LogWriteBody): Promise<number> {
   const created = await api.createLog(log);
   return created.id!;
 }

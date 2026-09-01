@@ -125,6 +125,13 @@ One row per match played. This is the primary personal-data table. Key fields:
 - `battleLog`: The raw text copied from TCG Live's battle protocol (in German). Optional — only present when the user pastes it in.
 - `analysis`: `JSON.stringify(BattleAnalysis)` — the result of the server-side LLM analyzing the battle log. Only present after the user triggers analysis.
 
+**Wire-only addition, not part of this type (plan `personal-data-role-rework.md`
+§0.6/§3.7):** `apps/web/src/lib/api.ts`'s `LogWriteBody` is `Omit<OpponentLog, 'id'>
+& { playerName?: string }`. `playerName` is **never persisted** on `opponent_logs`
+— it only pins "me" for the server-side battle-log parse
+(`apps/api/src/lib/matchLogPipeline.ts`), closing a gap where the web client
+accepted-but-never-sent the field the server already validated.
+
 ---
 
 ## Deck Performance Types
@@ -225,6 +232,71 @@ interface BattleAnalysis {
 }
 ```
 The complete analysis of one match. Stored in `opponentLogs.analysis` as a JSON string. All four arrays (`keyMoments`, `playMistakes`, `cardNotes`, `deckSuggestions`) are validated after Claude returns the response — items whose `evidence` field cannot be found in the raw log are silently removed.
+
+---
+
+## Battle-Log Prefill Types (`@pokekon/shared`)
+
+Introduced by the battle-log-first "Match loggen" flow (plan
+`personal-data-role-rework.md` §3.1–§3.5, `packages/shared/src/battleLogPrefill.ts`).
+Pure, client-side computation — none of this is persisted; it only pre-fills the
+`AddLogModal` form fields from a pasted battle log.
+
+### `ArchetypeSignature`
+```typescript
+interface ArchetypeSignature {
+  slug: string;
+  name: string;
+  logNames: string[];
+}
+```
+One archetype's recognition signature: card-name fragments as they appear in a
+**German** PTCG-Live log. Supplied by the caller (`apps/web/src/constants/archetypes.ts`'s
+`archetypeSignatures()`) so this module stays free of UI constants.
+
+### `ArchetypeCandidate`
+```typescript
+interface ArchetypeCandidate {
+  slug: string;
+  name: string;
+  matched: string[];
+  coverage: number;
+}
+```
+One archetype's match result against a set of opponent card names. `coverage` is
+`matched.length / signature.logNames.length` (0–1, unrounded) — a **coverage
+ratio**, not a fabricated percent confidence: the parser itself exposes no
+confidence signal at all.
+
+### `OpponentArchetypeGuess`
+```typescript
+interface OpponentArchetypeGuess {
+  candidates: ArchetypeCandidate[]; // sorted by coverage desc, then name asc; max 3
+  best: ArchetypeCandidate | null;  // non-null exactly when confidence === 'unique'
+  confidence: 'unique' | 'ambiguous' | 'none';
+}
+```
+`unique` = exactly one candidate reaches coverage 1 with no tie at the top → safe
+to pre-select. `ambiguous` = at least one candidate, but not uniquely so → offer,
+never pick. `none` = nothing matched at all.
+
+### `BattleLogPrefill`
+```typescript
+interface BattleLogPrefill {
+  parsed: ParsedBattleLog;
+  playerPinned: boolean;
+  detectedPlayers: [string, string];
+  opponentCards: string[];
+  archetype: OpponentArchetypeGuess;
+  result: 'W' | 'L' | null; // never 'T' — German logs carry no draw marker
+}
+```
+The full prefill result for one pasted log, assembled by
+`prefillFromBattleLog(log, playerName, signatures)`. `playerPinned` is `true` only
+when `playerName` exactly matched one of the two names the parser detected — when
+`false`, the UI must ask "Welcher Spieler bist du?" before using `result` or
+`archetype` (an unpinned split could mean the "opponent" card evidence is actually
+the local player's own deck).
 
 ---
 

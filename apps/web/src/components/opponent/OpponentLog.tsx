@@ -26,8 +26,10 @@ interface Props {
   logs: OpponentLogType[];
   /** When set, only shows logs for this deck and pre-selects it in the add modal */
   deckId?: number;
-  /** @deprecated – kept for call-site compatibility; button is now always a FAB */
-  showAddButton?: boolean;
+  /** 'card' (default) renders the own card frame + header; 'bare' omits both
+   *  so the component can sit inside an outer CollapsibleSection without a
+   *  double border (plan personal-data-role-rework §3.8). */
+  chrome?: 'card' | 'bare';
 }
 
 /**
@@ -42,7 +44,7 @@ interface Props {
  * because the detail modal is transient — closing it should not affect browser
  * history.
  */
-export function OpponentLog({ logs, deckId }: Props) {
+export function OpponentLog({ logs, deckId, chrome = 'card' }: Props) {
   const { t } = useTranslation('opponents');
   const { refresh, decks } = useDashboardStore();
   const [showModal, setShowModal] = useState(false);
@@ -60,15 +62,17 @@ export function OpponentLog({ logs, deckId }: Props) {
   };
 
   return (
-    <div className="card overflow-hidden p-0 relative">
-      <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-200">
-        <div>
-          <h3 className="card-header mb-0">{t('logList.title')}</h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {t('logList.recordedMatches', { count: filtered.length })}
-          </p>
+    <div className={chrome === 'card' ? 'card overflow-hidden p-0 relative' : 'relative'}>
+      {chrome === 'card' && (
+        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-200">
+          <div>
+            <h3 className="card-header mb-0">{t('logList.title')}</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {t('logList.recordedMatches', { count: filtered.length })}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="overflow-y-auto max-h-[520px]">
         {filtered.length === 0 ? (

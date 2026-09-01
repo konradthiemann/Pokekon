@@ -1,13 +1,14 @@
 import { useState, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, X, Star, Pencil, Check, Search } from 'lucide-react';
+import { tournamentWinRatePct } from '@pokekon/shared';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { PokemonIcon } from '../shared/PokemonIcon';
 import { CreateDeckModal } from './CreateDeckModal';
 import { ImportDeckModal } from './ImportDeckModal';
 import { KNOWN_ARCHETYPES } from '../../constants/archetypes';
 
-export type DeckSection = 'deck' | 'analytics' | 'log';
+export type DeckSection = 'deck' | 'analytics';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -51,7 +52,10 @@ export function DeckSwitcher() {
           const logs = opponentLogs.filter((l) => l.deckId === d.id);
           const wins = logs.filter((l) => l.result === 'W').length;
           const losses = logs.filter((l) => l.result === 'L').length;
-          const rate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
+          const ties = logs.filter((l) => l.result === 'T').length;
+          // Tie-weighted, not wins/(wins+losses) — plan
+          // personal-data-role-rework.md §6 decision 1.
+          const rate = tournamentWinRatePct(wins, losses, ties, 0) ?? 0;
           return [d.id!, { games: logs.length, winRate: rate }] as const;
         }),
       ),

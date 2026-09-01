@@ -319,7 +319,9 @@ export async function listAllLogs(deckId?: number): Promise<OpponentLog[]> {
   }
 }
 
-export type LogWriteBody = Omit<OpponentLog, 'id'>;
+/** `playerName` is NOT persisted on opponent_logs — it only pins "me" for the
+ *  server-side battle-log parse (apps/api/src/validation.ts, syncParsedLog). */
+export type LogWriteBody = Omit<OpponentLog, 'id'> & { playerName?: string };
 
 export async function createLog(log: LogWriteBody): Promise<OpponentLog> {
   const row = await request<OpponentLogRow>('/api/logs', {

@@ -1,4 +1,4 @@
-import { parseBattleLog } from '@pokekon/shared';
+import { parseBattleLog, tournamentWinRatePct } from '@pokekon/shared';
 import type { OpponentLog, DeckPerformanceStats, CardPerformance } from '../types';
 
 function avg(arr: number[]): number {
@@ -42,8 +42,10 @@ export function computeDeckPerformanceStats(
 
   const wins = games.filter((g) => g.result === 'W');
   const losses = games.filter((g) => g.result === 'L');
-  const decisive = wins.length + losses.length;
-  const overallWinRate = decisive > 0 ? Math.round((wins.length / decisive) * 100) : 0;
+  const ties = games.filter((g) => g.result === 'T');
+  // Tie-weighted (a tie counts as a third of a win), not wins/(wins+losses) —
+  // plan personal-data-role-rework.md §6 decision 1, single win-rate formula.
+  const overallWinRate = tournamentWinRatePct(wins.length, losses.length, ties.length, 0) ?? 0;
 
   // ── Game length ─────────────────────────────────────────────────────────────
   const avgGameLength = avg(games.map((g) => g.parsed.totalTurns));

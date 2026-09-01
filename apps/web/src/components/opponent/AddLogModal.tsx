@@ -1,12 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, CheckCircle2 } from 'lucide-react';
-import { BEST_OF_VALUES, type BestOf } from '@pokekon/shared';
+import { BEST_OF_VALUES, prefillFromBattleLog, type BestOf } from '@pokekon/shared';
 import type { EventType, MatchResult } from '../../types';
 import { addOpponentLog } from '../../db/queries';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { PokemonIcon } from '../shared/PokemonIcon';
-import { KNOWN_ARCHETYPES } from '../../constants/archetypes';
+import { KNOWN_ARCHETYPES, archetypeSignatures } from '../../constants/archetypes';
+import { PLAYER_NAME_KEY } from '../../lib/demo';
+
+/**
+ * Mirrors apps/api/src/validation.ts's `MAX_BATTLE_LOG_CHARS`. Duplicated
+ * deliberately, not imported: apps/api is not a dependency of apps/web, and
+ * this plan's scope (personal-data-role-rework §2/§3.7) does not promote the
+ * constant to @pokekon/shared. If the server-side limit ever changes, update
+ * both call sites — a security-agent follow-up may want to close this gap.
+ */
+const MAX_BATTLE_LOG_CHARS = 200_000;
 
 /**
  * Describes the active state and color tokens for each result tap button.
@@ -57,14 +67,19 @@ interface Props {
 /**
  * Modal for logging a match result against an opponent archetype.
  *
- * The design prioritises the three most-common interactions (pick opponent
- * deck, tap result, save) at the top of the form, then hides secondary
- * fields (notes, deck version, battle log) in a `<details>` element
- * so the modal feels compact on mobile without removing functionality.
+ * Battle-log-first (plan personal-data-role-rework §3.6): pasting a
+ * PTCG-Live log is now the FIRST field. When it uniquely identifies the
+ * opponent archetype and/or result, those fields pre-select themselves
+ * (still editable, never silently overwritten again once touched); an
+ * ambiguous guess offers up to three candidate chips instead of picking one;
+ * no match at all falls back to the fully manual form with a neutral hint,
+ * never error styling. Secondary fields (notes, deck version) stay hidden in
+ * a `<details>` element so the modal feels compact on mobile.
  *
  * Tournament flow: "Save & next round" keeps the event context (deck, event
- * type, date, deck version), bumps the round number, and resets only the
- * per-game fields — so logging round after round takes three taps each.
+ * type, date, deck version, player name), bumps the round number, and resets
+ * only the per-game fields — so logging round after round takes three taps
+ * each.
  *
  * React Concept: `customArch` is kept as a separate piece of state from
  * `archetype` so that switching away from "Other…" and back restores the
@@ -109,6 +124,82 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loggedCount, setLoggedCount] = useState(0);
+
+  // ── Battle-log-first pre-fill (plan personal-data-role-rework §3.6) ────────
+  // `playerName` pins "me" for the parse — read once from the same
+  // localStorage key the analysis tab and demo login already use, so a
+  // player who has ever used either feature gets pre-filling for free.
+  const [playerName, setPlayerName] = useState(() => localStorage.getItem(PLAYER_NAME_KEY) ?? '');
+  const [fromLogArchetype, setFromLogArchetype] = useState(false);
+  const [fromLogResult, setFromLogResult] = useState(false);
+  const signatures = useMemo(() => archetypeSignatures(), []);
+  // Deferred, not the raw `battleLog` state, feeds the (potentially
+  // expensive — real logs run through @pokekon/shared's parser)
+  // prefill computation. Security review follow-up (plan
+  // personal-data-role-rework.md): pasting/typing arbitrary text used to
+  // re-run `prefillFromBattleLog` synchronously on every keystroke; a
+  // defensive per-line length cap in the parser now bounds the worst case
+  // (see battleLogParser.ts's `MAX_TURN_LINE_LENGTH`), and this
+  // `useDeferredValue` is the complementary UX-level mitigation — it lets
+  // React keep the textarea itself responsive while typing continues, and
+  // coalesces rapid keystrokes into fewer actual recomputations (React may
+  // skip an intermediate deferred value entirely if a newer one arrives
+  // first) instead of computing on every single change.
+  const deferredBattleLog = useDeferredValue(battleLog);
+  const prefill = useMemo(
+    () => prefillFromBattleLog(deferredBattleLog, playerName, signatures),
+    [deferredBattleLog, playerName, signatures],
+  );
+  // Guards every prefill-driven render below against an empty field —
+  // `prefillFromBattleLog('', ...)` already returns `null` for real input,
+  // but this stays explicit so nothing depends on that alone. Keyed off the
+  // same deferred value `prefill` was actually computed from, so the two
+  // never disagree about whether there "is" a log yet.
+  const hasBattleLog = deferredBattleLog.trim() !== '';
+
+  /** Selects a known archetype tile, tagging whether the choice came from the
+   *  battle-log guess (renders the "from log" badge) or a manual tap
+   *  (clears it, so a manual override never keeps a stale badge, M2). */
+  const selectArchetype = (slug: string, fromLog: boolean) => {
+    setArchetype(slug);
+    setCustomArch('');
+    setFromLogArchetype(fromLog);
+  };
+
+  const selectResult = (value: MatchResult, fromLog: boolean) => {
+    setResult(value);
+    setFromLogResult(fromLog);
+  };
+
+  // Re-applies the battle-log guess exactly when the (deferred) log text OR
+  // the pinned player changes (adjust-state-during-render, the same pattern
+  // already established above for the bestOf default) — never on an
+  // unrelated re-render, so a manual override (M2) is never silently
+  // reverted. Compares against `deferredBattleLog`, matching what `prefill`
+  // was actually computed from.
+  const [lastPrefillLog, setLastPrefillLog] = useState<string | null>(null);
+  const [lastPrefillPlayerName, setLastPrefillPlayerName] = useState<string | null>(null);
+  if (deferredBattleLog !== lastPrefillLog || playerName !== lastPrefillPlayerName) {
+    setLastPrefillLog(deferredBattleLog);
+    setLastPrefillPlayerName(playerName);
+    if (hasBattleLog && prefill?.playerPinned) {
+      if (prefill.archetype.confidence === 'unique' && prefill.archetype.best) {
+        selectArchetype(prefill.archetype.best.slug, true);
+      } else {
+        setFromLogArchetype(false);
+      }
+      // A single battle log covers exactly one Bo1 game — a Bo3 match is not
+      // fully described by it, so the result stays manual (plan §3.6 M6).
+      if (bestOf === 'BO1' && prefill.result) {
+        selectResult(prefill.result, true);
+      } else {
+        setFromLogResult(false);
+      }
+    } else {
+      setFromLogArchetype(false);
+      setFromLogResult(false);
+    }
+  }
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -161,12 +252,17 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
         deckSnapshotId: deckSnapshotId === '' ? undefined : Number(deckSnapshotId),
         battleLog: battleLog.trim() || undefined,
         deckId: selectedDeckId ?? undefined,
+        // Not persisted (validation.ts) — only pins "me" for the server-side
+        // parse. Omitted entirely (not sent as '') when unknown (plan §0.6/§3.7).
+        ...(playerName.trim() ? { playerName: playerName.trim() } : {}),
       });
       if (!keepOpen) {
         onClose();
         return;
       }
-      // Reset per-game fields, keep event context (deck, event, date, version)
+      // Reset per-game fields, keep event context (deck, event, date, version,
+      // player name) — battleLog resetting also clears the from-log markers
+      // via the adjust-during-render block above (M8).
       setArchetype('');
       setCustomArch('');
       setResult(null);
@@ -213,7 +309,49 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
         </div>
 
         <div className="space-y-4">
-          {/* My Deck — always first */}
+          {/* Battle log — first field (plan §3.6): pasting a PTCG-Live log
+              pre-fills opponent + result below, before anything is picked
+              manually. */}
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">
+              {t('addLog.battleLogPrimary')}
+              <span className="ml-1 text-slate-400">{t('addLog.battleLogPrimaryHint')}</span>
+            </label>
+            <textarea
+              value={battleLog}
+              onChange={(e) => setBattleLog(e.target.value)}
+              placeholder={t('addLog.battleLogPlaceholder')}
+              rows={4}
+              maxLength={MAX_BATTLE_LOG_CHARS}
+              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200 resize-y font-mono text-xs"
+            />
+            {/* "Who are you" — shown whenever a log was pasted but the local
+                player couldn't be pinned exactly (plan §3.6 M5). Nothing else
+                pre-fills until this is answered, since the me/opponent split
+                would otherwise be a coin flip. */}
+            {hasBattleLog && prefill && !prefill.playerPinned && (
+              <div className="mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                <p className="text-xs text-slate-700 mb-1.5">{t('addLog.fromLog.whoAreYou')}</p>
+                <div className="flex gap-2">
+                  {prefill.detectedPlayers.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => {
+                        localStorage.setItem(PLAYER_NAME_KEY, name);
+                        setPlayerName(name);
+                      }}
+                      className="btn-ghost text-xs px-2.5 py-1"
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* My Deck */}
           <div>
             <label className="block text-xs text-slate-600 mb-1">{t('addLog.myDeck')}</label>
             <select
@@ -237,16 +375,20 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
 
           {/* Opponent deck — visual tap grid */}
           <div>
-            <label className="block text-xs text-slate-600 mb-2">{t('addLog.opponentDeck')}</label>
+            <label className="block text-xs text-slate-600 mb-2 flex items-center gap-1.5">
+              {t('addLog.opponentDeck')}
+              {fromLogArchetype && (
+                <span className="text-[10px] font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-full px-1.5 py-0.5">
+                  {t('addLog.fromLog.badge')}
+                </span>
+              )}
+            </label>
             <div className="grid grid-cols-2 gap-1.5">
               {KNOWN_ARCHETYPES.map((a) => (
                 <button
                   key={a.slug}
                   type="button"
-                  onClick={() => {
-                    setArchetype(a.slug);
-                    setCustomArch('');
-                  }}
+                  onClick={() => selectArchetype(a.slug, false)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-all ${
                     archetype === a.slug
                       ? 'bg-brand-100 border-brand-200 text-brand-800'
@@ -261,9 +403,7 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
               {/* "Other…" tile — selects custom mode */}
               <button
                 type="button"
-                onClick={() => {
-                  setArchetype('');
-                }}
+                onClick={() => selectArchetype('', false)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-all ${
                   isCustomMode && archetype === ''
                     ? 'bg-brand-100 border-brand-200 text-brand-800'
@@ -286,17 +426,50 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
                 className="input mt-2"
               />
             )}
+            {/* Ambiguous guess (plan §3.6 M3): offer, never auto-pick. */}
+            {hasBattleLog &&
+              prefill?.playerPinned &&
+              prefill.archetype.confidence === 'ambiguous' && (
+                <div className="mt-2">
+                  <p className="text-[11px] text-slate-500 mb-1">
+                    {t('addLog.fromLog.pickOpponent')}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {prefill.archetype.candidates.map((c) => (
+                      <button
+                        key={c.slug}
+                        type="button"
+                        onClick={() => selectArchetype(c.slug, true)}
+                        className="text-xs px-2.5 py-1 rounded-full border border-slate-300 bg-slate-50 text-slate-700 hover:border-brand-300"
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            {/* No match at all (plan §3.6 M4): neutral hint, never error styling. */}
+            {hasBattleLog && prefill?.playerPinned && prefill.archetype.confidence === 'none' && (
+              <p className="mt-2 text-[11px] text-slate-500">{t('addLog.fromLog.notRecognised')}</p>
+            )}
           </div>
 
           {/* Result — 3-button tap row */}
           <div>
-            <label className="block text-xs text-slate-600 mb-2">{t('addLog.result')}</label>
+            <label className="block text-xs text-slate-600 mb-2 flex items-center gap-1.5">
+              {t('addLog.result')}
+              {fromLogResult && (
+                <span className="text-[10px] font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-full px-1.5 py-0.5">
+                  {t('addLog.fromLog.badge')}
+                </span>
+              )}
+            </label>
             <div className="grid grid-cols-3 gap-2">
               {RESULT_BUTTONS.map(([val, labelKey, activeCls, inactiveCls]) => (
                 <button
                   key={val}
                   type="button"
-                  onClick={() => setResult(val as MatchResult)}
+                  onClick={() => selectResult(val as MatchResult, false)}
                   className={`py-3 rounded-xl border-2 text-sm font-bold transition-all ${
                     result === val ? activeCls + ' scale-105 shadow-pop' : inactiveCls
                   }`}
@@ -306,6 +479,17 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
                 </button>
               ))}
             </div>
+            {hasBattleLog && prefill?.playerPinned && bestOf !== 'BO1' && (
+              <p className="mt-2 text-[11px] text-slate-500">{t('addLog.fromLog.bo3Notice')}</p>
+            )}
+            {hasBattleLog &&
+              prefill?.playerPinned &&
+              bestOf === 'BO1' &&
+              prefill.result === null && (
+                <p className="mt-2 text-[11px] text-slate-500">
+                  {t('addLog.fromLog.resultUnknown')}
+                </p>
+              )}
           </div>
 
           {/* Match format — Bo1/Bo3, defaulted from event type until touched */}
@@ -411,20 +595,6 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
                   </select>
                 </div>
               )}
-
-              <div>
-                <label className="block text-xs text-slate-600 mb-1">
-                  {t('addLog.battleLog')}
-                  <span className="ml-1 text-slate-400">{t('addLog.battleLogHint')}</span>
-                </label>
-                <textarea
-                  value={battleLog}
-                  onChange={(e) => setBattleLog(e.target.value)}
-                  placeholder={t('addLog.battleLogPlaceholder')}
-                  rows={4}
-                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200 resize-y font-mono text-xs"
-                />
-              </div>
             </div>
           </details>
         </div>

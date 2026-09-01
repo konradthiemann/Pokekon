@@ -23,13 +23,26 @@ describe('computeDeckAnalytics', () => {
     expect(a.prizeCurveWins).toEqual([]);
   });
 
-  it('excludes ties from the win-rate denominator', () => {
+  // Deliberate, non-silent replacement of the previous naive-formula test
+  // (plan `.claude/plans/personal-data-role-rework.md` §6, "Entscheidungen
+  // (bestätigt 2026-09-01)" #1 — one of the five Spec-2 laggards explicitly
+  // carried over into this plan so the whole repo has exactly one win-rate
+  // formula, `tournamentWinRatePct` from `@pokekon/shared/winRate`). The old
+  // test asserted `winRatePct: 50` for 1W/1L/1T by EXCLUDING the tie from the
+  // denominator (wins/(wins+losses)). That is no longer the intended
+  // behaviour — see tdd.md "never silently reconcile a conflicting contract".
+  it('counts ties as a third of a win in the win-rate (tie-weighted formula, plan §6 decision 1)', () => {
     const a = computeDeckAnalytics(1, 4, [
+      parsed({ result: 'W' }),
       parsed({ result: 'W' }),
       parsed({ result: 'L' }),
       parsed({ result: 'T' }),
+      parsed({ result: 'T' }),
+      parsed({ result: 'T' }),
     ]);
-    expect(a.record).toMatchObject({ games: 3, wins: 1, losses: 1, ties: 1, winRatePct: 50 });
+    // Naive (old) formula: wins/(wins+losses) = 2/3 ≈ 67 %.
+    // Tie-weighted (new, tournamentWinRatePct): (2 + 3*(1/3)) / 6 = 3/6 = 50 %.
+    expect(a.record).toMatchObject({ games: 6, wins: 2, losses: 1, ties: 3, winRatePct: 50 });
   });
 
   it('counts unparsed games in the record but not in turn-quality metrics', () => {

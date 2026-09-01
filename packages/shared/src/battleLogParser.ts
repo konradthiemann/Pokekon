@@ -80,11 +80,21 @@ export interface ParsedBattleLog {
 
 /**
  * Draw/search supporters and other common Supporter cards used to flag a "clean
- * setup". Card names in PTCG Live German logs are the English print names for
- * Trainers, so these are matched verbatim. This is a heuristic allow-list — it
- * is intentionally conservative and may need extending as the meta rotates; an
- * unknown supporter simply isn't counted (it never produces a wrong attacker or
- * damage figure).
+ * setup". This is a heuristic allow-list — it is intentionally conservative and
+ * may need extending as the meta rotates; an unknown supporter simply isn't
+ * counted (it never produces a wrong attacker or damage figure).
+ *
+ * CORRECTION (plan `personal-data-role-rework.md` §0.5 — belegt against
+ * apps/api/src/lib/demoSeed.ts's real reference log, LOG_NZOROARK_WIN): this
+ * list is English, but real German PTCG-Live logs localise Trainer names too
+ * ("Rockos Erkundung", "Schloss von N", "Höhlensystem Null", ...), not just
+ * Pokémon names. The claim that used to sit here — that German-locale logs
+ * print English Trainer names verbatim — does not hold. Practical effect: this
+ * allow-list effectively never matches in a real German log, so
+ * `setupCleanByTurn2` below runs on a systematically weak signal. Fixing the
+ * list itself is parser work and out of scope for that plan (documented as a
+ * known gap in docs/features.md §7, not silently left as an apparent
+ * oversight).
  */
 const KNOWN_SUPPORTERS = new Set<string>([
   'Iono',
@@ -192,6 +202,28 @@ interface ParsedTurnRaw extends ParsedTurn {
   koDetails: { pokemon: string; owner: string }[];
 }
 
+/**
+ * Defensive upper bound on a single turn-block line before it is handed to
+ * any of the regexes below. Real PTCG-Live protocol lines are short (well
+ * under a few hundred characters) — this exists purely as a worst-case cap,
+ * independent of any individual regex's own behaviour, for a line that
+ * doesn't look like real log output at all.
+ *
+ * Security review finding (plan personal-data-role-rework.md): several of
+ * these regexes (starting with the `m2` pattern just below) have unanchored
+ * `.+`/`.+?` groups and show measured quadratic (O(n²)) blowup on a long,
+ * non-matching line — e.g. many "X von Y hat " repetitions with no trailing
+ * "eingesetzt" (~2s for a single 240,000-char line). This used to be a
+ * theoretical concern only; the battle-log-first paste flow
+ * (AddLogModal → prefillFromBattleLog → parseBattleLog) made it a reachable
+ * one by running the parser synchronously on the main thread against
+ * unvetted pasted text on every keystroke/paste. `MAX_BATTLE_LOG_CHARS`
+ * (validation.ts) bounds the TOTAL log length but not a single line's
+ * length, so this guard is the actual worst-case mitigation; the regexes
+ * themselves are otherwise unchanged (plan's "parser is out of scope" rule).
+ */
+const MAX_TURN_LINE_LENGTH = 2000;
+
 function parseTurnBlock(
   blockLines: string[],
   turnNumber: number,
@@ -201,6 +233,7 @@ function parseTurnBlock(
   // Determine whose turn it is from the first recognisable action
   let player = p1;
   for (const line of blockLines) {
+    if (line.length > MAX_TURN_LINE_LENGTH) continue;
     const m = line.match(/^(\S+) hat /);
     if (m && (m[1] === p1 || m[1] === p2)) {
       player = m[1];
@@ -228,6 +261,7 @@ function parseTurnBlock(
   for (let i = 0; i < blockLines.length; i++) {
     const line = blockLines[i];
     if (!line.trim()) continue;
+    if (line.length > MAX_TURN_LINE_LENGTH) continue;
 
     // Cards played
     const playMatch = line.match(/^(\S+) hat (.+?) gespielt\./);
@@ -452,9 +486,19 @@ export function parseBattleLog(log: string, myPlayerName: string): ParsedBattleL
   }
 
   // ── Winner ────────────────────────────────────────────────────────────────
+  // The "X hat gewonnen" sentence can be preceded by another sentence on the
+  // same line — e.g. a concession: "Du hast aufgegeben. Gtmap hat gewonnen."
+  // (verbatim tail of Konrad's own reference log, demoSeed.ts:224). Anchoring
+  // only to the start of the line would silently drop the winner for every
+  // conceded game, which is the common case online. The sentence-boundary
+  // prefix (start of string, or `.`/`!`/`?` + whitespace) still excludes a
+  // coin-toss win line ("X hat den Münzwurf gewonnen"), since that phrase has
+  // no "gewonnen" directly after the player name.
+  // Plan personal-data-role-rework §3.4, Entscheidung 5 — the ONE sanctioned
+  // exception to this plan's "battleLogParser.ts is out of scope" boundary.
   let winner: string | null = null;
   for (const line of lines) {
-    const m = line.match(/^(\S+) hat gewonnen/);
+    const m = line.match(/(?:^|[.!?]\s+)(\S+) hat gewonnen/);
     if (m) {
       winner = m[1];
       break;

@@ -14,19 +14,29 @@
     "matchFormat": "Match-Format",
     "eventDate": "Datum",
     "round": "Runde",
-    "moreOptions": "Mehr Optionen (Notizen, Deck-Version, Kampfprotokoll)",
+    "moreOptions": "Mehr Optionen (Notizen, Deck-Version)",
     "notes": "Notizen (optional)",
     "notesPlaceholder": "z.B. Gegen Phantom Dive verloren",
     "deckVersion": "Gespielte Deck-Version",
     "untagged": "— Ohne Version —",
     "battleLog": "Kampfprotokoll (optional)",
     "battleLogHint": "— für KI-Analyse",
+    "battleLogPrimary": "Kampfprotokoll (optional)",
+    "battleLogPrimaryHint": "— Gegner und Ergebnis werden daraus vorgeschlagen",
     "battleLogPlaceholder": "Kampfprotokoll hier einfügen…",
     "saveFailed": "Match konnte nicht gespeichert werden",
     "saveAndNext": "& nächste Runde",
     "saveAndClose": "Speichern",
     "loggedOne": "Match gespeichert",
-    "loggedMany": "{{count}} Matches gespeichert"
+    "loggedMany": "{{count}} Matches gespeichert",
+    "fromLog": {
+      "badge": "aus Log",
+      "pickOpponent": "Aus dem Protokoll: welches Deck war es?",
+      "notRecognised": "Gegner nicht aus dem Protokoll erkannt — bitte auswählen.",
+      "resultUnknown": "Ergebnis nicht aus dem Protokoll erkannt.",
+      "whoAreYou": "Welcher Spieler bist du?",
+      "bo3Notice": "Ein Kampfprotokoll deckt ein Spiel ab, nicht das ganze Match."
+    }
   },
   "eventTypes": {
     "Online": "Online",

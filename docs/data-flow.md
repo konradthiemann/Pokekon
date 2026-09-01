@@ -49,8 +49,10 @@ sequenceDiagram
     participant DB as Dexie / IndexedDB
     participant Hook as useRecommendations
 
-    User->>AddLogModal: Fill in archetype, event, result
-    User->>AddLogModal: (optional) Paste battle log text
+    User->>AddLogModal: (optional, now FIRST) Paste battle log text
+    AddLogModal->>AddLogModal: prefillFromBattleLog(log, playerName, signatures) [@pokekon/shared, client-only]
+    AddLogModal-->>User: pre-fills opponent/result when unique, offers chips when ambiguous, asks "who are you" when unpinned
+    User->>AddLogModal: Fill in / confirm archetype, event, result
     User->>AddLogModal: Submit
     AddLogModal->>DB: addOpponentLog(logData)
     AddLogModal->>Store: refresh()
@@ -63,6 +65,15 @@ sequenceDiagram
 ```
 
 After the log is written to IndexedDB, `refresh()` reloads both the raw logs and the derived `archetypeStats`. The `useRecommendations` hook in `RecommendationsPage` reacts automatically because it depends on `archetypeStats` from the store.
+
+**Where the pre-fill happens (plan `personal-data-role-rework.md` §3.5/§3.6):**
+entirely on the client, entirely before submit — `prefillFromBattleLog` lives in
+`@pokekon/shared` (no server round-trip; `parseBattleLog` was already called
+client-side elsewhere, e.g. `MatchDetailModal`) and is pure: it reads the pasted
+text and the `tcg-player-name` value, and returns a `BattleLogPrefill` or `null`.
+**Nothing new is persisted** — the archetype/result pre-fill only sets the same
+form fields a manual entry would set; the only wire change is the now-actually-sent
+`playerName` (see the pipeline section below).
 
 ---
 
@@ -345,6 +356,14 @@ sequenceDiagram
 heuristic player detection. The parse step is wrapped so a parser failure logs a
 warning but never fails the log write. Parsed rows cascade-delete with their
 `opponent_logs` row.
+
+**Fixed gap (plan `personal-data-role-rework.md` §0.6/§3.7):** the server has
+accepted `playerName` on this route from the start, but `AddLogModal` never
+actually sent it — `matchLogPipeline.ts` always parsed with `''`, so
+`match_log_parsed.turns` could silently be attributed to the wrong side. The web
+client now sends `playerName` whenever it is known (the same value stored under
+`localStorage['tcg-player-name']`), omitting the field entirely otherwise. Not
+re-parsed retroactively — see [database.md](./database.md).
 
 ## Deck Analytics Read Path
 
