@@ -11,7 +11,8 @@ import { ChevronRight, RefreshCw } from 'lucide-react';
 import { matchupCellInterval, type MatchupRow } from '@pokekon/shared';
 import { getMetaMatchups, type MatchupSource, type MetaWindow } from '../../lib/api';
 import { PokemonIcon } from '../shared/PokemonIcon';
-import { confidenceTier, type ConfidenceTier } from './confidence';
+import { confidenceTier } from './confidence';
+import { cellHueClass, cellStyle } from './matchupCellStyle';
 
 // G-regulation decks rotated out April 10 2026 — exclude from display
 const EXCLUDED_SLUGS = new Set(['gardevoir-ex-sv', 'gholdengo-lunatone']);
@@ -33,36 +34,6 @@ function formatDeckName(slug: string): string {
     .split('-')
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
-}
-
-// Colour hue by win rate (unchanged buckets); confidence is expressed
-// separately via opacity, graded by the Wilson interval's width — a
-// narrow band renders fully saturated, a wide one washed out. This
-// replaces the old binary MIN_GAMES_FOR_COLOR grey-out: every cell with
-// data now shows its number, never just a placeholder (plan §3.6).
-const TIER_OPACITY: Record<ConfidenceTier, string> = {
-  high: 'opacity-100',
-  medium: 'opacity-80',
-  low: 'opacity-60',
-  veryLow: 'opacity-40',
-};
-
-function cellStyle(winRate: number, tier: ConfidenceTier): string {
-  const hue =
-    winRate >= 70
-      ? 'bg-emerald-700 text-white font-bold'
-      : winRate >= 60
-        ? 'bg-emerald-200 text-emerald-900 font-bold'
-        : winRate >= 55
-          ? 'bg-emerald-100 text-emerald-800'
-          : winRate >= 45
-            ? 'bg-slate-50 text-slate-600'
-            : winRate >= 40
-              ? 'bg-red-100 text-red-800'
-              : winRate >= 30
-                ? 'bg-red-200 text-red-900 font-bold'
-                : 'bg-red-700 text-white font-bold';
-  return `${hue} ${TIER_OPACITY[tier]}`;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -319,7 +290,7 @@ export function MatchupMatrix({
                     return (
                       <td
                         key={col}
-                        className={`px-1 py-1.5 text-center ${cellStyle(entry.winRate, 'high')} opacity-60`}
+                        className={`px-1 py-1.5 text-center ${cellHueClass(entry.winRate)} opacity-60`}
                         title={t('matchupMatrix.mirrorTooltip')}
                       >
                         <div className="font-mono text-xs font-semibold leading-none whitespace-nowrap">
