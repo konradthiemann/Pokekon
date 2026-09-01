@@ -14,19 +14,29 @@
     "matchFormat": "Match Format",
     "eventDate": "Event Date",
     "round": "Round",
-    "moreOptions": "More options (notes, deck version, battle log)",
+    "moreOptions": "More options (notes, deck version)",
     "notes": "Notes (optional)",
     "notesPlaceholder": "e.g. Lost to Phantom Dive stream",
     "deckVersion": "Deck version played",
     "untagged": "— Untagged —",
     "battleLog": "Battle log (optional)",
     "battleLogHint": "— for AI analysis",
+    "battleLogPrimary": "Battle log (optional)",
+    "battleLogPrimaryHint": "— opponent and result will be suggested from it",
     "battleLogPlaceholder": "Paste battle log here…",
     "saveFailed": "Failed to save match",
     "saveAndNext": "& next round",
     "saveAndClose": "Save",
     "loggedOne": "Match saved",
-    "loggedMany": "{{count}} matches saved"
+    "loggedMany": "{{count}} matches saved",
+    "fromLog": {
+      "badge": "From log",
+      "pickOpponent": "From the log: which deck was it?",
+      "notRecognised": "Opponent not recognised from the log — please choose.",
+      "resultUnknown": "Couldn't tell the result from the log.",
+      "whoAreYou": "Who are you?",
+      "bo3Notice": "A battle log covers one game, not the whole match."
+    }
   },
   "eventTypes": {
     "Online": "Online",
