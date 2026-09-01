@@ -14,7 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "migrate:deploy": "node dist/migrate.js",
-    "job:sync-meta": "node dist/jobs/syncMeta.js"
+    "job:sync-meta": "node dist/jobs/syncMeta.js",
+    "job:backfill-winrates": "node dist/jobs/backfillMetaWinRates.js"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.16",

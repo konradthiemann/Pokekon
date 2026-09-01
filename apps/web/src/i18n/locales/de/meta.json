@@ -163,6 +163,8 @@
     "cellTooltip": "{{row}} vs {{col}}: {{winRate}}% · {{wins}}W-{{losses}}L-{{ties}}T",
     "source": "Quelle: TrainerHill.com · {{date}} · Zellen zeigen die Winrate aus Sicht des Zeilen-Decks",
     "sourceBlend": "Echte Daten: {{ownGames}} Online-Bo1-Matches ({{ownPairs}} Paarungen) · {{fallback}} Paarungen via TrainerHill (Näherung) · Winrate aus Sicht des Zeilen-Decks",
+    "conflictNote_one": "· {{count}} Paarung weicht >15pp von TrainerHill ab",
+    "conflictNote_other": "· {{count}} Paarungen weichen >15pp von TrainerHill ab",
     "reload": "Daten neu laden"
   },
   "metaShareChart": {
@@ -189,6 +191,8 @@
       "winRate": "WR"
     },
     "sampleSize": "(n={{count}})",
+    "unknownFormat_one": "+{{count}} Format unbekannt",
+    "unknownFormat_other": "+{{count}} Format unbekannt",
     "showTop": "Top {{count}} anzeigen",
     "showAll": "Alle {{count}} Decks anzeigen"
   },
@@ -198,6 +202,8 @@
     "winRate": "Winrate",
     "tooltipValue_one": "{{value}}% ({{count}} Spiel)",
     "tooltipValue_other": "{{value}}% ({{count}} Spiele)",
+    "tooltipUnknown_one": "· {{count}} ausgeschlossen (Format unbekannt)",
+    "tooltipUnknown_other": "· {{count}} ausgeschlossen (Format unbekannt)",
     "legend": "Grün = vorteilhaft (60%+)   Orange = ausgeglichen (40–60%)   Rot = unvorteilhaft (<40%)"
   }
 }

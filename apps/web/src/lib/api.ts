@@ -9,6 +9,7 @@ import type {
   TournamentDecklist,
 } from '@pokekon/shared';
 import type {
+  BestOf,
   CardRole,
   CardType,
   Deck,
@@ -123,6 +124,7 @@ interface OpponentLogRow {
   eventType: OpponentLog['eventType'];
   eventDate: string;
   result: OpponentLog['result'];
+  bestOf: OpponentLog['bestOf'] | null;
   notes: string;
   round: number | null;
   deckSnapshotId: number | null;
@@ -202,6 +204,7 @@ function toOpponentLog(row: OpponentLogRow): OpponentLog {
     eventType: row.eventType,
     eventDate: row.eventDate,
     result: row.result,
+    bestOf: row.bestOf ?? undefined,
     notes: row.notes,
     round: row.round ?? undefined,
     deckSnapshotId: row.deckSnapshotId ?? undefined,
@@ -327,6 +330,25 @@ export async function createLog(log: LogWriteBody): Promise<OpponentLog> {
   return toOpponentLog(row);
 }
 
+/** Body for POST /api/logs/import — the one-time legacy-Dexie migration path
+ *  ONLY (`localImport.ts`). Unlike `LogWriteBody`, `bestOf` is explicit and
+ *  nullable here: legacy logs genuinely predate the field, so they import as
+ *  `null` ("format unknown") rather than a guessed default. The regular
+ *  create path (`createLog`) stays hard-required and never accepts `null`.
+ *
+ * Batched: the server enforces a genuine once-per-account use of this
+ * endpoint (409 on a second call, security review addendum) — one request
+ * for the whole local export, not one call per log. */
+export async function createImportedLogs(
+  logs: (Omit<LogWriteBody, 'bestOf'> & { bestOf: BestOf | null })[],
+): Promise<OpponentLog[]> {
+  const rows = await request<OpponentLogRow[]>('/api/logs/import', {
+    method: 'POST',
+    body: JSON.stringify(logs.map((log) => ({ ...log, notes: log.notes ?? '' }))),
+  });
+  return rows.map(toOpponentLog);
+}
+
 export async function updateLog(id: number, patch: Partial<LogWriteBody>): Promise<OpponentLog> {
   const row = await request<OpponentLogRow>(`/api/logs/${id}`, {
     method: 'PATCH',
@@ -422,6 +444,7 @@ interface MetaSnapshotRow {
   winRatePct: number | null;
   wins: number;
   losses: number;
+  ties: number;
   playerCount: number;
   period: string;
   sourceNote: string;
@@ -437,6 +460,7 @@ function toMetaSnapshot(row: MetaSnapshotRow): MetaSnapshot {
     winRatePct: row.winRatePct,
     wins: row.wins,
     losses: row.losses,
+    ties: row.ties,
     playerCount: row.playerCount,
     period: row.period,
     sourceNote: row.sourceNote,
@@ -475,6 +499,7 @@ export interface FieldAnalysisArchetype {
   winRatePct: number | null;
   wins: number;
   losses: number;
+  ties: number;
   playerCount: number;
   /** Data-driven Pokémon sprite slugs (Limitless deck.icons); [] when none. */
   icons: string[];
@@ -486,11 +511,27 @@ export interface FieldAnalysisArchetype {
 /** How much of the matchup data behind a field score is real vs. approximate:
  *  `ownPairs`/`ownGames` come from real online-Bo1 matches, `fallbackPairs` from
  *  the external TrainerHill matrix filling coverage gaps. */
+/** One matchup pair where our own data and the TrainerHill fallback disagree
+ *  by more than the conflict threshold — a hint, not an auto-fix; the number
+ *  actually shown is always the own value. */
+export interface MatchupConflict {
+  deck1: string;
+  deck2: string;
+  ownWinRate: number;
+  fallbackWinRate: number;
+  deltaPp: number;
+  ownGames: number;
+  fallbackGames: number;
+}
+
 export interface MatchupSource {
   ownPairs: number;
   fallbackPairs: number;
   ownGames: number;
   trainerHillImportedAt: string | null;
+  /** Total number of conflicting pairs; `conflicts` is capped to the top 25. */
+  conflictCount: number;
+  conflicts: MatchupConflict[];
 }
 
 export interface FieldAnalysis extends MetaWindow {
@@ -536,6 +577,7 @@ export interface ArchetypeAnalysis extends MetaWindow {
     winRatePct: number | null;
     wins: number;
     losses: number;
+    ties: number;
     playerCount: number;
     icons: string[];
   };

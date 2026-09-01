@@ -246,6 +246,7 @@ async function recomputeCurrentPeriodSnapshots(
       icons: tournamentStandings.icons,
       wins: tournamentStandings.wins,
       losses: tournamentStandings.losses,
+      ties: tournamentStandings.ties,
     })
     .from(tournamentStandings)
     .innerJoin(tournaments, eq(tournamentStandings.tournamentId, tournaments.id))
@@ -259,7 +260,7 @@ async function recomputeCurrentPeriodSnapshots(
       deck: r.icons
         ? { id: r.archetypeId, name: r.archetypeName, icons: r.icons }
         : { id: r.archetypeId, name: r.archetypeName },
-      record: { wins: r.wins, losses: r.losses },
+      record: { wins: r.wins, losses: r.losses, ties: r.ties },
     });
     byTournament.set(r.tournamentId, list);
   }
@@ -286,6 +287,7 @@ async function recomputeCurrentPeriodSnapshots(
             winRatePct: s.winRatePct,
             wins: s.wins,
             losses: s.losses,
+            ties: s.ties,
             playerCount: s.playerCount,
             icons: s.icons,
             sourceNote,

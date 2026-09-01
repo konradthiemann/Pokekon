@@ -11,6 +11,7 @@
     "loss": "Loss",
     "tie": "Tie",
     "eventType": "Event Type",
+    "matchFormat": "Match Format",
     "eventDate": "Event Date",
     "round": "Round",
     "moreOptions": "More options (notes, deck version, battle log)",
@@ -33,6 +34,13 @@
     "LCup": "League Cup",
     "Regional": "Regional",
     "Worlds": "Worlds"
+  },
+  "bestOf": {
+    "bo1": "Bo1",
+    "bo3": "Bo3",
+    "unknown": "Format unknown",
+    "hint": "This match was logged before the format field existed. Was it Bo1 or Bo3?",
+    "dismiss": "Don't show again"
   },
   "matchDetail": {
     "versus": "vs. {{archetype}}",

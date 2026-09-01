@@ -13,7 +13,7 @@ import {
   date,
   check,
 } from 'drizzle-orm/pg-core';
-import { SWISS_MODE_VALUES } from '@pokekon/shared';
+import { BEST_OF_VALUES, SWISS_MODE_VALUES } from '@pokekon/shared';
 import type {
   ParsedTurn,
   PrizePoint,
@@ -218,6 +218,9 @@ export const opponentLogs = pgTable(
     eventType: text('event_type', { enum: eventTypeValues }).notNull(),
     eventDate: date('event_date', { mode: 'string' }).notNull(),
     result: text('result', { enum: matchResultValues }).notNull(),
+    // NULLABLE = "format unknown" for logs written before this column existed;
+    // required at the API layer (validation.ts) for new logs going forward.
+    bestOf: text('best_of', { enum: BEST_OF_VALUES }),
     notes: text('notes').default('').notNull(),
     round: integer('round'),
     deckSnapshotId: integer('deck_snapshot_id').references(() => deckSnapshots.id, {
@@ -232,6 +235,9 @@ export const opponentLogs = pgTable(
     index('opponent_logs_archetype_eventDate_idx').on(table.archetype, table.eventDate),
     // Plain event_date index for the 1/2/3/4-week time-window analytics queries (plan §5.4).
     index('opponent_logs_eventDate_idx').on(table.eventDate),
+    // Defence-in-depth: validation.ts already constrains bestOf, but the DB
+    // enforces the enum too (NULL passes — the column is nullable).
+    check('opponent_logs_best_of_chk', sql`${table.bestOf} in ('BO1', 'BO3')`),
   ],
 );
 
@@ -249,9 +255,10 @@ export const metaSnapshots = pgTable(
     // carry no slug; the sync upsert backfills it on the next run.
     archetypeId: text('archetype_id'),
     frequencyPct: real('frequency_pct').notNull(),
-    winRatePct: integer('win_rate_pct'), // nullable: no decided games yet
+    winRatePct: integer('win_rate_pct'), // nullable: no games at all yet
     wins: integer('wins').notNull(),
     losses: integer('losses').notNull(),
+    ties: integer('ties').notNull().default(0),
     playerCount: integer('player_count').notNull(),
     // Pokémon sprite slugs from Limitless `deck.icons` (data-driven archetype
     // icons); null for rows synced before this column existed — the frontend
@@ -479,4 +486,19 @@ export const userAiSettings = pgTable('user_ai_settings', {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
+});
+
+// ─── Legacy Dexie import, one-time-use flag (security review, plan §3.6 addendum) ──
+// POST /api/logs/import is the ONLY place a client may write `bestOf: null` —
+// otherwise the hard-required-on-create guarantee would be a dead letter for
+// any client that just calls this route instead of the regular one. A row
+// here means "this account has already run the legacy import once"; the
+// route 409s any further attempt. Presence-of-row (not a boolean/nullable
+// column) so a unique-constraint violation is the race-safety net for free.
+
+export const legacyImportState = pgTable('legacy_import_state', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  importedAt: timestamp('imported_at', { withTimezone: true }).defaultNow().notNull(),
 });

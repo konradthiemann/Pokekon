@@ -82,7 +82,7 @@ describe('importLocalData id remapping', () => {
     mockedApi.createDeck.mockResolvedValue(wireDeck(101));
     mockedApi.replaceDeckCards.mockResolvedValue([]);
     mockedApi.createDeckSnapshot.mockResolvedValue(wireSnapshot(201, 101));
-    mockedApi.createLog.mockResolvedValue(wireLog(301));
+    mockedApi.createImportedLogs.mockResolvedValue([wireLog(301)]);
 
     const progress: { done: number; total: number }[] = [];
     await importLocalData((p) => progress.push({ ...p }));
@@ -104,13 +104,22 @@ describe('importLocalData id remapping', () => {
       cards: '[]',
     });
 
-    // Log references translated through both id maps.
-    expect(mockedApi.createLog).toHaveBeenCalledTimes(1);
-    expect(mockedApi.createLog.mock.calls[0][0]).toMatchObject({
+    // Log references translated through both id maps, imported in ONE batch
+    // through the legacy-migration endpoint (not the regular, hard-required
+    // createLog, and not one call per log — the server enforces once-per-
+    // account use of this endpoint).
+    expect(mockedApi.createImportedLogs).toHaveBeenCalledTimes(1);
+    expect(mockedApi.createLog).not.toHaveBeenCalled();
+    const [sentLogs] = mockedApi.createImportedLogs.mock.calls[0];
+    expect(sentLogs).toHaveLength(1);
+    expect(sentLogs[0]).toMatchObject({
       deckId: 101,
       deckSnapshotId: 201,
       archetype: 'gholdengo',
       result: 'W',
+      // Legacy Dexie logs predate bestOf entirely — imported as explicit
+      // "format unknown" (null), never a guessed default.
+      bestOf: null,
     });
 
     // Progress reaches total: deck + cards + snapshot + log = 4 steps.
@@ -138,13 +147,13 @@ describe('importLocalData id remapping', () => {
     });
 
     mockedApi.createDeck.mockResolvedValue(wireDeck(55));
-    mockedApi.createLog.mockResolvedValue(wireLog(301));
+    mockedApi.createImportedLogs.mockResolvedValue([wireLog(301)]);
 
     await importLocalData();
 
-    const sent = mockedApi.createLog.mock.calls[0][0];
-    expect(sent.deckId).toBe(55);
-    expect(sent.deckSnapshotId).toBeUndefined();
+    const [sentLogs] = mockedApi.createImportedLogs.mock.calls[0];
+    expect(sentLogs[0]?.deckId).toBe(55);
+    expect(sentLogs[0]?.deckSnapshotId).toBeUndefined();
   });
 
   it('does not delete any local data', async () => {
@@ -159,6 +168,10 @@ describe('importLocalData id remapping', () => {
 
     await importLocalData();
 
+    // No local logs at all — the batched import call is skipped entirely
+    // rather than sent with an empty array (the server rejects an empty
+    // batch, and there is nothing needing the once-per-account bypass).
+    expect(mockedApi.createImportedLogs).not.toHaveBeenCalled();
     expect(await db.decks.count()).toBe(1);
   });
 });

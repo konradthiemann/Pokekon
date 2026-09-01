@@ -1,0 +1,1 @@
+ALTER TABLE "meta_snapshots" ADD COLUMN "ties" integer DEFAULT 0 NOT NULL;

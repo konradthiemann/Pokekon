@@ -54,7 +54,13 @@ describe('computeMetaSnapshots', () => {
     expect(snapshots.map((s) => s.archetype)).toEqual(['Popular']);
   });
 
-  it('reports a null win rate when there are no decisive games', () => {
+  // Deliberate rewrite (plan §0/§4 step 3, tester note): the tournament formula
+  // (plan §3.1) counts a tie as a third of a win, so "0W/0L/5T" is no longer
+  // "no data" (null) — it is a real, if modest, win rate. The old expectation
+  // (null for this exact input) directly contradicts the new AC and cannot
+  // coexist with it; this is a conscious, documented semantic change, not a
+  // silent test-adjustment (see plan §0 meta.test.ts:56-68 and §6 risk 3).
+  it('counts ties as a third of a win, so pure ties are no longer "no data" (33%, not null)', () => {
     const { snapshots } = computeMetaSnapshots(
       [
         [
@@ -65,7 +71,38 @@ describe('computeMetaSnapshots', () => {
       '2026-W20',
       'test',
     );
+    expect(snapshots[0]?.winRatePct).toBe(33);
+  });
+
+  it('reports a null win rate only when there are no games at all', () => {
+    const { snapshots } = computeMetaSnapshots(
+      [
+        [
+          { deck: { id: 'a', name: 'A' }, record: { wins: 0, losses: 0, ties: 0 } },
+          { deck: { id: 'a', name: 'A' }, record: { wins: 0, losses: 0, ties: 0 } },
+        ],
+      ],
+      '2026-W20',
+      'test',
+    );
     expect(snapshots[0]?.winRatePct).toBeNull();
+  });
+
+  it('counts ties as a third of a win when aggregating meta snapshots (AC 6W/4L/2T -> 56)', () => {
+    const { snapshots } = computeMetaSnapshots(
+      [
+        [
+          { deck: { id: 'a', name: 'A' }, record: { wins: 3, losses: 2, ties: 1 } },
+          { deck: { id: 'a', name: 'A' }, record: { wins: 3, losses: 2, ties: 1 } },
+        ],
+      ],
+      '2026-W20',
+      'test',
+    );
+    expect(snapshots[0]).toMatchObject({ wins: 6, losses: 4, ties: 2 });
+    // (6 + 2/3) / 12 ≈ 55.6 % → rounds to 56 (integer route), not the old
+    // ties-excluded 60 (6/10).
+    expect(snapshots[0]?.winRatePct).toBe(56);
   });
 
   it('skips empty tournaments without inflating counts', () => {

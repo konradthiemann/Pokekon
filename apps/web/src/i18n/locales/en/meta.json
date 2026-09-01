@@ -163,6 +163,8 @@
     "cellTooltip": "{{row}} vs {{col}}: {{winRate}}% · {{wins}}W-{{losses}}L-{{ties}}T",
     "source": "Source: TrainerHill.com · {{date}} · Cells show win rate from row deck's perspective",
     "sourceBlend": "Real data: {{ownGames}} online-Bo1 matches ({{ownPairs}} pairings) · {{fallback}} pairings via TrainerHill (approx.) · win rate from row deck's perspective",
+    "conflictNote_one": "· {{count}} pairing disagrees with TrainerHill by >15pp",
+    "conflictNote_other": "· {{count}} pairings disagree with TrainerHill by >15pp",
     "reload": "Reload data"
   },
   "metaShareChart": {
@@ -189,6 +191,8 @@
       "winRate": "WR"
     },
     "sampleSize": "(n={{count}})",
+    "unknownFormat_one": "+{{count}} unknown format",
+    "unknownFormat_other": "+{{count}} unknown format",
     "showTop": "Show top {{count}}",
     "showAll": "Show all {{count}} decks"
   },
@@ -198,6 +202,8 @@
     "winRate": "Win Rate",
     "tooltipValue_one": "{{value}}% ({{count}} game)",
     "tooltipValue_other": "{{value}}% ({{count}} games)",
+    "tooltipUnknown_one": "· {{count}} excluded (unknown format)",
+    "tooltipUnknown_other": "· {{count}} excluded (unknown format)",
     "legend": "Green = favorable (60%+)   Orange = even (40–60%)   Red = unfavorable (<40%)"
   }
 }

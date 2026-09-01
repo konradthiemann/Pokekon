@@ -107,6 +107,23 @@ sequenceDiagram
 
 The sync always clears all existing meta snapshots before writing new ones. The period label is the current ISO week (e.g., `"2026-W15"`), so re-syncing in the same week replaces the same-period rows via the compound index upsert.
 
+> **Note on the diagram above:** it predates the server-side sync
+> (`apps/api/src/jobs/syncMeta.ts`, [features.md](./features.md) §2) and is kept
+> here as a historical record of the browser-side predecessor; it does not
+> reflect the current data path. Two additions the current server-side sync
+> makes that are worth documenting even without redrawing the whole diagram:
+> - **Ties propagate through the sync path:** `tournament_standings.ties` →
+>   `recomputeCurrentPeriodSnapshots` sums them per archetype →
+>   `meta_snapshots.ties` and its tie-weighted `win_rate_pct`
+>   (`tournamentWinRatePct`, `@pokekon/shared`).
+> - **Matchup blend + conflict flag:** `GET /api/meta/matchups` builds each
+>   directed pair from `tournament_matchups` (own data) with the TrainerHill
+>   CSV as a fallback for pairs without enough own games; the two sources are
+>   also compared via `detectMatchupConflicts` (own vs. fallback, > 15pp with
+>   own data overriding the fallback → flagged), exposed as
+>   `matchupSource.conflictCount`/`conflicts` and logged server-side. The
+>   displayed win rate is always the own value — a conflict never changes it.
+
 ---
 
 ## Deck Import (Text Paste)

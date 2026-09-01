@@ -29,7 +29,7 @@
 The default landing page shows four summary stat cards (overall win rate, games logged, deck size, top meta threat) and two charts:
 
 - **Meta Share Chart** (`MetaShareChart`): A pie or bar chart showing the frequency distribution of archetypes from the latest `metaSnapshots`.
-- **Win Rate Chart** (`WinRateChart`): Compares the user's personal win rate against each archetype with the archetype's overall tournament win rate.
+- **Win Rate Chart** (`WinRateChart`): Compares the user's personal win rate against each archetype, on a **Bo1-equivalent** basis — Bo3 results are converted back to their single-game win rate (`bo3ToBo1WinRate`) and logs with no known match format are excluded from the number (shown as an excluded-games footnote) rather than folded in. Both this and the archetype's own tournament win rate weight a tie as a third of a win (`tournamentWinRatePct`, `@pokekon/shared`).
 - **Meta Table** (`MetaTable`): A sortable table of all archetypes with encounter count, win/loss, and meta frequency.
 
 Data source: Zustand store (`archetypeStats`, `metaSnapshots`). No API calls on this page.
@@ -48,9 +48,11 @@ Runs **server-side** (`POST /api/meta/sync` → `apps/api/src/jobs/syncMeta.ts`,
 3. Classifies each new candidate via the Limitless `/details` endpoint (`isOnline`, `platform`, Swiss-phase `mode`) and keeps only **online Bo1-Swiss** events — the proxy for local Bo1 Challenges/Cups. The tournament cap (`maxTournaments=80`, `maxProbes=160`) is high enough to ingest **all** qualifying events in the window; the delta skip keeps the per-run cost bounded.
 4. Fetches standings for each selected tournament
 5. **Fetches `/pairings`** for each tournament and resolves the round-by-round head-to-heads into per-archetype matchup rows, which are persisted in `tournament_matchups`. Simultaneously, **per-pilot match results** are derived: for each standing, the pairing data is mapped into `StandingMatchResult[]` records (opponent archetype slug + W/L/T + round number) and stored in `tournament_standings.match_results` (jsonb, added in migration `0009`). A failed pairings fetch leaves `pairingsSyncedAt` null so the event is retried next run (its standings still persist).
-6. **Persists the raw data** (plan §5.2): upserts `tournaments`, replaces the event's `tournament_standings` rows — including player name, placing, **pruned decklist** jsonb, **`icons`** (Limitless `deck.icons`), and **`match_results`** — so the archetype drilldown, time-window analyses, and the prediction drill-down read from the database instead of re-fetching.
+6. **Persists the raw data** (plan §5.2): upserts `tournaments`, replaces the event's `tournament_standings` rows — including player name, placing, wins/losses/**ties**, **pruned decklist** jsonb, **`icons`** (Limitless `deck.icons`), and **`match_results`** — so the archetype drilldown, time-window analyses, and the prediction drill-down read from the database instead of re-fetching.
 7. **Recomputes `meta_snapshots` from the full DB** (not only the current run's fetch): because the delta skip means a run may not have fetched every event in the week, the weekly snapshots are derived from all persisted standings matching the window — so accumulated runs compose into a complete picture. Icons are surfaced from whichever pilot carried them.
-8. Filters out archetypes with fewer than 2 total players; computes `frequencyPct` (players / total players) and `winRatePct`; upserts `meta_snapshots` (keyed `period` + `archetype`, also carrying the Limitless slug in `archetype_id`).
+8. Filters out archetypes with fewer than 2 total players; computes `frequencyPct` (players / total players) and `winRatePct` via `tournamentWinRatePct` (a tie counts as a third of a win, `null` only when there were no games at all — `packages/shared/src/winRate.ts`); upserts `meta_snapshots` (keyed `period` + `archetype`, also carrying the Limitless slug in `archetype_id` and the summed `ties`).
+
+**One-off historical backfill:** `npm run job:backfill-winrates -w @pokekon/api [-- --dry-run]` (`apps/api/src/jobs/backfillMetaWinRates.ts`) recomputes `win_rate_pct`/`ties` on existing `meta_snapshots` rows from the raw `tournament_standings` history, so the tie-aware formula applies retroactively without a code-only trend break. It only overwrites a row when its stored `wins`/`losses` still exactly match the freshly recomputed raw totals for that period (a mismatch means the row was originally synced under a different scope and is left untouched, only counted); periods with no raw data at all (pre-migration-`0005` history) are also left untouched. Always run `--dry-run` first and check the counters before the real run (plan §5).
 
 **Downstream consumers of `match_results`:** The archetype-lists endpoint (`GET /api/meta/archetypes/:id/lists`) joins each standing's `match_results` jsonb and returns it as the `matchResults` field of every `ArchetypeListEntry`. The prediction panel's per-list drill-down (`ListFieldPerformance`) reads this field to show real game-by-game W/L vs the local field — no additional server call needed.
 
@@ -113,6 +115,23 @@ The `DeckSwitcher` component shows all decks as tabs. The `DeckAnalyticsPanel` f
 Records the result of each game played. Fields:
 - Opponent deck archetype (text, matched against meta data)
 - Event type (LC, LCup, Regional, Worlds, Online)
+- Match format — Bo1 or Bo3 (`bestOf`, **required** on new logs). Defaults from
+  the event type (Regional/Worlds → Bo3, else Bo1) but is always changeable
+  before saving, and stays fixed once changed even if the event type changes
+  afterwards. Logs written before this field existed have `bestOf: null`
+  ("format unknown"): shown as a badge in the log list and match detail, they
+  count toward the personal win rate but are excluded from the Bo1-equivalent
+  comparison (§1) until backfilled via the one-time hint in the match detail
+  modal (dismissable, `preferences.ts`). `bestOf` is hard-required on
+  `POST /api/logs` (400 without it) so this can never be guessed for a
+  newly-logged match; the **one exception** is the one-time legacy-Dexie
+  migration (`localImport.ts`), which sends the whole local export as ONE
+  batch to a dedicated `POST /api/logs/import` endpoint that explicitly
+  accepts (and requires) `bestOf: null` — the only place a client may send
+  `null` for this field. That endpoint is genuinely single-use per account
+  (`legacy_import_state`, [database.md](./database.md)): a second attempt at
+  any time returns `409`, so it can never become a standing second path
+  around the hard-required guarantee above.
 - Event date
 - Result (W / L / T)
 - Round number (optional)
@@ -264,7 +283,9 @@ This data is **not persisted** — it lives only in Zustand's `recentTournaments
 
 A head-to-head win-rate cross-table for the current Standard meta. Cells are color-coded (green favorable, red unfavorable, gray below the min-games threshold) and show the win rate from the row deck's perspective.
 
-**Data source:** `GET /api/meta/matchups?days&online&bo1` — a **real online-Bo1 matrix** built from the round pairings persisted in `tournament_matchups`, blended with the external TrainerHill CSV as a coverage fallback. The blend works as follows: for each directed pair (A vs B), the own data takes precedence when it has at least `MIN_MATCHUP_GAMES` decisive games; otherwise the TrainerHill row fills in. The response includes a `matchupSource` object (`ownPairs`, `fallbackPairs`, `ownGames`, `trainerHillImportedAt`) so the UI can display a source note distinguishing real head-to-heads from the approximate external fallback.
+**Data source:** `GET /api/meta/matchups?days&online&bo1` — a **real online-Bo1 matrix** built from the round pairings persisted in `tournament_matchups`, blended with the external TrainerHill CSV as a coverage fallback. Win rate uses the shared tournament formula (a tie counts as a third of a win). The blend works as follows: for each directed pair (A vs B), the own data takes precedence when it has at least `MIN_MATCHUP_GAMES` decisive games; otherwise the TrainerHill row fills in. The response includes a `matchupSource` object (`ownPairs`, `fallbackPairs`, `ownGames`, `trainerHillImportedAt`, `conflictCount`, `conflicts`) so the UI can display a source note distinguishing real head-to-heads from the approximate external fallback.
+
+**Source conflicts:** when our own data overrides the TrainerHill fallback for a pair (`>= MIN_MATCHUP_GAMES`) and the two win rates differ by more than 15 percentage points, `detectMatchupConflicts` (`packages/shared/src/matchupConflict.ts`) flags it — the matrix note shows the count with a tooltip listing each pair's own/fallback values, and the server logs one summary line per request. **The displayed win rate is always the own value**; a conflict is a hint for a human to look at, never an auto-fix — TrainerHill's own tie convention is unknown, so the two numbers being compared may not even be defined the same way.
 
 The legacy `GET /api/matchups` endpoint (external TrainerHill batch only, no window filter) remains available for the local-meta prediction panel and CSV import (`POST /api/matchups/import`). The server lazily seeds `matchup_matrix` from the CSV bundled at `apps/api/data/matchup-matrix.csv` on first read.
 
@@ -290,7 +311,7 @@ Unlike the four dashboard tabs (which are Zustand `activeTab` state, not URLs), 
 
 Every archetype row is clickable and opens an in-tab drilldown. The whole Meta tab shares one **window control** — a free numeric day input (accessible `QuantityStepper`, range 1–180) with **preset buttons** (7 / 14 / 30 / 60 days) for quick-jumps, plus an **online-Bo1 toggle** (default on: only ground-truth online Bo1-Swiss events, the local-Bo1 proxy) — that drives both the overview and the drilldown:
 
-- **KPI header:** meta share, tournament win rate, pilot count, field score + rank, weekly share/WR trend chips.
+- **KPI header:** meta share, tournament win rate, pilot count, field score + rank, weekly share/WR trend chips. The trend reads `meta_snapshots.win_rate_pct` directly, so it only reflects the tie-aware formula for periods the one-off backfill job (§2) has touched or that were synced after the formula changed; older, un-backfilled periods (or periods with no persisted raw standings to recompute from) keep their original value.
 - **Field performance (the core metric, plan §3.4):** `FieldWR(A) = Σ share(B) × MatchupWR(A vs B)` over all opponents with usable matchup data (≥10 games per pair), the mirror counting as 50 %. Normalised by the covered share; the **coverage %** is always shown (low coverage < 40 % gets a warning) so a shiny score on thin data is impossible to miss. Computed in `packages/shared/src/fieldWinRate.ts`, served by `GET /api/meta/archetypes/:id/analysis`.
 - **Preparation panel:** opponents weighted by *frequency × matchup weakness* — common **and** bad-for-you decks rank first ("Darauf musst du vorbereitet sein"), plus the mirror probability and the good matchups (free wins).
 - **Matchups vs the field:** a table (`MatchupTable`) listing this archetype's record against every covered opponent — win rate, game count, and meta share — sorted from most favourable to least favourable. Data comes from the same real online-Bo1 blend (`tournament_matchups` + TrainerHill fallback) as the matrix. Opponent icons are data-driven from `iconsById` returned by `GET /api/meta/archetypes/:id/analysis`.

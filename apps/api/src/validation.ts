@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ARCHETYPE_SLUG_PATTERN } from '@pokekon/shared';
+import { ARCHETYPE_SLUG_PATTERN, BEST_OF_VALUES } from '@pokekon/shared';
 import {
   aiProviderValues,
   cardTypeValues,
@@ -59,6 +59,7 @@ const logFields = {
   eventType: z.enum(eventTypeValues),
   eventDate: isoDate,
   result: z.enum(matchResultValues),
+  bestOf: z.enum(BEST_OF_VALUES),
   notes: z.string(),
   round: z.number().int().positive().nullish(),
   deckSnapshotId: z.number().int().positive().nullish(),
@@ -70,6 +71,36 @@ const logFields = {
 };
 
 export const logBodySchema = z.object({ ...logFields, notes: z.string().default('') });
+
+/**
+ * POST /api/logs/import ONLY (the one-time legacy-Dexie migration path,
+ * `localImport.ts`) — the single, narrow exception to `bestOf` being
+ * hard-required. Legacy logs genuinely have no known format; importing them
+ * requires an *explicit* `bestOf: null` ("format unknown"), never a guessed
+ * default (that would undermine the whole point of hard-requiring the field
+ * on the regular, interactive create path below). The key must still be
+ * present — omitting it entirely is rejected, same as on `logBodySchema`.
+ *
+ * Batched (one array, one request) rather than one call per log: the route
+ * enforces a true once-per-user usage (`legacy_import_state`, 409 on a
+ * second attempt) — a per-log endpoint would either only ever let a SINGLE
+ * legacy log through per account, or need a separate "session" concept. One
+ * request for the whole local Dexie export sidesteps both.
+ */
+export const logImportEntrySchema = z.object({
+  ...logFields,
+  bestOf: z.enum(BEST_OF_VALUES).nullable(),
+  notes: z.string().default(''),
+});
+
+// 20000: generous headroom over any realistic personal TCG match history —
+// even several games a day, every day, for multiple years of active play
+// stays well under this. Deliberately NOT a multi-batch/resumable-import
+// design (over-engineering for a solo-hobby project, CLAUDE.md "kein
+// over-engineering"): the import is genuinely once-per-account (see the
+// route), so the cap only needs to comfortably exceed real usage, not
+// accommodate an unbounded number of batches.
+export const logImportBodySchema = z.array(logImportEntrySchema).min(1).max(20_000);
 
 export const logPatchSchema = z
   .object(logFields)

@@ -228,7 +228,11 @@ export function ArchetypeDetail({
               <p className="text-xs text-slate-500">{t('archetypeDetail.kpi.winRate')}</p>
               <p className="text-xl font-extrabold tabular-nums">
                 <WinRateBadge
-                  pct={winRatePct1(analysis.archetype.wins, analysis.archetype.losses)}
+                  pct={winRatePct1(
+                    analysis.archetype.wins,
+                    analysis.archetype.losses,
+                    analysis.archetype.ties,
+                  )}
                 />
               </p>
             </div>

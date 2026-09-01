@@ -1,0 +1,2 @@
+ALTER TABLE "opponent_logs" ADD COLUMN "best_of" text;--> statement-breakpoint
+ALTER TABLE "opponent_logs" ADD CONSTRAINT "opponent_logs_best_of_chk" CHECK ("opponent_logs"."best_of" in ('BO1', 'BO3'));
