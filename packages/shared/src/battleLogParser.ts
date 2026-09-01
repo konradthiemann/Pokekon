@@ -80,11 +80,21 @@ export interface ParsedBattleLog {
 
 /**
  * Draw/search supporters and other common Supporter cards used to flag a "clean
- * setup". Card names in PTCG Live German logs are the English print names for
- * Trainers, so these are matched verbatim. This is a heuristic allow-list — it
- * is intentionally conservative and may need extending as the meta rotates; an
- * unknown supporter simply isn't counted (it never produces a wrong attacker or
- * damage figure).
+ * setup". This is a heuristic allow-list — it is intentionally conservative and
+ * may need extending as the meta rotates; an unknown supporter simply isn't
+ * counted (it never produces a wrong attacker or damage figure).
+ *
+ * CORRECTION (plan `personal-data-role-rework.md` §0.5 — belegt against
+ * apps/api/src/lib/demoSeed.ts's real reference log, LOG_NZOROARK_WIN): this
+ * list is English, but real German PTCG-Live logs localise Trainer names too
+ * ("Rockos Erkundung", "Schloss von N", "Höhlensystem Null", ...), not just
+ * Pokémon names. The claim that used to sit here — that German-locale logs
+ * print English Trainer names verbatim — does not hold. Practical effect: this
+ * allow-list effectively never matches in a real German log, so
+ * `setupCleanByTurn2` below runs on a systematically weak signal. Fixing the
+ * list itself is parser work and out of scope for that plan (documented as a
+ * known gap in docs/features.md §7, not silently left as an apparent
+ * oversight).
  */
 const KNOWN_SUPPORTERS = new Set<string>([
   'Iono',

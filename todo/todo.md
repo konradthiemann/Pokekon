@@ -210,7 +210,16 @@ Links eine schlanke Deck-Liste (80–120px breit), scrollbar, jedes Deck als Zei
 
 ## Punkt 5 — Section-Navigation und Trash-Icon UX verbessern
 
-**Status:** `[x]`
+**Status:** `[x]` — **veraltet** (Plan `.claude/plans/personal-data-role-rework.md`
+§0.2/§4 Slice C, 2026-09-01): Die hier beschriebene Section-Navigation lebt seit
+Längerem nicht mehr in `DeckSwitcher.tsx` — die Komponente rendert nur noch die
+Deck-Liste + den Archetyp-Picker (kein Trash-Icon, keine Section-Buttons dort mehr).
+Die eigentliche Section-Navigation zog nach `DeckPage.tsx` um und hatte dort zuletzt
+**drei** gleichrangige Tabs (Deck List / Analytics / Match Log). Spec 4 hat diese
+IA erneut geändert: nur noch **zwei** Tabs (Deck List / Analytics), Match-Log als
+eingeklappter Bereich am Ende von Analytics, "Match loggen" als eigener,
+dauerhaft sichtbarer Button. Dieser Punkt bleibt als historischer Kontext stehen,
+ist aber für den aktuellen Code nicht mehr anwendbar.
 
 ### Problem
 In `DeckSwitcher.tsx` Zeile 111–129 sind die Section-Buttons ("Deck List" / "Analytics" / "Match Log") als ein `border border-gray-700` Container mit aneinandergereihten Buttons implementiert. Der Trash-Icon (Zeile 131–155) ist direkt daneben — beides im selben `ml-auto flex` Container.

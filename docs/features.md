@@ -90,6 +90,11 @@ Users can save a named snapshot of the current deck list at any moment. Snapshot
 - Can be attached to match logs when logging a game
 - Are used by the recommendation engine to compare win rates across deck versions
 
+Snapshot selection is offered **in the logging context** (the "more options" section
+of "Match loggen") rather than as its own main area — it is secondary information a
+log can carry, not a destination of its own (see §6's battle-log-first flow and the
+deck-page IA change described there).
+
 **Typical workflow:**
 1. Build deck variant A, play some games
 2. Save snapshot "v1 — original build"
@@ -110,7 +115,43 @@ The `DeckSwitcher` component shows all decks as tabs. The `DeckAnalyticsPanel` f
 
 ## 6. Match Log
 
-**Page:** `DeckPage` — "Match Log" section; also accessible as standalone `OpponentsPage`
+**Page:** `DeckPage` — the deck page has **two** co-equal sections (Deck List /
+Analytics); the match log is no longer a third tab. A small, always-visible
+"Log match" button next to the section tabs opens `AddLogModal` from either
+section; the log list itself lives as an initially-**collapsed** section at the
+end of Analytics, titled with the current log count (plan
+`personal-data-role-rework.md` §3.8 — the deck-page IA acceptance criterion demotes
+this *area*, not the logging *action*, which stays one tap away). Also accessible
+as standalone `OpponentsPage`.
+
+**Battle-log-first entry (plan §3.6):** pasting a PTCG-Live battle log is the
+**first** field in "Match loggen", before the manual archetype/result pickers. If
+the pasted log's evidence uniquely identifies the opponent archetype and/or the
+game's result, those fields pre-select themselves (still fully editable — a manual
+override is never silently reverted by a later render). Three outcomes, no
+invented percentages:
+- **Unique** — exactly one archetype candidate's card-name signature is fully
+  covered by the opponent's cards in the log → pre-selected automatically.
+- **Ambiguous** — more than one candidate is equally well covered (or none reaches
+  full coverage) → up to three candidate chips are offered; none is auto-picked.
+- **None** — no signature fragment matched at all → the form behaves exactly as if
+  no log had been pasted, with a neutral hint, never error styling.
+
+The result is only pre-filled for **Bo1** — a single battle log covers one game,
+not a whole Bo3 match — and only once the local player is unambiguously identified
+in the log; if the parser's two detected names don't include an exact match for the
+stored player name, the modal asks "Welcher Spieler bist du?" once, persists the
+answer to `localStorage['tcg-player-name']`, and only then proceeds with the guess.
+This logic lives entirely in a new, pure `@pokekon/shared` module
+(`battleLogPrefill.ts`) that consumes `ParsedBattleLog` output — it does not change
+the parser itself (see §7's one narrow exception) or persist anything beyond what
+already existed.
+
+Saving a log now also sends the local player's name (`playerName`, already accepted
+but previously unused by the web client) so the server-side parse
+(`match_log_parsed`) is pinned to the correct side from the moment of creation,
+instead of falling back to a frequency heuristic that could silently attribute the
+wrong player's turns.
 
 Records the result of each game played. Fields:
 - Opponent deck archetype (text, matched against meta data)
@@ -137,7 +178,9 @@ Records the result of each game played. Fields:
 - Round number (optional)
 - Deck snapshot (optional — which version was played)
 - Notes (free text)
-- Battle log (optional — raw protocol text from TCG Live)
+- Battle log (optional — raw protocol text from TCG Live, capped at
+  `MAX_BATTLE_LOG_CHARS` = 200,000 characters server-side, ~2x the largest
+  realistic log; the client textarea carries the same `maxLength`)
 
 Logs drive the `archetypeStats` computation and all recommendation rules that depend on personal match history.
 
@@ -150,16 +193,51 @@ Logs drive the `archetypeStats` computation and all recommendation rules that de
 The battle log is the raw text from TCG Live's in-game protocol. It is **in German** because TCG Live uses German UI for German-language accounts.
 
 **What is parsed:**
-- Player names (detected by frequency analysis on action lines)
+- Player names (detected by frequency analysis on action lines) — this is name
+  detection only, **not** opponent archetype detection (see correction below).
 - Turn-by-turn breakdown: cards played, energy attached, damage dealt, KOs, prizes taken
 - Prize progression chart data (how many prizes each player had after each turn)
 - Damage-by-turn chart data
 - Card frequency (how often each card was played by the user)
-- Winner detection
+- Winner detection, including a game the local player conceded (`"Du hast
+  aufgegeben. X hat gewonnen."`) — the regex tolerates a sentence prefix before
+  "X hat gewonnen", not just an anchored start-of-line match, so the common
+  online case of a conceded game still yields a winner (plan
+  `personal-data-role-rework.md` §3.4/§0.5; the **one** sanctioned, additive
+  exception to that plan's "the parser is out of scope" rule — it changes no
+  persisted field and has exactly one display consumer).
 
 **Output types:** `ParsedBattleLog`, `ParsedTurn`, `PrizePoint`, `DamagePoint`, `CardCount`
 
 The parser relies on the `tcg-player-name` localStorage key to identify which player is "you". If not set, it defaults to the most-frequent actor in the log.
+
+**Corrections (plan `personal-data-role-rework.md` §0.3/§0.5 — belegt, replacing an
+earlier, inaccurate description):**
+- **The parser detects no opponent archetype and exposes no confidence value at
+  all.** `ParsedBattleLog` has no archetype field and no score. Archetype
+  detection (§6 above) is a **separate**, newer module
+  (`@pokekon/shared/battleLogPrefill.ts`) that consumes the parser's output
+  (cards played, bench, active Pokémon, KOs) without modifying it, and reports a
+  coverage-based `unique`/`ambiguous`/`none` result instead of a fabricated
+  percentage.
+- **Card names in real German logs are German, not English.** The previous claim
+  here (and the doc comment this section was based on) — that PTCG Live's German
+  client prints English print names for Trainers — does **not** hold for real
+  logs: Konrad's own reference log (`apps/api/src/lib/demoSeed.ts`) shows fully
+  localised Pokémon **and** Trainer names (`Ns Zoroark-ex`, `Mega-Kangama-ex` =
+  Kangaskhan, `Rockos Erkundung`, `Schloss von N`, `Höhlensystem Null`, ...).
+  `battleLogPrefill.ts`'s archetype signatures therefore carry an optional,
+  hand-maintained `logNames` field with the German fragments per archetype
+  (currently filled in for a handful of archetypes verified against that real
+  log; a missing or wrong fragment only ever causes a **missed** detection,
+  never a wrong one).
+- **Known gap, not fixed here:** `KNOWN_SUPPORTERS` (the allow-list
+  `battleLogParser.ts` uses to flag a "clean setup") is English-only and
+  therefore effectively never matches in a real German log, so
+  `setupCleanByTurn2` (and the recommendation rules that depend on it, §10 rules
+  11/12) work from a systematically weak signal today. Fixing this is parser
+  work and out of scope for this plan; noted here so it doesn't read as an
+  oversight.
 
 ---
 
@@ -246,6 +324,16 @@ Generated by the `useRecommendations` hook. Runs entirely in the browser — no 
 **Rule 2 — no fabricated tech card:** The old hand-curated `TECH_SUGGESTIONS` table (archetype → "add card X") has been removed. Asserting a specific counter card is not defensible: a card that appears often in winning lists may be a universal staple (not a tech), and a genuine tech may not fit every deck's energy or shell. Rule 2 now reports the matchup weakness from the user's **own logged games** and points to the data-driven List Comparison (successful lists of the user's own archetype, which is deck-fit-safe) instead.
 
 **Local meta priority:** When the user marks specific archetypes as "local meta" (via `LocalMetaPanel`), those archetypes receive a priority boost in tech suggestions (always `high` priority when WR is bad) and generate blind-spot warnings even if their global meta share is below the normal threshold.
+
+**Unchanged by the battle-log-first rework (plan `personal-data-role-rework.md`
+§3.8):** the 14 rules and their thresholds above are untouched. What changed is
+visibility at zero logs — `OverviewPage` and `RecommendationsPage` now show a
+static, honest notice explaining that the meta table / recommendations above work
+from real tournament data, and listing exactly three of the real thresholds a
+user can unlock by logging matches (rule 2's `≥5 encounters`, rules 9–12's `≥3
+games with a battle log`, rule 1/6's `≥2 deck versions + ≥4 logs`) — a
+static list, not a live re-explanation of all 14 rules, since that belongs to a
+future prediction-focused feature, not this one.
 
 ---
 

@@ -166,9 +166,14 @@ keys themselves are BYOK: entered by the user, stored encrypted, server-side onl
 ### Application Shell
 
 `App.tsx` renders the layout (`Sidebar` + `BottomNav`) and one page based on
-`store.activeTab` (overview · deck · recommendations · meta). Opponent-log
-functionality is embedded in `DeckPage`'s "Match Log" section rather than a
-separate tab.
+`store.activeTab` (overview · deck · recommendations · meta) — the match log has
+no top-level tab of its own. Within `DeckPage`, opponent-log functionality is not
+its own section either (plan `personal-data-role-rework.md` §3.8): the page has
+two co-equal sections (Deck List / Analytics), a small always-visible "Log match"
+button opens `AddLogModal` from either, and the log list itself is an
+initially-collapsed section at the end of Analytics (`OpponentLog` with
+`chrome="bare"`, nested in a `CollapsibleSection`) — demoting the area, not the
+logging action.
 
 ### State Management Pattern
 
