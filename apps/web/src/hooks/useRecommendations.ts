@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { tournamentWinRatePct } from '@pokekon/shared';
 import type {
   ArchetypeStats,
   DeckCard,
@@ -19,8 +20,10 @@ import type {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function winRate(wins: number, losses: number): number {
-  return wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
+// Tie-weighted (a tie counts as a third of a win), not wins/(wins+losses) —
+// plan personal-data-role-rework.md §6 decision 1, single win-rate formula.
+function winRate(wins: number, losses: number, ties: number): number {
+  return tournamentWinRatePct(wins, losses, ties, 0) ?? 0;
 }
 
 /** Group logs by deck snapshot ID (null = untagged) */
@@ -105,7 +108,8 @@ export function useRecommendations({
           if (matchLogs.length < 1) continue;
           const wins = matchLogs.filter((l) => l.result === 'W').length;
           const losses = matchLogs.filter((l) => l.result === 'L').length;
-          const wr = winRate(wins, losses);
+          const ties = matchLogs.filter((l) => l.result === 'T').length;
+          const wr = winRate(wins, losses, ties);
           const label =
             snapId != null
               ? (snapMap.get(snapId)?.label ?? t('snapshotFallback', { id: snapId }))
@@ -262,7 +266,8 @@ export function useRecommendations({
           const logs = opponentLogs.filter((l) => l.deckSnapshotId === id);
           const w = logs.filter((l) => l.result === 'W').length;
           const l = logs.filter((l) => l.result === 'L').length;
-          return { id, logs, wr: winRate(w, l) };
+          const ties = logs.filter((l) => l.result === 'T').length;
+          return { id, logs, wr: winRate(w, l, ties) };
         })
         .filter((s) => s.logs.length >= 3);
 

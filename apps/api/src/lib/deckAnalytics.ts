@@ -1,4 +1,9 @@
-import type { DeckAnalytics, PrizePoint, WinRateBlock } from '@pokekon/shared';
+import {
+  tournamentWinRatePct,
+  type DeckAnalytics,
+  type PrizePoint,
+  type WinRateBlock,
+} from '@pokekon/shared';
 import type { MatchResult } from '../db/schema.js';
 
 /** One match row feeding the analytics aggregation (opponent_log ⨝ match_log_parsed). */
@@ -16,17 +21,20 @@ function round(value: number, decimals = 1): number {
   return Math.round(value * f) / f;
 }
 
+// Tie-weighted (a tie counts as a third of a win), not wins/(wins+losses) —
+// one of the five Personal-Analytics spots Spec 2 deferred to Spec 4 (plan
+// personal-data-role-rework.md §0.7/§6 decision 1). `tournamentWinRatePct`
+// is the single win-rate formula for the whole repo.
 function winRateBlock(results: MatchResult[]): WinRateBlock {
   const wins = results.filter((r) => r === 'W').length;
   const losses = results.filter((r) => r === 'L').length;
   const ties = results.filter((r) => r === 'T').length;
-  const decided = wins + losses;
   return {
     games: results.length,
     wins,
     losses,
     ties,
-    winRatePct: decided === 0 ? null : round((wins / decided) * 100),
+    winRatePct: tournamentWinRatePct(wins, losses, ties, 1),
   };
 }
 

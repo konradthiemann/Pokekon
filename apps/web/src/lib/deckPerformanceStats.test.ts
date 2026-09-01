@@ -99,6 +99,27 @@ describe('computeDeckPerformanceStats', () => {
     expect(stats?.cardPerformance.find((c) => c.card === 'Iono')).toBeUndefined();
   });
 
+  // Plan `.claude/plans/personal-data-role-rework.md` §6, "Entscheidungen
+  // (bestätigt 2026-09-01)" #1 — one of the five Spec-2 win-rate laggards
+  // carried over: `overallWinRate` still computes wins/(wins+losses),
+  // silently dropping ties from the denominator entirely.
+  it('counts ties as a third of a win in the overall win rate (tie-weighted formula, plan §6 decision 1)', () => {
+    const stats = computeDeckPerformanceStats(
+      [
+        makeLog('W', LOG_WIN),
+        makeLog('L', LOG_LOSS),
+        makeLog('T', LOG_WIN),
+        makeLog('T', LOG_LOSS),
+        makeLog('T', LOG_WIN),
+      ],
+      'Konrad',
+    );
+    // Naive wins/(wins+losses) would give 1/2 = 50 %.
+    // Tie-weighted: (1 + 3*(1/3)) / 5 = 2/5 = 40 %.
+    expect(stats?.totalGamesAnalyzed).toBe(5);
+    expect(stats?.overallWinRate).toBe(40);
+  });
+
   it('skips logs without battle text but keeps the rest', () => {
     const stats = computeDeckPerformanceStats(
       [makeLog('W', LOG_WIN), makeLog('T'), makeLog('L', LOG_LOSS)],
