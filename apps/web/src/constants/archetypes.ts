@@ -2,9 +2,20 @@
 // CreateDeckModal combobox, AddLogModal tile grid, and slug generation.
 // Update here when the meta rotates; do NOT maintain parallel lists elsewhere.
 
+import { normaliseCardName, type ArchetypeSignature } from '@pokekon/shared';
+
 export interface KnownArchetype {
   slug: string;
   name: string;
+  /**
+   * Card-name fragments as they appear in a GERMAN PTCG Live battle log.
+   * Optional: when omitted, the English display name's tokens are used — which
+   * is correct only where the German name is identical (Zoroark, Absol, Latias).
+   * A wrong-language fragment can only cause a MISSED detection, never a wrong
+   * one, so the table may be filled in incrementally (plan
+   * personal-data-role-rework §3.6, Risiko 1).
+   */
+  logNames?: string[];
 }
 
 export const KNOWN_ARCHETYPES: KnownArchetype[] = [
@@ -14,12 +25,21 @@ export const KNOWN_ARCHETYPES: KnownArchetype[] = [
   { slug: 'alakazam-dudunsparce', name: 'Alakazam Dudunsparce' },
   { slug: 'dragapult-blaziken', name: 'Dragapult Blaziken' },
   { slug: 'dragapult-dusknoir', name: 'Dragapult Dusknoir' },
-  { slug: 'n-zoroark', name: "N's Zoroark" },
+  // logNames: 'Zoroark' is identical in German PTCG-Live logs (verified,
+  // demoSeed.ts:150-224 "Ns Zoroark-ex" / "Ns Zorua").
+  { slug: 'n-zoroark', name: "N's Zoroark", logNames: ['Zoroark'] },
   { slug: 'rocket-mewtwo-ex', name: "Rocket's Mewtwo" },
   { slug: 'starmie-froslass', name: 'Starmie Froslass' },
   { slug: 'ogerpon-meganium', name: 'Ogerpon Meganium' },
   { slug: 'grimmsnarl-froslass', name: 'Grimmsnarl Froslass' },
-  { slug: 'raging-bolt-ogerpon', name: 'Raging Bolt Ogerpon' },
+  // logNames: German localised name for "Raging Bolt" verified in
+  // demoSeed.ts:179 ("Furienblitz-ex von Gtmap ..."). Only this one fragment
+  // is used (not "Ogerpon") — the specific Ogerpon variant paired with Raging
+  // Bolt in a real log is not yet a verified fact, and this plan's safety
+  // rule (a missing fragment only ever under-detects, never mis-detects)
+  // means a single, verified fragment is strictly safer than a compound one
+  // built partly on an unverified guess.
+  { slug: 'raging-bolt-ogerpon', name: 'Raging Bolt Ogerpon', logNames: ['Furienblitz'] },
   { slug: 'mega-absol-box', name: 'Mega Absol Box' },
   // ── Tier 2 ───────────────────────────────────────────────────────────────
   { slug: 'cynthias-garchomp', name: "Cynthia's Garchomp" },
@@ -45,7 +65,10 @@ export const KNOWN_ARCHETYPES: KnownArchetype[] = [
   { slug: 'hops-trevenant', name: "Hop's Trevenant" },
   { slug: 'decidueye', name: 'Decidueye' },
   { slug: 'ursaluna-lunatone', name: 'Ursaluna Lunatone' },
-  { slug: 'lopunny-dudunsparce', name: 'Lopunny Dudunsparce' },
+  // logNames: German localised names verified in demoSeed.ts:150-224
+  // ("Mega-Schlapor-ex" = Lopunny, "Haspiror" = Dudunsparce) — the real,
+  // ambiguity-triggering pairing with n-zoroark from plan §3.3 row 5.
+  { slug: 'lopunny-dudunsparce', name: 'Lopunny Dudunsparce', logNames: ['Schlapor', 'Haspiror'] },
   { slug: 'hydrapple-ogerpon', name: 'Hydrapple Ogerpon' },
   { slug: 'yanmega', name: 'Yanmega' },
   { slug: 'ethanss-typhlosion', name: "Ethan's Typhlosion" },
@@ -74,4 +97,38 @@ export function toArchetypeSlug(name: string): string {
     .replace(/'\w*/g, '')
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '');
+}
+
+/** Generic display-name tokens that describe a deck's role, not a card. */
+const GENERIC_NAME_STOPWORDS = new Set(['box', 'lead']);
+
+/**
+ * KNOWN_ARCHETYPES mapped to shared's ArchetypeSignature (plan
+ * personal-data-role-rework §3.6). Entries without `logNames` fall back to
+ * the display-name tokens, minus the generic words 'box'/'lead' and minus
+ * any token that normalises to an empty fragment (e.g. a bare "ex"/"gx" word
+ * in the display name, such as "Dragapult ex" — normaliseCardName always
+ * strips those suffix tokens, so keeping them as a *required* fragment would
+ * make coverage 1 permanently unreachable for that archetype). Entries that
+ * would end up with an empty fragment list are dropped entirely.
+ */
+export function archetypeSignatures(): ArchetypeSignature[] {
+  const signatures: ArchetypeSignature[] = [];
+
+  for (const archetype of KNOWN_ARCHETYPES) {
+    const logNames =
+      archetype.logNames && archetype.logNames.length > 0
+        ? archetype.logNames
+        : archetype.name
+            .split(/\s+/)
+            .map((token) => token.trim())
+            .filter((token) => token !== '')
+            .filter((token) => !GENERIC_NAME_STOPWORDS.has(token.toLowerCase()))
+            .filter((token) => normaliseCardName(token) !== '');
+
+    if (logNames.length === 0) continue;
+    signatures.push({ slug: archetype.slug, name: archetype.name, logNames });
+  }
+
+  return signatures;
 }
