@@ -504,6 +504,9 @@ export interface FieldAnalysisArchetype {
   /** Data-driven Pokémon sprite slugs (Limitless deck.icons); [] when none. */
   icons: string[];
   fieldWinRatePct: number | null;
+  /** Optional so an older server (deploy window) can't crash a newer client. */
+  fieldWinRateLowPct?: number | null;
+  fieldWinRateHighPct?: number | null;
   coveragePct: number;
   rank: number;
 }

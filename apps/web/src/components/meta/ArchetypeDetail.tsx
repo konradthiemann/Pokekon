@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Loader2, TrendingUp } from 'lucide-react';
+import { wilsonInterval } from '@pokekon/shared';
 import {
   ApiError,
   getArchetypeAnalysis,
@@ -235,6 +236,18 @@ export function ArchetypeDetail({
                   )}
                 />
               </p>
+              {(() => {
+                const wr = wilsonInterval(
+                  analysis.archetype.wins,
+                  analysis.archetype.losses,
+                  analysis.archetype.ties,
+                );
+                return wr ? (
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    {`${wr.lowPct.toFixed(1)}–${wr.highPct.toFixed(1)} %`}
+                  </p>
+                ) : null;
+              })()}
             </div>
             <div className="card p-3">
               <p className="text-xs text-slate-500">{t('archetypeDetail.kpi.players')}</p>
@@ -258,6 +271,12 @@ export function ArchetypeDetail({
                   #{analysis.fieldScore.rank}
                 </span>
               </p>
+              {analysis.fieldScore.fieldWinRateLowPct !== null &&
+                analysis.fieldScore.fieldWinRateHighPct !== null && (
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    {`${analysis.fieldScore.fieldWinRateLowPct.toFixed(1)}–${analysis.fieldScore.fieldWinRateHighPct.toFixed(1)} %`}
+                  </p>
+                )}
             </div>
           </div>
 

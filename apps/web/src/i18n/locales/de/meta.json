@@ -35,7 +35,7 @@
     "rankingHint": "Erwartete Win-Rate gegen dein lokales Feld (Anteil × Matchup-WR, Mirror = 50 %). Klicke ein Deck für Details.",
     "coverage": "{{pct}} % Deckung",
     "perspective": "Aus Sicht von:",
-    "bestPositioned": "Bestpositioniert gegen dein Feld: {{deck}} · {{wr}} % Feld-WR",
+    "bestPositionedInterval": "Bestpositioniert gegen dein Feld: {{deck}} · {{range}} Feld-WR",
     "fieldCount": "Dein Feld ({{count}})",
     "listsTitle": "Beste Listen für {{deck}}",
     "listsHint": "Erfolgreichste Turnierlisten dieses Decks im Fenster — als Bauvorlage gegen dein lokales Feld.",
@@ -89,7 +89,9 @@
       "lowCoverage": "Geringe Datenabdeckung — Score vorsichtig interpretieren.",
       "mirror": "Mirror-Wahrscheinlichkeit: {{pct}} %",
       "matchupSource": "Matchup-Daten: TrainerHill · Stand {{date}} · gemischtes Bo1/Bo3-Format, als Näherung",
-      "noMatchups": "Keine Matchup-Daten importiert — der Score basiert nur auf dem Mirror."
+      "noMatchups": "Keine Matchup-Daten importiert — der Score basiert nur auf dem Mirror.",
+      "interval": "95-%-Konfidenzintervall: {{low}}–{{high}} %",
+      "intervalHint": "Zwei getrennte Fragen: Deckung sagt, wie viel des Felds überhaupt Daten hat; dieses Intervall sagt, wie sicher wir uns bei dem Teil sind, der Daten hat."
     },
     "threats": {
       "title": "Darauf musst du vorbereitet sein",
@@ -100,7 +102,8 @@
       "shareLabel": "{{pct}}% Feld",
       "winRateLabel": "{{pct}}% WR",
       "gamesLabel_one": "{{count}} Spiel",
-      "gamesLabel_other": "{{count}} Spiele"
+      "gamesLabel_other": "{{count}} Spiele",
+      "unreliable": "unsicher — Intervall schließt 50 % ein"
     },
     "matchupTable": {
       "title": "Matchups gegen das Feld",
@@ -108,7 +111,8 @@
       "deck": "Gegner",
       "winRate": "Matchup-WR",
       "sample": "Spiele",
-      "share": "Feld-Anteil"
+      "share": "Feld-Anteil",
+      "interval": "95-%-Intervall"
     },
     "trend": {
       "title": "Verlauf",
