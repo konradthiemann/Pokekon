@@ -46,6 +46,9 @@ export function MatchupTable({
                 {t('archetypeDetail.matchupTable.winRate')}
               </th>
               <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+                {t('archetypeDetail.matchupTable.interval')}
+              </th>
+              <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-600">
                 {t('archetypeDetail.matchupTable.sample')}
               </th>
               <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-600">
@@ -74,6 +77,14 @@ export function MatchupTable({
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono">
                   <WinRateBadge pct={Math.round(m.winRatePct * 10) / 10} />
+                  {!m.significant && (
+                    <span className="ml-1.5 rounded bg-slate-100 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-500">
+                      {t('archetypeDetail.threats.unreliable')}
+                    </span>
+                  )}
+                </td>
+                <td className="px-3 py-1.5 text-right text-xs tabular-nums text-slate-500">
+                  {m.lowPct.toFixed(0)}–{m.highPct.toFixed(0)}%
                 </td>
                 <td className="px-3 py-1.5 text-right text-xs tabular-nums text-slate-500">
                   {m.games}
