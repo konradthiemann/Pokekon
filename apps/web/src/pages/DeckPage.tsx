@@ -6,8 +6,10 @@ import { LocalMetaPanel } from '../components/deck/LocalMetaPanel';
 import { DeckSwitcher, type DeckSection } from '../components/deck/DeckSwitcher';
 import { DeckAnalyticsPanel } from '../components/deck/DeckAnalyticsPanel';
 import { OpponentLog } from '../components/opponent/OpponentLog';
+import { AddLogModal } from '../components/opponent/AddLogModal';
+import { CollapsibleSection } from '../components/layout/CollapsibleSection';
 import { SidePanel } from '../components/deck/SidePanel';
-import { Clock, Settings2, BarChart2, List, Plus, Copy, AlertTriangle } from 'lucide-react';
+import { Settings2, BarChart2, List, Plus, Copy, AlertTriangle } from 'lucide-react';
 
 // ─── Deck Settings ────────────────────────────────────────────────────────────
 
@@ -163,24 +165,30 @@ function DeckSettingsWidget() {
 // ─── Section tabs ─────────────────────────────────────────────────────────────
 
 // Labels are i18n keys in the `deck` namespace, resolved at render time.
+// Two co-equal sections (plan personal-data-role-rework §3.8) — the match
+// log is no longer a third tab; it lives as a collapsed section inside
+// Analytics (below), and "Log match" is a small, always-visible action next
+// to the tabs instead.
 const SECTIONS = [
   { id: 'deck' as const, labelKey: 'page.tabs.deckList', Icon: List },
   { id: 'analytics' as const, labelKey: 'page.tabs.analytics', Icon: BarChart2 },
-  { id: 'log' as const, labelKey: 'page.tabs.matchLog', Icon: Clock },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function DeckPage() {
   const { t } = useTranslation('deck');
-  const { decks, activeDeckId, deckCards, opponentLogs, metaSnapshots, activeDeck } =
+  const { decks, activeDeckId, deckCards, opponentLogs, metaSnapshots, activeDeck, refresh } =
     useDashboardStore();
   const [activeSection, setActiveSection] = useState<DeckSection>('deck');
+  const [showAddLogModal, setShowAddLogModal] = useState(false);
 
   const totalCards = deckCards.reduce((s, c) => s + c.count, 0);
   const pokemon = deckCards.filter((c) => c.type === 'Pokemon').reduce((s, c) => s + c.count, 0);
   const trainers = deckCards.filter((c) => c.type === 'Trainer').reduce((s, c) => s + c.count, 0);
   const energy = deckCards.filter((c) => c.type === 'Energy').reduce((s, c) => s + c.count, 0);
+  const deckLogs =
+    activeDeckId != null ? opponentLogs.filter((l) => l.deckId === activeDeckId) : opponentLogs;
 
   return (
     <div className="space-y-4">
@@ -190,23 +198,36 @@ export function DeckPage() {
       {/* ── Selected-deck content area ──────────────────────────────────── */}
       {activeDeck ? (
         <>
-          {/* Section tab bar */}
-          <div className="flex rounded-2xl overflow-hidden backdrop-blur-md border border-slate-200 bg-white">
-            {SECTIONS.map(({ id, labelKey, Icon }) => (
-              <button
-                key={id}
-                onClick={() => setActiveSection(id)}
-                className={[
-                  'flex-1 flex items-center justify-center gap-2 py-3 text-xs font-medium transition-all',
-                  activeSection === id
-                    ? 'text-brand-800 bg-brand-50 shadow-[inset_0_-2px_0_0_rgba(96,165,250,0.6)]'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
-                ].join(' ')}
-              >
-                <Icon className="w-3.5 h-3.5" aria-hidden="true" />
-                {t(labelKey)}
-              </button>
-            ))}
+          {/* Section tab bar + a small, permanently visible "Log match" action
+              (plan §3.8) — the match log itself is demoted to a collapsed
+              section below, but logging a match stays one tap away on both
+              sections. */}
+          <div className="flex items-center gap-2">
+            <div className="flex flex-1 rounded-2xl overflow-hidden backdrop-blur-md border border-slate-200 bg-white">
+              {SECTIONS.map(({ id, labelKey, Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveSection(id)}
+                  className={[
+                    'flex-1 flex items-center justify-center gap-2 py-3 text-xs font-medium transition-all',
+                    activeSection === id
+                      ? 'text-brand-800 bg-brand-50 shadow-[inset_0_-2px_0_0_rgba(96,165,250,0.6)]'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
+                  ].join(' ')}
+                >
+                  <Icon className="w-3.5 h-3.5" aria-hidden="true" />
+                  {t(labelKey)}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAddLogModal(true)}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-medium bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+              {t('page.logMatch')}
+            </button>
           </div>
 
           {/* Tab content */}
@@ -254,16 +275,29 @@ export function DeckPage() {
             )}
 
             {activeSection === 'analytics' && (
-              <DeckAnalyticsPanel
-                decks={decks}
-                allLogs={opponentLogs}
-                metaSnapshots={metaSnapshots}
-                activeDeckId={activeDeckId}
-              />
-            )}
+              <>
+                <DeckAnalyticsPanel
+                  decks={decks}
+                  allLogs={opponentLogs}
+                  metaSnapshots={metaSnapshots}
+                  activeDeckId={activeDeckId}
+                />
 
-            {activeSection === 'log' && (
-              <OpponentLog logs={opponentLogs} deckId={activeDeckId ?? undefined} showAddButton />
+                {/* Match log — demoted from a co-equal tab to a collapsed
+                    section at the end of Analytics (plan §3.8): the AC
+                    demotes the FLOOR, not the ACTION, so "Log match" above
+                    stays reachable regardless of whether this is open. */}
+                <CollapsibleSection
+                  title={t('page.matchLogSection', { count: deckLogs.length })}
+                  defaultOpen={false}
+                >
+                  <OpponentLog
+                    chrome="bare"
+                    logs={opponentLogs}
+                    deckId={activeDeckId ?? undefined}
+                  />
+                </CollapsibleSection>
+              </>
             )}
           </div>
         </>
@@ -272,6 +306,16 @@ export function DeckPage() {
         <div className="card py-12 text-center text-slate-400 text-sm">
           {t('page.selectDeckPrompt')}
         </div>
+      )}
+
+      {showAddLogModal && (
+        <AddLogModal
+          preselectedDeckId={activeDeckId ?? undefined}
+          onClose={() => {
+            setShowAddLogModal(false);
+            refresh();
+          }}
+        />
       )}
     </div>
   );
