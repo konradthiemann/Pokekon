@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, CheckCircle2 } from 'lucide-react';
 import { BEST_OF_VALUES, prefillFromBattleLog, type BestOf } from '@pokekon/shared';
@@ -133,14 +133,29 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
   const [fromLogArchetype, setFromLogArchetype] = useState(false);
   const [fromLogResult, setFromLogResult] = useState(false);
   const signatures = useMemo(() => archetypeSignatures(), []);
+  // Deferred, not the raw `battleLog` state, feeds the (potentially
+  // expensive — real logs run through @pokekon/shared's parser)
+  // prefill computation. Security review follow-up (plan
+  // personal-data-role-rework.md): pasting/typing arbitrary text used to
+  // re-run `prefillFromBattleLog` synchronously on every keystroke; a
+  // defensive per-line length cap in the parser now bounds the worst case
+  // (see battleLogParser.ts's `MAX_TURN_LINE_LENGTH`), and this
+  // `useDeferredValue` is the complementary UX-level mitigation — it lets
+  // React keep the textarea itself responsive while typing continues, and
+  // coalesces rapid keystrokes into fewer actual recomputations (React may
+  // skip an intermediate deferred value entirely if a newer one arrives
+  // first) instead of computing on every single change.
+  const deferredBattleLog = useDeferredValue(battleLog);
   const prefill = useMemo(
-    () => prefillFromBattleLog(battleLog, playerName, signatures),
-    [battleLog, playerName, signatures],
+    () => prefillFromBattleLog(deferredBattleLog, playerName, signatures),
+    [deferredBattleLog, playerName, signatures],
   );
   // Guards every prefill-driven render below against an empty field —
   // `prefillFromBattleLog('', ...)` already returns `null` for real input,
-  // but this stays explicit so nothing depends on that alone.
-  const hasBattleLog = battleLog.trim() !== '';
+  // but this stays explicit so nothing depends on that alone. Keyed off the
+  // same deferred value `prefill` was actually computed from, so the two
+  // never disagree about whether there "is" a log yet.
+  const hasBattleLog = deferredBattleLog.trim() !== '';
 
   /** Selects a known archetype tile, tagging whether the choice came from the
    *  battle-log guess (renders the "from log" badge) or a manual tap
@@ -156,14 +171,16 @@ export function AddLogModal({ onClose, preselectedDeckId }: Props) {
     setFromLogResult(fromLog);
   };
 
-  // Re-applies the battle-log guess exactly when the log text OR the pinned
-  // player changes (adjust-state-during-render, the same pattern already
-  // established above for the bestOf default) — never on an unrelated
-  // re-render, so a manual override (M2) is never silently reverted.
+  // Re-applies the battle-log guess exactly when the (deferred) log text OR
+  // the pinned player changes (adjust-state-during-render, the same pattern
+  // already established above for the bestOf default) — never on an
+  // unrelated re-render, so a manual override (M2) is never silently
+  // reverted. Compares against `deferredBattleLog`, matching what `prefill`
+  // was actually computed from.
   const [lastPrefillLog, setLastPrefillLog] = useState<string | null>(null);
   const [lastPrefillPlayerName, setLastPrefillPlayerName] = useState<string | null>(null);
-  if (battleLog !== lastPrefillLog || playerName !== lastPrefillPlayerName) {
-    setLastPrefillLog(battleLog);
+  if (deferredBattleLog !== lastPrefillLog || playerName !== lastPrefillPlayerName) {
+    setLastPrefillLog(deferredBattleLog);
     setLastPrefillPlayerName(playerName);
     if (hasBattleLog && prefill?.playerPinned) {
       if (prefill.archetype.confidence === 'unique' && prefill.archetype.best) {
