@@ -8,9 +8,10 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, RefreshCw } from 'lucide-react';
-import { MIN_MATCHUP_GAMES, type MatchupRow } from '@pokekon/shared';
+import { matchupCellInterval, type MatchupRow } from '@pokekon/shared';
 import { getMetaMatchups, type MatchupSource, type MetaWindow } from '../../lib/api';
 import { PokemonIcon } from '../shared/PokemonIcon';
+import { confidenceTier, type ConfidenceTier } from './confidence';
 
 // G-regulation decks rotated out April 10 2026 — exclude from display
 const EXCLUDED_SLUGS = new Set(['gardevoir-ex-sv', 'gholdengo-lunatone']);
@@ -34,19 +35,34 @@ function formatDeckName(slug: string): string {
     .join(' ');
 }
 
-// The same "sample too small" threshold the field-score coverage uses — one
-// shared constant so matrix greying and score coverage can never drift apart.
-const MIN_GAMES_FOR_COLOR = MIN_MATCHUP_GAMES;
+// Colour hue by win rate (unchanged buckets); confidence is expressed
+// separately via opacity, graded by the Wilson interval's width — a
+// narrow band renders fully saturated, a wide one washed out. This
+// replaces the old binary MIN_GAMES_FOR_COLOR grey-out: every cell with
+// data now shows its number, never just a placeholder (plan §3.6).
+const TIER_OPACITY: Record<ConfidenceTier, string> = {
+  high: 'opacity-100',
+  medium: 'opacity-80',
+  low: 'opacity-60',
+  veryLow: 'opacity-40',
+};
 
-function cellStyle(winRate: number, total: number): string {
-  if (total < MIN_GAMES_FOR_COLOR) return 'bg-slate-100 text-slate-400';
-  if (winRate >= 70) return 'bg-emerald-700 text-white font-bold';
-  if (winRate >= 60) return 'bg-emerald-200 text-emerald-900 font-bold';
-  if (winRate >= 55) return 'bg-emerald-100 text-emerald-800';
-  if (winRate >= 45) return 'bg-slate-50 text-slate-600';
-  if (winRate >= 40) return 'bg-red-100 text-red-800';
-  if (winRate >= 30) return 'bg-red-200 text-red-900 font-bold';
-  return 'bg-red-700 text-white font-bold';
+function cellStyle(winRate: number, tier: ConfidenceTier): string {
+  const hue =
+    winRate >= 70
+      ? 'bg-emerald-700 text-white font-bold'
+      : winRate >= 60
+        ? 'bg-emerald-200 text-emerald-900 font-bold'
+        : winRate >= 55
+          ? 'bg-emerald-100 text-emerald-800'
+          : winRate >= 45
+            ? 'bg-slate-50 text-slate-600'
+            : winRate >= 40
+              ? 'bg-red-100 text-red-800'
+              : winRate >= 30
+                ? 'bg-red-200 text-red-900 font-bold'
+                : 'bg-red-700 text-white font-bold';
+  return `${hue} ${TIER_OPACITY[tier]}`;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -61,7 +77,7 @@ export function MatchupMatrix({
   iconsById: Record<string, string[]>;
 }) {
   const { t } = useTranslation('meta');
-  const [minGames, setMinGames] = useState<number>(10);
+  const [minGames, setMinGames] = useState<number>(1);
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [entries, setEntries] = useState<MatchupRow[] | null>(null);
   const [source, setSource] = useState<MatchupSource | null>(null);
@@ -167,6 +183,8 @@ export function MatchupMatrix({
         </div>
         <span className="hidden md:inline">·</span>
         <span>{t('matchupMatrix.perspectiveNote')}</span>
+        <span className="hidden md:inline">·</span>
+        <span>{t('matchupMatrix.confidenceLegend')}</span>
         <div className="flex items-center gap-1.5 ml-auto">
           <span className="px-1.5 py-0.5 rounded bg-emerald-700 text-white text-xs font-bold">
             ≥70%
@@ -292,10 +310,32 @@ export function MatchupMatrix({
                     );
                   }
 
+                  // The mirror (diagonal) is a special case: the bundled
+                  // TrainerHill CSV double-counts mirror wins/losses (a
+                  // Wilson interval over wins+losses+ties would be wrong,
+                  // see plan §0), so it gets no band and no confidence tier —
+                  // just the plain win rate at reduced opacity, as before.
+                  if (isDiagonal) {
+                    return (
+                      <td
+                        key={col}
+                        className={`px-1 py-1.5 text-center ${cellStyle(entry.winRate, 'high')} opacity-60`}
+                        title={t('matchupMatrix.mirrorTooltip')}
+                      >
+                        <div className="font-mono text-xs font-semibold leading-none whitespace-nowrap">
+                          {entry.winRate.toFixed(1)}%
+                        </div>
+                      </td>
+                    );
+                  }
+
+                  const interval = matchupCellInterval(entry);
+                  const tier = interval ? confidenceTier(interval.widthPct) : 'veryLow';
+
                   return (
                     <td
                       key={col}
-                      className={`px-1 py-1.5 text-center ${cellStyle(entry.winRate, entry.total)} ${isDiagonal ? 'opacity-60' : ''}`}
+                      className={`px-1 py-1.5 text-center ${cellStyle(entry.winRate, tier)}`}
                       title={t('matchupMatrix.cellTooltip', {
                         row: formatDeckName(row),
                         col: formatDeckName(col),
@@ -303,11 +343,18 @@ export function MatchupMatrix({
                         wins: entry.wins,
                         losses: entry.losses,
                         ties: entry.ties,
+                        low: interval ? interval.lowPct.toFixed(1) : '—',
+                        high: interval ? interval.highPct.toFixed(1) : '—',
                       })}
                     >
                       <div className="font-mono text-xs font-semibold leading-none whitespace-nowrap">
                         {entry.winRate.toFixed(1)}%
                       </div>
+                      {interval && (
+                        <div className="font-mono text-[9px] leading-none whitespace-nowrap opacity-80 mt-0.5">
+                          {interval.lowPct.toFixed(0)}–{interval.highPct.toFixed(0)}%
+                        </div>
+                      )}
                     </td>
                   );
                 })}
