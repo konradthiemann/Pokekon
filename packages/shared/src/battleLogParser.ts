@@ -202,6 +202,28 @@ interface ParsedTurnRaw extends ParsedTurn {
   koDetails: { pokemon: string; owner: string }[];
 }
 
+/**
+ * Defensive upper bound on a single turn-block line before it is handed to
+ * any of the regexes below. Real PTCG-Live protocol lines are short (well
+ * under a few hundred characters) — this exists purely as a worst-case cap,
+ * independent of any individual regex's own behaviour, for a line that
+ * doesn't look like real log output at all.
+ *
+ * Security review finding (plan personal-data-role-rework.md): several of
+ * these regexes (starting with the `m2` pattern just below) have unanchored
+ * `.+`/`.+?` groups and show measured quadratic (O(n²)) blowup on a long,
+ * non-matching line — e.g. many "X von Y hat " repetitions with no trailing
+ * "eingesetzt" (~2s for a single 240,000-char line). This used to be a
+ * theoretical concern only; the battle-log-first paste flow
+ * (AddLogModal → prefillFromBattleLog → parseBattleLog) made it a reachable
+ * one by running the parser synchronously on the main thread against
+ * unvetted pasted text on every keystroke/paste. `MAX_BATTLE_LOG_CHARS`
+ * (validation.ts) bounds the TOTAL log length but not a single line's
+ * length, so this guard is the actual worst-case mitigation; the regexes
+ * themselves are otherwise unchanged (plan's "parser is out of scope" rule).
+ */
+const MAX_TURN_LINE_LENGTH = 2000;
+
 function parseTurnBlock(
   blockLines: string[],
   turnNumber: number,
@@ -211,6 +233,7 @@ function parseTurnBlock(
   // Determine whose turn it is from the first recognisable action
   let player = p1;
   for (const line of blockLines) {
+    if (line.length > MAX_TURN_LINE_LENGTH) continue;
     const m = line.match(/^(\S+) hat /);
     if (m && (m[1] === p1 || m[1] === p2)) {
       player = m[1];
@@ -238,6 +261,7 @@ function parseTurnBlock(
   for (let i = 0; i < blockLines.length; i++) {
     const line = blockLines[i];
     if (!line.trim()) continue;
+    if (line.length > MAX_TURN_LINE_LENGTH) continue;
 
     // Cards played
     const playMatch = line.match(/^(\S+) hat (.+?) gespielt\./);

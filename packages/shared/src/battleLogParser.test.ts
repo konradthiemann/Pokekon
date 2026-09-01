@@ -190,4 +190,51 @@ describe('parseBattleLog', () => {
       expect(parsed.winner).toBeNull();
     });
   });
+
+  // ── ReDoS guard on turn-block lines (security review finding, plan
+  //    personal-data-role-rework.md — battle-log-first paste made this an
+  //    actually reachable attack path: AddLogModal now runs parseBattleLog
+  //    synchronously on the main thread on every keystroke/paste of
+  //    unvetted pasted text). parseTurnBlock's `m2` pattern
+  //    (`/^.+ von (\S+) hat .+ eingesetzt/`) has two unanchored `.+` groups
+  //    and shows measured quadratic (O(n²)) blowup on a long line with many
+  //    "X von Y hat " repetitions and no trailing "eingesetzt": empirically
+  //    ~2 seconds for a single 240,000-char line (well within the 200,000
+  //    total-character POST /api/logs limit if it's all one line — the total
+  //    cap does not bound a single line's length). A defensive per-line
+  //    length cap ahead of every turn-block regex bounds the worst case
+  //    independently of the regex itself.
+  describe('ReDoS guard on turn-block lines (security review finding)', () => {
+    it('returns quickly for a single pathologically long line with no match, instead of hanging on catastrophic regex backtracking', () => {
+      // No real PTCG-Live line is anywhere near this long; this is a
+      // synthetic, deliberately adversarial payload (240,000 chars, single
+      // line, no "eingesetzt" ending) designed to trigger the worst case of
+      // the vulnerable pattern.
+      const maliciousLine = 'X von Y hat '.repeat(20_000);
+      const log = [
+        'Vorbereitung',
+        'Konrad hat den Münzwurf gewonnen.',
+        'Konrad hat für die Starthand 7 Karten gezogen.',
+        'GegnerX hat für die Starthand 7 Karten gezogen.',
+        '',
+        'Zug von Konrad',
+        maliciousLine,
+        '',
+        'Konrad hat gewonnen!',
+      ].join('\n');
+
+      const start = Date.now();
+      const parsed = parseBattleLog(log, 'Konrad');
+      const durationMs = Date.now() - start;
+
+      // Unfixed, this single line alone measured ~2000ms; the fix (skip any
+      // turn-block line over a small defensive length cap before it ever
+      // reaches a regex) should make this line-independent and fast.
+      expect(durationMs).toBeLessThan(200);
+      // The log otherwise parses normally — the malicious line is silently
+      // skipped, not treated as a parse failure.
+      expect(parsed.winner).toBe('Konrad');
+      expect(parsed.totalTurns).toBe(1);
+    });
+  });
 });
