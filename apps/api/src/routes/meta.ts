@@ -214,7 +214,15 @@ async function loadMatchupData(db: Db, window: MetaWindow): Promise<MatchupData>
   let fallbackPairs = 0;
   for (const { row, own } of byKey.values()) {
     rows.push(row);
-    cells.push({ deck1: row.deck1, deck2: row.deck2, total: row.total, winRate: row.winRate });
+    cells.push({
+      deck1: row.deck1,
+      deck2: row.deck2,
+      total: row.total,
+      winRate: row.winRate,
+      wins: row.wins,
+      losses: row.losses,
+      ties: row.ties,
+    });
     if (own) ownPairs += 1;
     else fallbackPairs += 1;
   }
@@ -362,6 +370,8 @@ export function createMetaRoutes(): Hono<ApiEnv> {
           playerCount: stats?.playerCount ?? 0,
           icons: stats?.icons ?? [],
           fieldWinRatePct: s.fieldWinRatePct,
+          fieldWinRateLowPct: s.fieldWinRateLowPct,
+          fieldWinRateHighPct: s.fieldWinRateHighPct,
           coveragePct: s.coveragePct,
           rank: s.rank,
         };
