@@ -9,12 +9,22 @@ import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { isoWeekLabel } from '@pokekon/shared';
+import {
+  computeArchetypeCardStats,
+  isoWeekLabel,
+  normalizeCardName,
+  placementPercentile,
+  type ListPerformanceEntry,
+  type TournamentDecklist,
+} from '@pokekon/shared';
 import { createApp } from './app.js';
 import type { Db } from './db/index.js';
 import * as schema from './db/schema.js';
 import { backfillMetaWinRates } from './jobs/backfillMetaWinRates.js';
-import { MAX_BATTLE_LOG_CHARS } from './validation.js';
+// Slice B (plan §3.6): the persistence job — does not exist yet, expected to
+// fail module resolution until the implementer adds it.
+import { computeCardStats } from './jobs/computeCardStats.js';
+import { MAX_BATTLE_LOG_CHARS, snapCardStatsWindow } from './validation.js';
 
 // ─── Test harness ─────────────────────────────────────────────────────────────
 // Runs the real routes against an in-memory Postgres (PGlite) created from the
@@ -2152,6 +2162,397 @@ describe('backfillMetaWinRates job (plan §3.8)', () => {
       .from(schema.metaSnapshots)
       .where(eq(schema.metaSnapshots.archetype, 'NoRawData'));
     expect(untouchedNoRaw[0]).toMatchObject({ winRatePct: 42 });
+  });
+});
+
+// ─── Spec 5 Slice B: card-performance precomputation (plan §3.5/§3.6) ─────────
+// Job + read route + validation. All new production symbols referenced below
+// (schema.archetypeCardStats, jobs/computeCardStats.js, validation's
+// snapCardStatsWindow) do not exist yet — that is the expected red state for
+// this slice (tester writes tests against the plan's contract before the
+// implementer builds it).
+
+function cardStatsDaysAgo(days: number): Date {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - days);
+  return d;
+}
+
+/** A trainer-only decklist containing exactly one card, so avgCount and
+ *  inclusionPct are trivial to reason about in every scenario below. */
+function decklistWithCard(cardName: string, count = 4): TournamentDecklist {
+  return { pokemon: [], trainer: [{ name: cardName, count }], energy: [] };
+}
+
+/** Seeds one online-Bo1 tournament (the job/route's default scope) with the
+ *  given standings. Mirrors the `seedTournament` helper used by the
+ *  'tournament drilldown' describe block above, duplicated here because that
+ *  one is scoped to its own describe closure. */
+async function seedCardStatsTournament(
+  id: string,
+  date: Date,
+  players: number,
+  standings: (typeof schema.tournamentStandings.$inferInsert)[],
+): Promise<void> {
+  await db.insert(schema.tournaments).values({
+    id,
+    name: `Card Stats Event ${id}`,
+    date,
+    players,
+    isOnline: true,
+    swissMode: 'BO1',
+  });
+  await db
+    .insert(schema.tournamentStandings)
+    .values(standings.map((s) => ({ ...s, tournamentId: id })));
+}
+
+const cardStatsStanding = (
+  archetypeId: string,
+  over: Partial<typeof schema.tournamentStandings.$inferInsert> = {},
+): typeof schema.tournamentStandings.$inferInsert => ({
+  tournamentId: '',
+  archetypeId,
+  archetypeName: archetypeId.toUpperCase(),
+  wins: 3,
+  losses: 2,
+  ties: 0,
+  ...over,
+});
+
+/** Clears every table the card-stats job reads from or writes to, keeping
+ *  each test isolated from its siblings and from earlier describe blocks. */
+async function clearCardStatsTables(): Promise<void> {
+  await db.delete(schema.tournaments); // standings cascade
+  await db.delete(schema.archetypeCardStats);
+}
+
+describe('computeCardStats job (plan §3.6, step 7)', () => {
+  it('writes inclusionPct/deltaPp/tier for a card that correlates with placement', async () => {
+    await clearCardStatsTables();
+    const players = 20;
+    // 5 lists WITH "Ultra Ball" take the top 5 places; 5 lists WITHOUT take the
+    // bottom 5 — an extreme, deterministic split so the scenario is
+    // unambiguous. The EXPECTED numbers are derived below by calling the same
+    // already-pinned pure engine from Slice A (packages/shared/src/
+    // cardPerformance.test.ts) on an equivalent ListPerformanceEntry[] — this
+    // test is about the job's wiring (window join, grouping, persistence),
+    // not about re-deriving the Mann-Whitney/Wilson statistics themselves.
+    const withPlacings = [1, 2, 3, 4, 5];
+    const withoutPlacings = [16, 17, 18, 19, 20];
+    const standings = [
+      ...withPlacings.map((placing) =>
+        cardStatsStanding('zoro', { placing, decklist: decklistWithCard('Ultra Ball', 4) }),
+      ),
+      ...withoutPlacings.map((placing) =>
+        cardStatsStanding('zoro', { placing, decklist: decklistWithCard('Poke Ball', 4) }),
+      ),
+    ];
+    await seedCardStatsTournament('cs-1', cardStatsDaysAgo(1), players, standings);
+
+    const result = await computeCardStats(db, { windows: [7], minLists: 8 });
+    expect(result.dryRun).toBe(false);
+    expect(result.windows).toEqual([7]);
+    expect(result.archetypesProcessed).toBe(1);
+    expect(result.archetypesSkipped).toBe(0);
+    expect(result.listsWithoutData).toBe(0);
+    // Exactly two distinct cards ("ultra ball", "poke ball") for one archetype
+    // in one window.
+    expect(result.rowsWritten).toBe(2);
+
+    const entries: ListPerformanceEntry[] = [
+      ...withPlacings.map((placing) => ({
+        counts: { 'ultra ball': 4 },
+        displayNames: { 'ultra ball': 'Ultra Ball' },
+        cardTypes: { 'ultra ball': 'trainer' as const },
+        percentile: placementPercentile(placing, players)!,
+      })),
+      ...withoutPlacings.map((placing) => ({
+        counts: { 'poke ball': 4 },
+        displayNames: { 'poke ball': 'Poke Ball' },
+        cardTypes: { 'poke ball': 'trainer' as const },
+        percentile: placementPercentile(placing, players)!,
+      })),
+    ];
+    const expected = computeArchetypeCardStats(entries).find(
+      (c) => normalizeCardName(c.cardName) === 'ultra ball',
+    );
+    expect(expected?.delta).not.toBeNull();
+
+    const rows = await db
+      .select()
+      .from(schema.archetypeCardStats)
+      .where(eq(schema.archetypeCardStats.archetypeId, 'zoro'));
+    const ultraBallRow = rows.find((r) => r.cardKey === 'ultra ball' && r.windowDays === 7);
+    expect(ultraBallRow).toBeDefined();
+    expect(ultraBallRow?.listsAnalyzed).toBe(10);
+    expect(ultraBallRow?.listsWith).toBe(5);
+    expect(ultraBallRow?.inclusionPct).toBeCloseTo(50, 1);
+    expect(ultraBallRow?.avgCount).toBeCloseTo(4, 1);
+    expect(ultraBallRow?.deltaPp).toBeCloseTo(expected!.delta!.deltaPp, 1);
+    expect(ultraBallRow?.superiorityPct).toBeCloseTo(expected!.delta!.superiorityPct, 1);
+    expect(ultraBallRow?.lowPct).toBeCloseTo(expected!.delta!.lowPct, 1);
+    expect(ultraBallRow?.highPct).toBeCloseTo(expected!.delta!.highPct, 1);
+    expect(ultraBallRow?.significant).toBe(expected!.delta!.significant);
+    expect(ultraBallRow?.tier).toBe(expected!.tier);
+    expect(ultraBallRow?.computedAt).not.toBeNull();
+  });
+
+  it('counts a standing without placing toward listsWithoutData and excludes it from the analysis', async () => {
+    await clearCardStatsTables();
+    const players = 20;
+    // 8 valid lists (>= default minLists) all include "Rare Candy"; a 9th
+    // standing has a decklist but no placing (a Limitless "drop") and must be
+    // counted in listsWithoutData while being excluded from the analysis.
+    const validStandings = Array.from({ length: 8 }, (_, i) =>
+      cardStatsStanding('gard', { placing: i + 1, decklist: decklistWithCard('Rare Candy', 2) }),
+    );
+    const dropStanding = cardStatsStanding('gard', {
+      placing: null,
+      decklist: decklistWithCard('Rare Candy', 2),
+    });
+    await seedCardStatsTournament('cs-2', cardStatsDaysAgo(1), players, [
+      ...validStandings,
+      dropStanding,
+    ]);
+
+    const result = await computeCardStats(db, { windows: [7], minLists: 8 });
+    expect(result.listsWithoutData).toBe(1);
+    expect(result.archetypesProcessed).toBe(1);
+    expect(result.rowsWritten).toBe(1); // one distinct card ("rare candy")
+
+    const rows = await db
+      .select()
+      .from(schema.archetypeCardStats)
+      .where(eq(schema.archetypeCardStats.archetypeId, 'gard'));
+    const rareCandy = rows.find((r) => r.cardKey === 'rare candy' && r.windowDays === 7);
+    expect(rareCandy?.listsAnalyzed).toBe(8); // the drop is NOT counted here
+    expect(rareCandy?.inclusionPct).toBeCloseTo(100, 1);
+  });
+
+  it('skips the "other" archetype entirely, writing no rows and not counting it as processed', async () => {
+    await clearCardStatsTables();
+    const players = 20;
+    const standings = Array.from({ length: 10 }, (_, i) =>
+      cardStatsStanding('other', {
+        archetypeName: 'Other',
+        placing: i + 1,
+        decklist: decklistWithCard("Professor's Research", 1),
+      }),
+    );
+    await seedCardStatsTournament('cs-3', cardStatsDaysAgo(1), players, standings);
+
+    const result = await computeCardStats(db, { windows: [7], minLists: 8 });
+    // 'other' is skipped at the grouping step (plan §3.6 step 3) — it is
+    // neither "processed" nor "skipped for too few lists" (step 4); it simply
+    // never reaches the per-archetype loop.
+    expect(result.archetypesProcessed).toBe(0);
+    expect(result.archetypesSkipped).toBe(0);
+    expect(result.rowsWritten).toBe(0);
+
+    const rows = await db
+      .select()
+      .from(schema.archetypeCardStats)
+      .where(eq(schema.archetypeCardStats.archetypeId, 'other'));
+    expect(rows).toHaveLength(0);
+  });
+
+  it('skips an archetype under minLists, incrementing archetypesSkipped and writing zero rows for it', async () => {
+    await clearCardStatsTables();
+    const players = 20;
+    // Only 3 usable lists — below the default minLists=8 job-economy floor.
+    const standings = [1, 2, 3].map((placing) =>
+      cardStatsStanding('tiny-arch', { placing, decklist: decklistWithCard("Boss's Orders", 2) }),
+    );
+    await seedCardStatsTournament('cs-4', cardStatsDaysAgo(1), players, standings);
+
+    const result = await computeCardStats(db, { windows: [7], minLists: 8 });
+    expect(result.archetypesSkipped).toBe(1);
+    expect(result.archetypesProcessed).toBe(0);
+    expect(result.rowsWritten).toBe(0);
+
+    const rows = await db
+      .select()
+      .from(schema.archetypeCardStats)
+      .where(eq(schema.archetypeCardStats.archetypeId, 'tiny-arch'));
+    expect(rows).toHaveLength(0);
+  });
+
+  it('dryRun:true produces identical counters but writes nothing', async () => {
+    await clearCardStatsTables();
+    const players = 20;
+    const standings = Array.from({ length: 8 }, (_, i) =>
+      cardStatsStanding('dry-arch', { placing: i + 1, decklist: decklistWithCard('Nest Ball', 4) }),
+    );
+    await seedCardStatsTournament('cs-5', cardStatsDaysAgo(1), players, standings);
+
+    const dry = await computeCardStats(db, { windows: [7], minLists: 8, dryRun: true });
+    expect(dry.dryRun).toBe(true);
+    expect(dry.rowsWritten).toBe(1);
+
+    const afterDry = await db
+      .select()
+      .from(schema.archetypeCardStats)
+      .where(eq(schema.archetypeCardStats.archetypeId, 'dry-arch'));
+    expect(afterDry).toHaveLength(0);
+
+    const real = await computeCardStats(db, { windows: [7], minLists: 8, dryRun: false });
+    expect(real.dryRun).toBe(false);
+    expect(real.archetypesProcessed).toBe(dry.archetypesProcessed);
+    expect(real.archetypesSkipped).toBe(dry.archetypesSkipped);
+    expect(real.rowsWritten).toBe(dry.rowsWritten);
+    expect(real.listsWithoutData).toBe(dry.listsWithoutData);
+
+    const afterReal = await db
+      .select()
+      .from(schema.archetypeCardStats)
+      .where(eq(schema.archetypeCardStats.archetypeId, 'dry-arch'));
+    expect(afterReal.length).toBeGreaterThan(0);
+  });
+
+  it('a second run REPLACES rows for the same (archetype, window) instead of duplicating them', async () => {
+    await clearCardStatsTables();
+    const players = 20;
+    const standings = Array.from({ length: 8 }, (_, i) =>
+      cardStatsStanding('replace-arch', { placing: i + 1, decklist: decklistWithCard('Iono', 4) }),
+    );
+    await seedCardStatsTournament('cs-6', cardStatsDaysAgo(1), players, standings);
+
+    const r1 = await computeCardStats(db, { windows: [7], minLists: 8 });
+    expect(r1.rowsWritten).toBe(1);
+    const first = await db
+      .select()
+      .from(schema.archetypeCardStats)
+      .where(eq(schema.archetypeCardStats.archetypeId, 'replace-arch'));
+    expect(first).toHaveLength(1); // exactly one distinct card
+
+    const r2 = await computeCardStats(db, { windows: [7], minLists: 8 });
+    expect(r2.rowsWritten).toBe(1);
+    const second = await db
+      .select()
+      .from(schema.archetypeCardStats)
+      .where(eq(schema.archetypeCardStats.archetypeId, 'replace-arch'));
+    expect(second).toHaveLength(1); // replaced, not duplicated (unique index holds)
+  });
+});
+
+describe('GET /api/meta/archetypes/:archetypeId/card-stats (plan §3.6, step 9)', () => {
+  it('serves cards[].delta and computedAt after a job run', async () => {
+    await clearCardStatsTables();
+    const players = 20;
+    const standings = Array.from({ length: 8 }, (_, i) =>
+      cardStatsStanding('route-arch', {
+        placing: i + 1,
+        decklist: decklistWithCard('Ultra Ball', 4),
+      }),
+    );
+    await seedCardStatsTournament('cs-route-1', cardStatsDaysAgo(1), players, standings);
+    await computeCardStats(db, { windows: [7], minLists: 8 });
+
+    const res = await request('/api/meta/archetypes/route-arch/card-stats?days=7', {
+      user: USER_A,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      archetypeId: string;
+      windowDays: number;
+      online: boolean;
+      bo1: boolean;
+      computedAt: string | null;
+      listsAnalyzed: number;
+      cards: { cardName: string; delta: unknown; tier: string }[];
+    };
+    expect(body.archetypeId).toBe('route-arch');
+    expect(body.windowDays).toBe(7);
+    expect(body.online).toBe(true);
+    expect(body.bo1).toBe(true);
+    expect(body.computedAt).not.toBeNull();
+    expect(body.listsAnalyzed).toBe(8);
+    const ultraBall = body.cards.find((c) => c.cardName === 'Ultra Ball');
+    expect(ultraBall).toBeDefined();
+    expect(ultraBall?.delta).not.toBeNull();
+    expect(typeof ultraBall?.tier).toBe('string');
+  });
+
+  it('returns 200 with cards:[] and computedAt:null for an archetype that was never computed (no 404)', async () => {
+    await clearCardStatsTables();
+    const res = await request('/api/meta/archetypes/never-computed-arch/card-stats', {
+      user: USER_A,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      cards: unknown[];
+      computedAt: string | null;
+      listsAnalyzed: number;
+    };
+    expect(body.cards).toEqual([]);
+    expect(body.computedAt).toBeNull();
+    expect(body.listsAnalyzed).toBe(0);
+  });
+
+  it('rejects an invalid archetype slug with 400', async () => {
+    // ARCHETYPE_SLUG_PATTERN is lowercase-only kebab-case — an uppercase
+    // letter is enough to fail it without needing URL-unsafe characters.
+    const res = await request('/api/meta/archetypes/Invalid-Slug/card-stats', { user: USER_A });
+    expect(res.status).toBe(400);
+  });
+
+  it('snaps days=30 to the 28-day precomputed window', async () => {
+    const res = await request('/api/meta/archetypes/route-arch/card-stats?days=30', {
+      user: USER_A,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { windowDays: number };
+    expect(body.windowDays).toBe(28);
+  });
+
+  it('snaps days=10 to the 7-day precomputed window', async () => {
+    const res = await request('/api/meta/archetypes/route-arch/card-stats?days=10', {
+      user: USER_A,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { windowDays: number };
+    expect(body.windowDays).toBe(7);
+  });
+
+  it('rejects days=999 (outside the 1..180 range) with 400', async () => {
+    const res = await request('/api/meta/archetypes/route-arch/card-stats?days=999', {
+      user: USER_A,
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; issues?: unknown };
+    expect(body.error).toBeDefined();
+  });
+
+  // Every other /api/meta/* reader requires a session (app.ts mounts
+  // sessionMiddleware over the whole /api sub-app, see the "requires a
+  // session on all drilldown routes" test above) — the plan's "keine Auth"
+  // (§3.6) means no ADDITIONAL per-route authorization/rate-limit on top of
+  // that baseline, not that this route bypasses the global session gate.
+  it('requires a session, like every other /api/meta/* reader', async () => {
+    const res = await request('/api/meta/archetypes/route-arch/card-stats');
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('snapCardStatsWindow (plan §3.6 — validation.ts)', () => {
+  it.each([
+    [1, 7],
+    [7, 7],
+    [10, 7],
+    [11, 14],
+    [14, 14],
+    [25, 28],
+    [30, 28],
+    [180, 28],
+  ])('snaps %i days to the %i-day precomputed window', (input, expected) => {
+    expect(snapCardStatsWindow(input)).toBe(expected);
+  });
+
+  it('breaks an exact tie in favour of the LARGER window (documented behaviour — unreachable via the integer `days` query, but a direct property of the function)', () => {
+    expect(snapCardStatsWindow(10.5)).toBe(14); // midpoint of 7 and 14
+    expect(snapCardStatsWindow(17.5)).toBe(21); // midpoint of 14 and 21
+    expect(snapCardStatsWindow(24.5)).toBe(28); // midpoint of 21 and 28
   });
 });
 
