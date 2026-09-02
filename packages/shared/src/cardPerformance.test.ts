@@ -109,15 +109,17 @@ describe('placementPercentile — additional edge cases documented in the docstr
 // ---------------------------------------------------------------------------
 
 describe('mannWhitneyTheta — binding value table (plan §3.2, exact)', () => {
-  it.each([
+  const cases: Array<[number[], number[], number, string]> = [
     [[1, 1, 1], [0, 0], 1, 'jede Paarung gewonnen'],
     [[0, 0], [1, 1, 1], 0, 'jede Paarung verloren'],
     [[0.5], [0.5], 0.5, 'eine Bindung, halber Kredit'],
     [[0.9, 0.1], [0.5], 0.5, '1 gewonnen, 1 verloren'],
     [[1, 2], [2, 3], 0.125, 'Paare: 0, 0, 0.5, 0 -> 0.5/4'],
     [[3, 4], [1, 2], 1, 'jede Paarung gewonnen'],
-  ] as const)('mannWhitneyTheta(%j, %j) -> %s (%s)', (withValues, withoutValues, expected) => {
-    expect(mannWhitneyTheta([...withValues], [...withoutValues])).toBeCloseTo(expected, 10);
+  ];
+
+  it.each(cases)('mannWhitneyTheta(%j, %j) -> %s (%s)', (withValues, withoutValues, expected) => {
+    expect(mannWhitneyTheta(withValues, withoutValues)).toBeCloseTo(expected, 10);
   });
 
   it('returns null when withValues is empty', () => {
