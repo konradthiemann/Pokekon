@@ -66,6 +66,19 @@
     "errors": {
       "fetchFailed": "Turnierliste konnte nicht geladen werden",
       "noListsFound": "Keine öffentlichen Decklisten für \"{{slug}}\" gefunden. Versuche das Limitless-Slug-Format (z. B. \"n-zoroark\", \"dragapult-ex\", \"alakazam-dudunsparce\")."
+    },
+    "delta": {
+      "label": "Platzierungs-Delta",
+      "value": "{{delta}} pp ({{low}}–{{high}} %)",
+      "neutral": "kein messbarer Unterschied",
+      "insufficient": "nicht genug Daten für eine Prognose",
+      "paradox": "häufig gespielt, aber ohne messbaren Platzierungsvorteil",
+      "hiddenGem": "selten gespielt, korreliert aber mit besseren Platzierungen",
+      "confirmed": "häufig gespielt und mit besseren Platzierungen korreliert",
+      "discouraged": "korreliert mit schlechteren Platzierungen",
+      "correlationNote": "Korrelation, keine Ursache — das zeigt, wie Listen mit dieser Karte platziert waren, keine Garantie für dein nächstes Spiel.",
+      "source": "aus {{lists}} Turnierlisten der letzten {{days}} Tage (Stand {{computedAt}})",
+      "sourceHint": "Andere Datenquelle als die Häufigkeit oben."
     }
   },
   "rules": {

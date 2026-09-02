@@ -1,5 +1,6 @@
 import type {
   AiSettings,
+  ArchetypeCardStat,
   BattleAnalysis,
   DeckAnalytics,
   FieldScore,
@@ -643,4 +644,35 @@ export interface MetaMatchups extends MetaWindow {
 
 export async function getMetaMatchups(window: MetaWindow): Promise<MetaMatchups> {
   return request<MetaMatchups>(`/api/meta/matchups?${metaWindowParams(window)}`);
+}
+
+// ─── Per-archetype card performance deltas (plan
+// .claude/plans/recommendation-to-prognosis.md §3.7) ──────────────────────────
+
+/** Precomputed per-card performance deltas for one archetype + window. The
+ *  `cards` entries carry the shared `@pokekon/shared` delta shape unchanged —
+ *  no boundary adapter, the wire and client shapes are identical. */
+export interface ArchetypeCardStatsResponse {
+  archetypeId: string;
+  windowDays: number;
+  online: boolean;
+  bo1: boolean;
+  /** null on a cold start (job hasn't run yet for this archetype/window). */
+  computedAt: string | null;
+  listsAnalyzed: number;
+  cards: ArchetypeCardStat[];
+}
+
+/** GET /api/meta/archetypes/{archetypeId}/card-stats — mirrors
+ *  `getDeckAnalytics`'s optional-query pattern: `days` is omitted from the
+ *  URL entirely when not provided, letting the server apply its own default
+ *  window. */
+export async function fetchArchetypeCardStats(
+  archetypeId: string,
+  days?: number,
+): Promise<ArchetypeCardStatsResponse> {
+  const query = days === undefined ? '' : `?days=${days}`;
+  return request<ArchetypeCardStatsResponse>(
+    `/api/meta/archetypes/${encodeURIComponent(archetypeId)}/card-stats${query}`,
+  );
 }

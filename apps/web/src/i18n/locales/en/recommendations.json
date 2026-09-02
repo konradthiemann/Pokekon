@@ -66,6 +66,19 @@
     "errors": {
       "fetchFailed": "Could not fetch tournament list",
       "noListsFound": "No public decklists found for \"{{slug}}\". Try the Limitless slug format (e.g. \"n-zoroark\", \"dragapult-ex\", \"alakazam-dudunsparce\")."
+    },
+    "delta": {
+      "label": "Placement delta",
+      "value": "{{delta}} pp ({{low}}–{{high}} %)",
+      "neutral": "no measurable difference",
+      "insufficient": "not enough data for a prognosis",
+      "paradox": "widely played, but no measurable placement advantage",
+      "hiddenGem": "rarely played, yet correlates with better placements",
+      "confirmed": "widely played and correlates with better placements",
+      "discouraged": "correlates with worse placements",
+      "correlationNote": "Correlation, not causation — this reflects how lists with this card placed, not a guarantee for your next game.",
+      "source": "from {{lists}} tournament lists of the last {{days}} days (as of {{computedAt}})",
+      "sourceHint": "A different data source than the frequency above."
     }
   },
   "rules": {
