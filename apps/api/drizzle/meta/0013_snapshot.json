@@ -1,5 +1,5 @@
 {
-  "id": "d1a49beb-2ea3-45f0-b82a-1ac700836658",
+  "id": "af76c1be-20c6-41e1-9f70-9a21729efb33",
   "prevId": "17741cf8-352d-40c0-b1ea-049f35b22fbf",
   "version": "7",
   "dialect": "postgresql",
@@ -306,6 +306,10 @@
         "archetype_card_stats_type_chk": {
           "name": "archetype_card_stats_type_chk",
           "value": "\"archetype_card_stats\".\"card_type\" in ('pokemon','trainer','energy')"
+        },
+        "archetype_card_stats_tier_chk": {
+          "name": "archetype_card_stats_tier_chk",
+          "value": "\"archetype_card_stats\".\"tier\" in ('insufficient','confirmed','hiddenGem','popularityParadox','discouraged','neutral')"
         }
       },
       "isRLSEnabled": false

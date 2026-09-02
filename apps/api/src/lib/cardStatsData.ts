@@ -65,13 +65,13 @@ export async function loadCardStats(
 
     return {
       cardName: r.cardName,
-      cardType: r.cardType as ArchetypeCardStat['cardType'],
+      cardType: r.cardType,
       listsAnalyzed: r.listsAnalyzed,
       listsWith: r.listsWith,
       inclusionPct: r.inclusionPct,
       avgCount: r.avgCount,
       delta,
-      tier: r.tier as ArchetypeCardStat['tier'],
+      tier: r.tier,
     };
   });
 

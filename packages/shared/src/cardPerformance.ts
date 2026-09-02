@@ -185,7 +185,8 @@ export function cardPerformanceDelta(
 // 3.4 -- aggregation over a whole archetype
 // ---------------------------------------------------------------------------
 
-type CardKind = 'pokemon' | 'trainer' | 'energy';
+export const CARD_KIND_VALUES = ['pokemon', 'trainer', 'energy'] as const;
+type CardKind = (typeof CARD_KIND_VALUES)[number];
 
 /** One published tournament list, reduced to what this analysis needs.
  *  Produced by the API job from tournament_standings joined with
@@ -206,21 +207,23 @@ export interface ListPerformanceEntry {
   percentile: number;
 }
 
-export type CardSignalTier =
+export const CARD_SIGNAL_TIER_VALUES = [
   /** No prognosis: a group is empty, or the band is wider than
    *  MAX_USABLE_BAND_PP. */
-  | 'insufficient'
+  'insufficient',
   /** Popular AND significantly positive -- the staple that earns its slot. */
-  | 'confirmed'
+  'confirmed',
   /** Rarely played AND significantly positive -- the underplayed candidate. */
-  | 'hiddenGem'
+  'hiddenGem',
   /** Popular BUT the delta is negative or its band still contains 50 -- the
    *  popularity paradox at card level. */
-  | 'popularityParadox'
+  'popularityParadox',
   /** Significantly negative and not popular. */
-  | 'discouraged'
+  'discouraged',
   /** Everything else: measurable, but nothing to say. */
-  | 'neutral';
+  'neutral',
+] as const;
+export type CardSignalTier = (typeof CARD_SIGNAL_TIER_VALUES)[number];
 
 export interface ArchetypeCardStat {
   /** Display name (first spelling seen); normalizeCardName(cardName) is the

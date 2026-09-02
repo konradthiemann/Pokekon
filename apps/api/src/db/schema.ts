@@ -13,7 +13,12 @@ import {
   date,
   check,
 } from 'drizzle-orm/pg-core';
-import { BEST_OF_VALUES, SWISS_MODE_VALUES } from '@pokekon/shared';
+import {
+  BEST_OF_VALUES,
+  SWISS_MODE_VALUES,
+  CARD_KIND_VALUES,
+  CARD_SIGNAL_TIER_VALUES,
+} from '@pokekon/shared';
 import type {
   ParsedTurn,
   PrizePoint,
@@ -441,7 +446,7 @@ export const archetypeCardStats = pgTable(
     cardKey: text('card_key').notNull(),
     /** Display spelling as seen in the source lists. */
     cardName: text('card_name').notNull(),
-    cardType: text('card_type').notNull(),
+    cardType: text('card_type', { enum: CARD_KIND_VALUES }).notNull(),
     /** Analysis window in days (7 | 14 | 21 | 28). Scope is always the default
      *  online-Bo1 scope — see plan section 5. */
     windowDays: integer('window_days').notNull(),
@@ -458,7 +463,7 @@ export const archetypeCardStats = pgTable(
     meanPercentileWithPct: real('mean_percentile_with_pct'),
     meanPercentileWithoutPct: real('mean_percentile_without_pct'),
     significant: boolean('significant').notNull().default(false),
-    tier: text('tier').notNull(),
+    tier: text('tier', { enum: CARD_SIGNAL_TIER_VALUES }).notNull(),
     computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
   },
   (table) => [
@@ -467,6 +472,10 @@ export const archetypeCardStats = pgTable(
     check(
       'archetype_card_stats_type_chk',
       sql`${table.cardType} in ('pokemon','trainer','energy')`,
+    ),
+    check(
+      'archetype_card_stats_tier_chk',
+      sql`${table.tier} in ('insufficient','confirmed','hiddenGem','popularityParadox','discouraged','neutral')`,
     ),
   ],
 );
