@@ -83,16 +83,22 @@ Archetyp), statt nur auf Kopienhäufigkeit.
   Berechnung läuft ausschließlich auf öffentlichen Turnierdaten (Konsistenz mit dem
   "funktioniert ohne eigene Logs"-Prinzip aus Spec 4).
 
-## Offene Fragen
+## Offene Fragen (entschieden, 2026-09-02)
 
-- **Metrik für "Performance":** Field-WR-Delta (setzt eine vollständige Matchup-Matrix pro
-  Liste voraus, aufwendiger) vs. einfacheres Platzierungs-Perzentil (leichter zu berechnen,
-  weniger direkt mit dem Field-Score-Konzept verbunden). Welche Metrik ist gewünscht, oder
-  soll das der Planung überlassen werden?
-- **Mindest-Stichprobengröße pro Karten-Gruppe:** Analog zu Spec 3 — reicht eine grobe
-  Faustregel (z. B. ≥10 Listen je Gruppe) oder soll hier bereits ein Wilson-artiger
-  Konfidenzgedanke einfließen, obwohl es sich um Listen-Vergleiche statt Win/Loss-Zählungen
-  handelt (andere Statistik, ggf. eigene Herleitung nötig)?
-- **Umfang:** Nur für den aktuell aktiven Deck-Archetyp berechnen (on-demand, wie
-  `fetchArchetypeComparison` heute), oder für alle Meta-Archetypen vorab serverseitig
-  cachen (mehr Rechenaufwand, aber sofort verfügbar)?
+- **Metrik für "Performance": Platzierungs-Perzentil.** Vergleicht die durchschnittliche
+  Turnier-Platzierung von Listen mit vs. ohne Karte X. Nutzt direkt das bereits vorhandene
+  `tournament_standings.placing` (kein Aufbau einer vollständigen Matchup-Matrix pro Liste
+  nötig — das wäre der Field-WR-Delta-Ansatz gewesen, hier verworfen zugunsten der einfacheren,
+  bereits datengedeckten Metrik).
+- **Mindest-Stichprobengröße pro Karten-Gruppe: Wilson-artiger Konfidenzgedanke,** konsistent
+  mit Spec 3s Prinzip (kein harter Cutoff, Unsicherheit bleibt sichtbar statt eine Gruppe unter
+  einer Schwelle komplett auszublenden). Die genaue Herleitung für Perzentil- statt Win/Loss-
+  Daten ist Teil der Planung — kein Wilson-Score-Reuse ohne Prüfung, ob die Annahmen (binomial)
+  übertragbar sind.
+- **Umfang: serverseitig für alle Meta-Archetypen vorberechnet,** nicht on-demand. Begründung:
+  `tournament_standings` liegt bereits serverseitig in Postgres (`syncMeta`-Job), und Golden
+  Rule §6 dieser CLAUDE.md verlangt, schwere Aggregationen dort statt in der App-Schicht zu
+  bauen. Card-Delta-Berechnung läuft daher als serverseitiger Job/Route, nicht als Client-Fetch
+  nach dem Vorbild des heutigen `fetchArchetypeComparison` (das live von Limitless liest, nicht
+  aus der eigenen DB — bewusster Bruch mit diesem einen Client-Pattern, kein Präzedenzfall dafür
+  nötig).
