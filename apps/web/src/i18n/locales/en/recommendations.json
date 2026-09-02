@@ -80,7 +80,10 @@
       "suggestion": "Improve your {{archetype}} matchup",
       "reasoning": "You're {{wins}}W/{{losses}}L vs {{archetype}} ({{winRate}}% WR in {{games}}).",
       "localNote": "This is a key local matchup.",
-      "dataHint": "Rather than a guessed tech card: use the List Comparison to line your list up against the most successful lists of your own archetype (deck-fit-safe, same shell) — so you see, from data, which cards top pilots run that you're missing."
+      "dataHint": "Rather than a guessed tech card: use the List Comparison to line your list up against the most successful lists of your own archetype (deck-fit-safe, same shell) — so you see, from data, which cards top pilots run that you're missing.",
+      "deltaCard": "{{card}} (+{{delta}} pp)",
+      "deltaHint_one": "In tournament lists for your archetype, {{cards}} correlates with better placements — you're not currently playing this card.",
+      "deltaHint_other": "In tournament lists for your archetype, {{cards}} correlate with better placements — you're not currently playing these cards."
     },
     "zeroWin": {
       "suggestion": "Research {{archetype}} matchup",

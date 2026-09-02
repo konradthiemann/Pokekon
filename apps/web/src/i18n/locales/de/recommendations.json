@@ -80,7 +80,10 @@
       "suggestion": "Matchup gegen {{archetype}} verbessern",
       "reasoning": "Deine Bilanz gegen {{archetype}}: {{wins}}S/{{losses}}N ({{winRate}}% WR in {{games}}).",
       "localNote": "Das ist ein wichtiges lokales Matchup.",
-      "dataHint": "Statt einer geratenen Tech-Karte: Gleiche deine Liste im Listen-Vergleich mit den erfolgreichsten Listen deines Archetyps ab (deck-fit-sicher, da gleiche Shell) — so siehst du datenbelegt, welche Karten Top-Piloten spielen und dir fehlen."
+      "dataHint": "Statt einer geratenen Tech-Karte: Gleiche deine Liste im Listen-Vergleich mit den erfolgreichsten Listen deines Archetyps ab (deck-fit-sicher, da gleiche Shell) — so siehst du datenbelegt, welche Karten Top-Piloten spielen und dir fehlen.",
+      "deltaCard": "{{card}} (+{{delta}} pp)",
+      "deltaHint_one": "In Turnierlisten deines Archetyps korreliert {{cards}} mit besseren Platzierungen — diese Karte spielst du aktuell nicht.",
+      "deltaHint_other": "In Turnierlisten deines Archetyps korrelieren {{cards}} mit besseren Platzierungen — diese Karten spielst du aktuell nicht."
     },
     "zeroWin": {
       "suggestion": "Matchup gegen {{archetype}} recherchieren",

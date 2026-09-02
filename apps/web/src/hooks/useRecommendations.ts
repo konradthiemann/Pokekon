@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { tournamentWinRatePct } from '@pokekon/shared';
+import { normalizeCardName, tournamentWinRatePct } from '@pokekon/shared';
+import type { ArchetypeCardStat } from '@pokekon/shared';
 import type {
   ArchetypeStats,
   DeckCard,
@@ -37,6 +38,34 @@ function groupBySnapshot(logs: OpponentLog[]): Map<number | null, OpponentLog[]>
   return map;
 }
 
+/**
+ * Selects up to two archetype-wide cards to name in Rule 2's reasoning
+ * (plan recommendation-to-prognosis.md §3.8, behavior 2): tier `hiddenGem`
+ * or `confirmed` (i.e. significant and deltaPp > 0), not already in the
+ * user's own deck list (matched via `normalizeCardName`), sorted by
+ * `deltaPp` descending with `inclusionPct` descending as tiebreak.
+ *
+ * Deliberately archetype-wide, not matchup-specific: this is the same
+ * candidate list regardless of which opponent Rule 2 is currently reporting
+ * on, since the delta describes the user's OWN archetype, not the matchup.
+ */
+function selectDeltaCandidates(
+  cardDeltas: ArchetypeCardStat[] | null | undefined,
+  deckCards: DeckCard[],
+): ArchetypeCardStat[] {
+  if (!cardDeltas || cardDeltas.length === 0) return [];
+  const ownedNames = new Set(deckCards.map((c) => normalizeCardName(c.name)));
+  return cardDeltas
+    .filter((cs) => cs.tier === 'hiddenGem' || cs.tier === 'confirmed')
+    .filter((cs) => cs.delta != null && cs.delta.deltaPp > 0)
+    .filter((cs) => !ownedNames.has(normalizeCardName(cs.cardName)))
+    .sort((a, b) => {
+      const deltaDiff = b.delta!.deltaPp - a.delta!.deltaPp;
+      return deltaDiff !== 0 ? deltaDiff : b.inclusionPct - a.inclusionPct;
+    })
+    .slice(0, 2);
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 interface RecommendationInput {
@@ -48,6 +77,10 @@ interface RecommendationInput {
   localMeta: string[];
   /** Aggregated statistics from battle-log protocols */
   deckStats?: DeckPerformanceStats | null;
+  /** Precomputed card deltas for the user's own archetype (plan §3.8).
+   *  Optional: the hook must still work with null/[] (cold start, older
+   *  server, no slug set) — see behavior 1 in the plan section. */
+  cardDeltas?: ArchetypeCardStat[] | null;
 }
 
 /**
@@ -71,8 +104,9 @@ export function useRecommendations({
   deckSnapshots,
   localMeta,
   deckStats,
+  cardDeltas,
 }: RecommendationInput): DeckRecommendation[] {
-  const { t } = useTranslation('recommendations');
+  const { t, i18n } = useTranslation('recommendations');
 
   return useMemo(() => {
     const recs: DeckRecommendation[] = [];
@@ -162,6 +196,27 @@ export function useRecommendations({
     // Flag matchups the user actually loses (from their OWN logged games) and
     // point to the data-driven List Comparison instead of asserting a counter
     // card. Zero-win matchups are Rule 3's job, so require at least one win here.
+    //
+    // Card-delta enrichment (plan §3.8): when cardDeltas is provided, up to
+    // two archetype-wide, non-owned cards with a significant positive delta
+    // are named in an APPENDED sentence — never naming the opponent archetype
+    // (the exact leaptrap `useRecommendations.ts:13-19` warns against).
+    const deltaCandidates = selectDeltaCandidates(cardDeltas, deckCards);
+    const deltaSentence =
+      deltaCandidates.length > 0
+        ? t('rules.tech.deltaHint', {
+            count: deltaCandidates.length,
+            cards: new Intl.ListFormat(i18n.language, {
+              style: 'long',
+              type: 'conjunction',
+            }).format(
+              deltaCandidates.map((cs) =>
+                t('rules.tech.deltaCard', { card: cs.cardName, delta: cs.delta!.deltaPp }),
+              ),
+            ),
+          })
+        : null;
+
     for (const stats of sortedStats) {
       if (stats.wins === 0 || stats.winRate > 50 || stats.encounters < 5) continue;
       const isLocal = localMetaSet.has(stats.archetype.toLowerCase());
@@ -177,7 +232,7 @@ export function useRecommendations({
           archetype: stats.archetype,
           winRate: stats.winRate,
           games: games(stats.encounters),
-        })}${isLocal ? ` ${t('rules.tech.localNote')}` : ''} ${t('rules.tech.dataHint')}`,
+        })}${isLocal ? ` ${t('rules.tech.localNote')}` : ''} ${t('rules.tech.dataHint')}${deltaSentence ? ` ${deltaSentence}` : ''}`,
         dataPoints: stats.encounters,
       });
     }
@@ -457,5 +512,15 @@ export function useRecommendations({
       const pd = priorityOrder[a.priority] - priorityOrder[b.priority];
       return pd !== 0 ? pd : b.dataPoints - a.dataPoints;
     });
-  }, [archetypeStats, deckCards, opponentLogs, deckSnapshots, deckStats, localMeta, t]);
+  }, [
+    archetypeStats,
+    deckCards,
+    opponentLogs,
+    deckSnapshots,
+    deckStats,
+    localMeta,
+    cardDeltas,
+    t,
+    i18n,
+  ]);
 }
