@@ -91,21 +91,22 @@ Fitness") zu zeigen — nicht nur eine statische Momentaufnahme.
   Fragen) ist ein periodischer Batch-Job (analog `syncMeta.ts`) wahrscheinlicher als ein
   On-Demand-Endpoint, aber das ist Teil der Planung.
 
-## Offene Fragen
+## Offene Fragen (entschieden, 2026-09-02)
 
-- **Rechenaufwand bei mehr als ~15–18 Archetypen:** Exhaustive Enumeration ist `2^n − 1`
-  Teilmengen. Das Referenzpapier nutzte 14 Archetypen (69,5 % des Feldes); Pokekons Meta kann
-  je nach Zeitfenster mehr umfassen. Muss die Eingabemenge auf die Top-N Archetypen begrenzt
-  werden (mit dokumentierter Begründung, welcher Anteil des Feldes das abdeckt), oder ist ein
-  effizienterer Algorithmus (z. B. Linear-Programming-basierte Nash-Berechnung für
-  Zwei-Spieler-Nullsummenspiele) vorzuziehen? Das ist eine substanzielle algorithmische
-  Entscheidung für die Planungsphase.
-- **Batch- vs. On-Demand-Berechnung:** Periodischer Job (wöchentlich, analog `syncMeta.ts`)
-  mit persistiertem Ergebnis, oder On-Demand mit Caching? Beeinflusst, ob eine neue
-  `apps/api/src/jobs/*.ts`-Datei plus Tabelle nötig ist oder eine reine
-  Request-Zeit-Berechnung mit In-Memory-Cache reicht.
-- **Darstellung der Robustheits-Nuance für Laien:** Die Unterscheidung "robuster Ausschluss"
-  vs. "fragile exakte Zusammensetzung" ist statistisch wichtig, aber für Nicht-Statistiker
-  potenziell verwirrend — insbesondere im Hinblick auf die "demo-mode-taugliche" Anforderung
-  aus dem Briefing. Reicht eine einfache Sprache ("X ist in den meisten Szenarien keine gute
-  Wahl") oder soll die Zahl selbst (78 %) sichtbar bleiben?
+- **Rechenaufwand bei mehr als ~15–18 Archetypen: LP-basierte Nash-Berechnung.** Pokekons
+  Matchup-Matrix ist ein symmetrisches Nullsummenspiel — dafür ist Linear-Programming-basierte
+  Nash-Berechnung (Minimax-Theorem) das exakte Standardverfahren, **keine** vereinfachte
+  Heuristik gegenüber exhaustiver Enumeration, sondern die für diese Spielklasse übliche
+  Methode. Skaliert auf beliebig viele Archetypen, ohne eine Top-N-Deckelung zu erzwingen. Der
+  Monte-Carlo-Robustheits-Check (AC 3) läuft unabhängig vom gewählten Basis-Algorithmus oben
+  drauf und bleibt wie in Quelle 1 beschrieben.
+- **Batch- vs. On-Demand-Berechnung: periodischer Batch-Job**, analog `syncMeta.ts` —
+  wöchentlich, passend zum bestehenden `period`-Konzept in `meta_snapshots` und kombinierbar
+  mit der Replicator-Trendrichtung (Woche-über-Woche). Braucht eine neue Tabelle plus
+  `apps/api/src/jobs/*.ts`-Datei; kein On-Demand-Endpoint mit In-Memory-Cache (Railway startet
+  den Prozess bei jedem Deploy neu, der erste Request danach würde die volle Rechenzeit
+  inklusive Monte-Carlo-Resampling tragen).
+- **Darstellung der Robustheits-Nuance für Laien: beides.** Prominent in einfacher Sprache
+  ("X ist in den meisten Szenarien keine gute Wahl"), die Zahl (z. B. 78 %) bleibt daneben
+  sichtbar. Passt zum bestehenden Anti-Halluzinations-Anspruch (Ehrlichkeit vor Vereinfachung,
+  CLAUDE.md Golden Rule 6) und zur Portfolio-Absicht aus der dritten User Story.
