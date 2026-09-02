@@ -211,6 +211,12 @@ export const metaSnapshots = pgTable('meta_snapshots', {
 
 **`archetype_card_stats`** (optional, als Cache) — Ergebnis von `deckComparison` pro Archetyp+Zeitraum, damit Limitless nicht bei jedem Aufruf befragt wird. TTL über `computedAt`.
 
+> ✅ **Umgesetzt (2026-09-02):** Spec 5 (recommendation-to-prognosis). Tabelle +
+> `jobs/computeCardStats.ts` + `GET /api/meta/archetypes/:id/card-stats`. Mann-Whitney-θ
+> mit Wilson-Konfidenzband via effektiver Stichprobengröße aus der Nullvarianz.
+> Vier Zeitfenster (7/14/21/28 Tage), nur online-Bo1-Scope. Precompute-Job läuft
+> nach syncMeta (separate Cron), separate Turnier-Population von Limitless-Fetch.
+
 ### 5.3 Decklisten normalisieren?
 `deck_snapshots.cards` ist heute jsonb — für *deine eigenen* Decks völlig ok (wenige Zeilen, immer als Ganzes gelesen). Für **Turnier-Decklisten** (Tausende, du willst „Karte X über alle Listen aggregieren") ist eine separate normalisierte Tabelle `standing_cards (standingId, cardName, count)` sinnvoll, weil du über Karten *hinweg* aggregierst. Faustregel: jsonb wenn immer als Blob gelesen, normalisiert wenn quer abgefragt.
 

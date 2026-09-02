@@ -3,6 +3,7 @@ import {
   ApiError,
   analyzeBattleLogViaApi,
   createDeckSnapshot,
+  fetchArchetypeCardStats,
   getAiSettings,
   getDeckAnalytics,
   getMeta,
@@ -11,6 +12,7 @@ import {
   syncMeta,
   updateAiSettings,
 } from './api';
+import type { ArchetypeCardStatsResponse } from './api';
 import type { DeckCard } from '../types';
 
 /**
@@ -270,6 +272,89 @@ describe('meta client', () => {
     expect(url).toBe('/api/meta/sync');
     expect(init.method).toBe('POST');
     expect(result).toMatchObject({ archetypes: 12, tournaments: 4 });
+  });
+});
+
+describe('fetchArchetypeCardStats (plan .claude/plans/recommendation-to-prognosis.md §3.7)', () => {
+  const WIRE_RESPONSE: ArchetypeCardStatsResponse = {
+    archetypeId: 'dragapult-ex',
+    windowDays: 14,
+    online: true,
+    bo1: true,
+    computedAt: '2026-06-01T00:00:00.000Z',
+    listsAnalyzed: 42,
+    cards: [
+      {
+        cardName: 'ultra ball',
+        cardType: 'trainer',
+        listsAnalyzed: 42,
+        listsWith: 38,
+        inclusionPct: 90.5,
+        avgCount: 3.2,
+        delta: {
+          listsWith: 38,
+          listsWithout: 4,
+          superiorityPct: 62.1,
+          deltaPp: 12.1,
+          lowPct: 44.0,
+          highPct: 78.5,
+          widthPct: 34.5,
+          significant: false,
+          effectiveN: 14.29,
+          meanPercentileWithPct: 55.0,
+          meanPercentileWithoutPct: 40.0,
+        },
+        tier: 'hiddenGem',
+      },
+    ],
+  };
+
+  it('requests the card-stats endpoint for the given window and returns the wire shape unchanged (delta fields tolerant-typed, no adapter)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(WIRE_RESPONSE));
+
+    const result = await fetchArchetypeCardStats('dragapult-ex', 14);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/meta/archetypes/dragapult-ex/card-stats?days=14',
+      expect.anything(),
+    );
+    expect(result).toEqual(WIRE_RESPONSE);
+  });
+
+  it('omits the days query when no window is provided (mirrors getDeckAnalytics)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(WIRE_RESPONSE));
+
+    await fetchArchetypeCardStats('dragapult-ex');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/meta/archetypes/dragapult-ex/card-stats',
+      expect.anything(),
+    );
+  });
+
+  it('surfaces a 400 (invalid slug) as an ApiError', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Invalid archetype id' }, 400));
+
+    await expect(fetchArchetypeCardStats('bad slug')).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('tolerates a cold-start response (computedAt: null, cards: [])', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        archetypeId: 'unknown-archetype',
+        windowDays: 28,
+        online: true,
+        bo1: true,
+        computedAt: null,
+        listsAnalyzed: 0,
+        cards: [],
+      }),
+    );
+
+    const result = await fetchArchetypeCardStats('unknown-archetype', 30);
+
+    expect(result.computedAt).toBeNull();
+    expect(result.cards).toEqual([]);
   });
 });
 

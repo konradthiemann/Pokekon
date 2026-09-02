@@ -102,3 +102,11 @@ Archetyp), statt nur auf Kopienhäufigkeit.
   nach dem Vorbild des heutigen `fetchArchetypeComparison` (das live von Limitless liest, nicht
   aus der eigenen DB — bewusster Bruch mit diesem einen Client-Pattern, kein Präzedenzfall dafür
   nötig).
+
+**Folge für die User Story oben (Klarstellung, kein Scope-Verlust):** Unter Entscheidung 1
+(Platzierungs-Perzentil statt Field-WR-Delta) ist "geschätzt +2 bis +5 Prozentpunkte
+**Field-WR**" nicht mehr die gemessene Größe — gemessen wird Platzierung, nicht Field-WR.
+Die Prognose liefert stattdessen eine Zahl in derselben *Form* (Prozentpunkte, 0 = neutral,
+mit Konfidenzband), aber anderer *Bedeutung*: Prozentpunkte **Platzierungs-Überlegenheit**
+(Mann-Whitney-Effektmaß, siehe `.claude/plans/recommendation-to-prognosis.md` §3.0 für die
+Herleitung). Das ist die direkte, bewusste Folge von Entscheidung 1.

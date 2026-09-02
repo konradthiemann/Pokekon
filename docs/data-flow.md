@@ -365,6 +365,129 @@ client now sends `playerName` whenever it is known (the same value stored under
 `localStorage['tcg-player-name']`), omitting the field entirely otherwise. Not
 re-parsed retroactively — see [database.md](./database.md).
 
+## Card Performance Delta Precomputation (Spec 5)
+
+```mermaid
+sequenceDiagram
+    participant Admin/Cron
+    participant Job as computeCardStats job
+    participant DB as PostgreSQL
+    participant Engine as @pokekon/shared
+
+    Note over Admin/Cron: Runs on schedule (separate cron after syncMeta)
+
+    Admin/Cron->>Job: npm run job:compute-card-stats [--dry-run]
+    Job->>DB: SELECT tournaments, tournament_standings WHERE online=true, swiss_mode='BO1', window_days in (7,14,21,28)
+    DB-->>Job: standings + tournaments.players
+
+    loop For each (archetype, window) pair
+        Job->>Job: Compute placementPercentile(placing, players)
+        Job->>Engine: computeArchetypeCardStats(lists)
+        Engine->>Engine: For each card: split into with/without groups
+        Engine->>Engine: mannWhitneyTheta() + rankEffectiveSampleSize()
+        Engine->>Engine: wilsonInterval() on effective sample size
+        Engine->>Engine: classifyCardSignal() → tier
+        Engine-->>Job: ArchetypeCardStat[]
+    end
+
+    alt dryRun = false
+        Job->>DB: For each (archetype, window):
+        DB->>DB: BEGIN TRANSACTION
+        DB->>DB: DELETE archetype_card_stats WHERE archetype_id = ?, window_days = ?
+        DB->>DB: INSERT ArchetypeCardStat[] (chunked, size 200)
+        DB->>DB: COMMIT
+    end
+
+    Job-->>Admin/Cron: CardStatsJobResult {computedAt, windows, archetypesProcessed, archetypesSkipped, rowsWritten, listsWithoutData, dryRun}
+```
+
+The job runs separately from `syncMeta` (no direct coupling). Both rows in a single
+(archetype, window) are written atomically, guaranteeing readers never see a
+partially-computed state. `computedAt` marks the point in time the run occurred;
+the UI surfaces this alongside each card's delta so users understand freshness.
+
+Archetype-window pairs with fewer than 8 usable lists are skipped entirely
+(no rows written, reported in `archetypesSkipped`). Listings without `decklist`
+or `placing` are dropped and tallied in `listsWithoutData`.
+
+---
+
+## Deck Comparison with Performance Deltas (Spec 5)
+
+The existing deck-comparison fetch (Limitless-based) is now extended with server-side
+precomputed deltas:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant DeckComparisonPanel
+    participant Store as dashboardStore
+    participant DeckComp as deckComparison.ts
+    participant API as GET /api/meta/archetypes/:id/card-stats
+    participant Limitless as play.limitlesstcg.com
+    participant Engine as @pokekon/shared
+
+    User->>DeckComparisonPanel: Click "Compare vs. Tournament"
+    DeckComparisonPanel->>Store: runDeckComparison()
+
+    par
+        Store->>DeckComp: fetchArchetypeComparison(slug, deckCards)
+        DeckComp->>Limitless: GET /api/tournaments, /standings
+        Limitless-->>DeckComp: Decklists + card frequency
+        DeckComp-->>Store: ComparisonResult {suggestedAdds, suggestedRemoves, countAdjustments}
+    and
+        Store->>API: fetchArchetypeCardStats(slug, days?)
+        API->>API: snapCardStatsWindow(days) → nearest precomputed window
+        DB-->>API: archetype_card_stats rows
+        API-->>Store: ArchetypeCardStatsResponse {cards[], computedAt, windowDays, listsAnalyzed}
+    end
+
+    Store->>DeckComp: attachCardDeltas(comparisonResult, cardStats)
+    DeckComp->>Engine: For each card: find matching server stats by normalizeCardName()
+    Engine->>Engine: Copy delta/tier onto the card object (in-place)
+    DeckComp-->>Store: ComparisonResult {suggestedAdds [with delta/tier], ...}
+    Store-->>DeckComparisonPanel: comparisonResult + cardStatsSource
+    DeckComparisonPanel-->>User: Show both signals: frequency bar + delta bar, separate source labels
+```
+
+The two fetches run in parallel; if the delta-fetch fails (old server, cold start, network error),
+the comparison still succeeds with `delta` and `tier` undefined on each card. The
+`cardStatsSource` field documents provenance (window, `computedAt`, `listsAnalyzed`)
+separately from the frequency data so both sources are always visible and distinct.
+
+---
+
+## Recommendation Rule 2 with Card Deltas (Spec 5)
+
+Rule 2 (weak matchup) is enriched when card performance deltas are available:
+
+```mermaid
+sequenceDiagram
+    participant Store as dashboardStore
+    participant Hook as useRecommendations
+    participant RecPage as RecommendationsPage
+
+    RecPage->>Store: Read archetypeStats, deckCards, cardStats
+    RecPage->>Hook: useRecommendations({..., cardDeltas: cardStats})
+
+    Hook->>Hook: Rule 2: Weak matchup check (≥5 encounters, ≤50% WR)
+    Note over Hook: If cardDeltas provided and not empty:
+    Hook->>Hook: Filter cardDeltas to tier='hiddenGem' or 'confirmed'
+    Hook->>Hook: Exclude cards already in deckCards (by normalizeCardName)
+    Hook->>Hook: Sort by deltaPp desc, then inclusionPct desc
+    Hook->>Hook: Take top 2 cards
+    Hook->>Hook: Append text: "In your archetype, [Card1] (+Xpp, 95% Y–Z) and [Card2] (+Aap, 95% B–C) correlate with better placements; you play neither."
+    Note over Hook: Archetype-wide correlation claim, never matchup-specific
+
+    Hook-->>RecPage: DeckRecommendation (same priority/id/category as before, enriched reasoning)
+```
+
+The enrichment is purely textual — it does not change priority, category, or data points.
+The statement is always correlational ("correlate with"), never causal ("help against" the opponent archetype).
+If no qualifying cards exist, the rule produces the original reasoning (frequency-based pointer to List Comparison).
+
+---
+
 ## Deck Analytics Read Path
 
 ```mermaid

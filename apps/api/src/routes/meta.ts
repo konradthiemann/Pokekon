@@ -24,6 +24,7 @@ import {
   tournaments,
 } from '../db/schema.js';
 import { runMetaSync } from '../jobs/syncMeta.js';
+import { loadCardStats } from '../lib/cardStatsData.js';
 import { ensureMatchups } from '../lib/matchupData.js';
 import { rateLimit } from '../lib/rateLimit.js';
 import { windowStartDays } from '../lib/timeWindow.js';
@@ -31,7 +32,9 @@ import type { ApiEnv } from '../middleware/session.js';
 import {
   archetypeIdParamSchema,
   archetypeListsQuerySchema,
+  cardStatsQuerySchema,
   metaWindowQuerySchema,
+  snapCardStatsWindow,
 } from '../validation.js';
 
 interface WindowAggregates {
@@ -65,7 +68,7 @@ export interface MetaWindow {
  *  count — the metashare and win rate then mirror local Challenge/Cup play.
  *  The date condition is unconditional, so the array is never empty and
  *  `and(...windowConditions(w))` can never collapse to an unfiltered query. */
-function windowConditions({ days, online, bo1 }: MetaWindow) {
+export function windowConditions({ days, online, bo1 }: MetaWindow) {
   const conds = [gte(tournaments.date, windowStartDays(days))];
   if (online) conds.push(eq(tournaments.isOnline, true));
   if (bo1) conds.push(eq(tournaments.swissMode, 'BO1'));
@@ -548,6 +551,36 @@ export function createMetaRoutes(): Hono<ApiEnv> {
       totalRanked: scores.length,
       listsAvailable: listsRow[0]?.total ?? 0,
       trend,
+    });
+  });
+
+  // GET /api/meta/archetypes/:archetypeId/card-stats?days — precomputed
+  // per-card performance deltas for one archetype (plan §3.6, step 9). Reads
+  // ONLY (jobs/computeCardStats.ts writes archetype_card_stats); `days` is
+  // snapped to the nearest precomputed window, and an archetype that was
+  // never computed serves 200 with `cards: []`/`computedAt: null` (cold
+  // start, no 404 — same reasoning as every other /api/meta/* reader).
+  // Scope is always the default online-Bo1 scope (plan section 5), so unlike
+  // the sibling routes above there is no online/bo1 query param here.
+  routes.get('/archetypes/:archetypeId/card-stats', async (c) => {
+    const archetypeId = archetypeIdParamSchema.safeParse(c.req.param('archetypeId'));
+    if (!archetypeId.success) return c.json({ error: 'Invalid archetype id' }, 400);
+    const parsedQuery = cardStatsQuerySchema.safeParse(c.req.query());
+    if (!parsedQuery.success) {
+      return c.json({ error: 'Invalid query parameters', issues: parsedQuery.error.issues }, 400);
+    }
+    const windowDays = snapCardStatsWindow(parsedQuery.data.days);
+
+    const batch = await loadCardStats(c.get('db'), archetypeId.data, windowDays);
+
+    return c.json({
+      archetypeId: archetypeId.data,
+      windowDays: batch.windowDays,
+      online: true,
+      bo1: true,
+      computedAt: batch.computedAt?.toISOString() ?? null,
+      listsAnalyzed: batch.listsAnalyzed,
+      cards: batch.cards,
     });
   });
 

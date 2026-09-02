@@ -168,6 +168,38 @@ export const archetypeListsQuerySchema = metaWindowQuerySchema.extend({
   offset: z.coerce.number().int().min(0).max(1000).default(0),
 });
 
+// ─── Card performance deltas (plan §3.5/§3.6) ─────────────────────────────────
+
+/** The only windows jobs/computeCardStats.ts precomputes; a read `days` value
+ *  is always snapped (below) to one of these. */
+export const CARD_STATS_WINDOWS = [7, 14, 21, 28] as const;
+
+export const cardStatsQuerySchema = z.object({
+  days: z.coerce
+    .number()
+    .int()
+    .min(META_WINDOW_MIN_DAYS)
+    .max(META_WINDOW_MAX_DAYS)
+    .default(META_WINDOW_DEFAULT_DAYS),
+});
+
+/** Nearest precomputed window; an exact tie goes to the LARGER window (more
+ *  data). At integer `days` and 7-day spacing an exact tie is unreachable via
+ *  the query (the midpoints are all *.5) — this rule is defensive, not dead
+ *  code, and is a direct property of the function itself. */
+export function snapCardStatsWindow(days: number): number {
+  let nearest: number = CARD_STATS_WINDOWS[0];
+  let nearestDistance = Math.abs(days - nearest);
+  for (const window of CARD_STATS_WINDOWS) {
+    const distance = Math.abs(days - window);
+    if (distance < nearestDistance || (distance === nearestDistance && window > nearest)) {
+      nearest = window;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
+
 // ─── LLM analysis (B6) ────────────────────────────────────────────────────────
 
 /**

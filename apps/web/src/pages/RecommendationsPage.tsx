@@ -17,6 +17,7 @@ export function RecommendationsPage() {
     localMeta,
     activeDeckId,
     activeDeck,
+    cardStats,
   } = useDashboardStore();
   const playerName = localStorage.getItem('tcg-player-name') ?? '';
 
@@ -37,6 +38,7 @@ export function RecommendationsPage() {
     deckSnapshots,
     localMeta,
     deckStats,
+    cardDeltas: cardStats,
   });
 
   const highCount = recommendations.filter((r) => r.priority === 'high').length;

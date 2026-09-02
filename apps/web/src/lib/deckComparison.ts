@@ -1,5 +1,7 @@
 import i18n from '../i18n';
 import type { DeckCard } from '../types';
+import { normalizeCardName } from '@pokekon/shared';
+import type { ArchetypeCardStat, CardPerformanceDelta, CardSignalTier } from '@pokekon/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -16,6 +18,14 @@ export interface CardStat {
   inUserDeck: boolean;
   /** How many copies the user runs */
   userCount: number;
+  /** Precomputed performance delta from our own DB (plan
+   *  .claude/plans/recommendation-to-prognosis.md §3.7). undefined = no
+   *  server data for this card (different tournament population, cold
+   *  start, older server). Attached additively by `attachCardDeltas`,
+   *  never computed here. */
+  delta?: CardPerformanceDelta;
+  /** Signal classification. undefined when `delta` is undefined. */
+  tier?: CardSignalTier;
 }
 
 export interface ComparisonResult {
@@ -31,6 +41,15 @@ export interface ComparisonResult {
   /** Cards where user count differs from typical by ≥1 (freq >= 50%) */
   countAdjustments: { name: string; userCount: number; typicalCount: number; diff: number }[];
   fetchedAt: Date;
+  /** Provenance of the delta signal — deliberately SEPARATE from the
+   *  frequency numbers above, which come from a different tournament
+   *  population (plan section 6, risk 5). null/undefined when no delta
+   *  data has been attached. */
+  cardStatsSource?: {
+    computedAt: string | null;
+    windowDays: number;
+    listsAnalyzed: number;
+  } | null;
 }
 
 // ─── Fetch helper ─────────────────────────────────────────────────────────────
@@ -277,4 +296,41 @@ export async function fetchArchetypeComparison(
     countAdjustments,
     fetchedAt: new Date(),
   };
+}
+
+// ─── Delta join (plan .claude/plans/recommendation-to-prognosis.md §3.7) ──────
+
+/**
+ * Pure join: attaches precomputed server-side card-performance deltas to an
+ * existing ComparisonResult by normalised card name. Never removes, reorders
+ * or recomputes anything that `fetchArchetypeComparison` produced —
+ * `suggestedAdds`/`suggestedRemoves`/`countAdjustments` keep their existing
+ * frequency-based membership untouched, because they were built by filtering
+ * the SAME `cardStats` array: mutating each matched `CardStat` in place (not
+ * rebuilding any array) is what makes the delta land on the identical object
+ * instance wherever it is referenced. Cards with no matching server row are
+ * returned unchanged (`delta`/`tier` stay undefined). No I/O, so it is
+ * unit-testable without a network.
+ */
+export function attachCardDeltas(
+  result: ComparisonResult,
+  stats: ArchetypeCardStat[],
+  source: NonNullable<ComparisonResult['cardStatsSource']>,
+): ComparisonResult {
+  const byName = new Map<string, ArchetypeCardStat>();
+  for (const stat of stats) {
+    byName.set(normalizeCardName(stat.cardName), stat);
+  }
+
+  for (const card of result.cardStats) {
+    const match = byName.get(normalizeCardName(card.name));
+    if (!match) continue;
+    // `delta` is null only for mathematical undefinedness (empty group) on
+    // the server side — the client type keeps that case as `undefined`
+    // rather than widening CardStat.delta to accept `null` too.
+    card.delta = match.delta ?? undefined;
+    card.tier = match.tier;
+  }
+
+  return { ...result, cardStatsSource: source };
 }

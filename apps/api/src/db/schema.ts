@@ -13,7 +13,12 @@ import {
   date,
   check,
 } from 'drizzle-orm/pg-core';
-import { BEST_OF_VALUES, SWISS_MODE_VALUES } from '@pokekon/shared';
+import {
+  BEST_OF_VALUES,
+  SWISS_MODE_VALUES,
+  CARD_KIND_VALUES,
+  CARD_SIGNAL_TIER_VALUES,
+} from '@pokekon/shared';
 import type {
   ParsedTurn,
   PrizePoint,
@@ -423,6 +428,56 @@ export const matchLogParsed = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index('match_log_parsed_userId_idx').on(table.userId)],
+);
+
+// ─── Per-archetype card performance deltas (plan §3.5) ───────────────────────
+// Precomputed by jobs/computeCardStats.ts, one row per (archetype, card, window).
+// Full-replace per (archetypeId, windowDays) on every job run — see the job's
+// doc comment for why (Postgres cache pattern, not a materialized view: the
+// actual statistics live in @pokekon/shared, see the plan). Scope is always
+// the default online-Bo1 scope (plan section 5).
+
+export const archetypeCardStats = pgTable(
+  'archetype_card_stats',
+  {
+    id: serial('id').primaryKey(),
+    archetypeId: text('archetype_id').notNull(),
+    /** normalizeCardName() key — the join key to the client's card list. */
+    cardKey: text('card_key').notNull(),
+    /** Display spelling as seen in the source lists. */
+    cardName: text('card_name').notNull(),
+    cardType: text('card_type', { enum: CARD_KIND_VALUES }).notNull(),
+    /** Analysis window in days (7 | 14 | 21 | 28). Scope is always the default
+     *  online-Bo1 scope — see plan section 5. */
+    windowDays: integer('window_days').notNull(),
+    listsAnalyzed: integer('lists_analyzed').notNull(),
+    listsWith: integer('lists_with').notNull(),
+    inclusionPct: real('inclusion_pct').notNull(),
+    avgCount: real('avg_count').notNull(),
+    /** All delta columns are nullable TOGETHER: null = a group was empty. */
+    superiorityPct: real('superiority_pct'),
+    deltaPp: real('delta_pp'),
+    lowPct: real('low_pct'),
+    highPct: real('high_pct'),
+    effectiveN: real('effective_n'),
+    meanPercentileWithPct: real('mean_percentile_with_pct'),
+    meanPercentileWithoutPct: real('mean_percentile_without_pct'),
+    significant: boolean('significant').notNull().default(false),
+    tier: text('tier', { enum: CARD_SIGNAL_TIER_VALUES }).notNull(),
+    computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('archetype_card_stats_uq').on(table.archetypeId, table.cardKey, table.windowDays),
+    index('archetype_card_stats_lookup_idx').on(table.archetypeId, table.windowDays),
+    check(
+      'archetype_card_stats_type_chk',
+      sql`${table.cardType} in ('pokemon','trainer','energy')`,
+    ),
+    check(
+      'archetype_card_stats_tier_chk',
+      sql`${table.tier} in ('insufficient','confirmed','hiddenGem','popularityParadox','discouraged','neutral')`,
+    ),
+  ],
 );
 
 export const decksRelations = relations(decks, ({ one, many }) => ({

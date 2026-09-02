@@ -24,9 +24,9 @@ import {
   copyDeckCards,
 } from '../db/queries';
 import { fetchRecentTournaments } from '../lib/metaFetch';
-import { ApiError } from '../lib/api';
-import type { MetaSyncResult } from '@pokekon/shared';
-import { fetchArchetypeComparison } from '../lib/deckComparison';
+import { ApiError, fetchArchetypeCardStats } from '../lib/api';
+import type { ArchetypeCardStat, MetaSyncResult } from '@pokekon/shared';
+import { attachCardDeltas, fetchArchetypeComparison } from '../lib/deckComparison';
 import type { ComparisonResult } from '../lib/deckComparison';
 import {
   getLocalMeta,
@@ -36,6 +36,15 @@ import {
   getActiveDeckId,
   setActiveDeckId,
 } from '../lib/preferences';
+
+// `loadCardStats` can be in flight from two independent, network-timing-
+// dependent callers at once (`refresh()` on an archetype switch,
+// `runDeckComparison()` after its own slower fetch) — whichever HTTP
+// response resolves LAST would otherwise silently win, even if it was
+// issued FIRST (i.e. it's for a now-stale archetype). This sequence number
+// lets each call recognise when a newer call has superseded it, so the most
+// recently ISSUED call always wins, never the most recently RESOLVED one.
+let cardStatsRequestSeq = 0;
 
 interface DashboardState {
   // Data
@@ -60,6 +69,14 @@ interface DashboardState {
   isComparing: boolean;
   compareProgress: string;
   compareError: string | null;
+
+  // Precomputed card deltas (plan .claude/plans/recommendation-to-prognosis.md
+  // §3.7). Auto-loaded alongside the comparison — the whole point of the
+  // server-side precomputation (spec decision 3: "sofort verfuegbar") is that
+  // no separate click is required.
+  cardStats: ArchetypeCardStat[];
+  cardStatsSource: ComparisonResult['cardStatsSource'];
+  isLoadingCardStats: boolean;
 
   // UI state
   isLoading: boolean;
@@ -89,6 +106,11 @@ interface DashboardState {
   setLocalMeta: (archetypes: string[]) => void;
   setDeckArchSlug: (slug: string) => void;
   runDeckComparison: () => Promise<void>;
+  /** Loads precomputed card deltas for one archetype. A failure never throws
+   *  — it clears `cardStats`/`cardStatsSource` and leaves everything else
+   *  (notably `comparisonResult`/`compareError`) untouched, so a broken
+   *  delta endpoint can never fail the whole comparison. */
+  loadCardStats: (archetypeSlug: string) => Promise<void>;
   // Deck management
   setActiveDeck: (id: number) => Promise<void>;
   createNewDeck: (archetype: string, archetypeName: string, variant: string) => Promise<number>;
@@ -119,6 +141,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   isComparing: false,
   compareProgress: '',
   compareError: null,
+  cardStats: [],
+  cardStatsSource: null,
+  isLoadingCardStats: false,
   isLoading: false,
   lastRefreshed: null,
   activeTab: 'overview',
@@ -153,7 +178,22 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         if (activeDeckId) setActiveDeckId(activeDeckId);
       }
 
+      const previousArchetype = get().activeDeck?.archetype;
       const activeDeck = decks.find((d) => d.id === activeDeckId) ?? null;
+
+      // Precomputed card deltas are server-side and instant (plan
+      // recommendation-to-prognosis §3.7/decision 3: "sofort verfuegbar",
+      // no click required) — auto-load them whenever the active archetype
+      // actually changes, not on every unrelated refresh. loadCardStats only
+      // depends on the archetype slug (already known here), so it runs
+      // alongside the other fetches below instead of after them — awaiting
+      // it as a separate step would add an unrelated network round-trip to
+      // every refresh() caller. It never fails `refresh()`: loadCardStats
+      // already catches and reports its own errors.
+      const cardStatsPromise =
+        activeDeck && activeDeck.archetype !== previousArchetype
+          ? get().loadCardStats(activeDeck.archetype)
+          : Promise.resolve();
 
       const [deckCards, deckSnapshots, opponentLogs, metaSnapshots, archetypeStats] =
         await Promise.all([
@@ -162,6 +202,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           getOpponentLogs(), // all logs for global archetype stats
           getLatestMetaSnapshots(),
           getArchetypeStats(),
+          cardStatsPromise,
         ]);
 
       set({
@@ -176,6 +217,16 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         lastRefreshed: new Date(),
         isLoading: false,
       });
+
+      if (!activeDeck && previousArchetype !== undefined) {
+        // The active deck was removed (e.g. the user deleted their last
+        // deck) — the previous archetype's deltas no longer apply to
+        // anything and must not linger for Rule 2 to keep reading.
+        // Bumping the sequence also discards any load still in flight for
+        // the deck that just disappeared.
+        cardStatsRequestSeq++;
+        set({ cardStats: [], cardStatsSource: null });
+      }
     } catch (err) {
       console.error('[DashboardStore] refresh failed:', err);
       set({ isLoading: false });
@@ -314,16 +365,51 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       compareProgress: i18n.t('layout:compare.starting'),
     });
     try {
-      const result = await fetchArchetypeComparison(slug, deckCards, (msg) =>
-        set({ compareProgress: msg }),
-      );
-      set({ comparisonResult: result, isComparing: false, compareProgress: '' });
+      // Run concurrently — loadCardStats only depends on `slug`, not on the
+      // comparison result, so awaiting it after fetchArchetypeComparison
+      // would add an unrelated network round-trip to every comparison run.
+      // loadCardStats never throws — its own try/catch keeps a delta-fetch
+      // failure from ever reaching (and failing) this comparison run.
+      const [result] = await Promise.all([
+        fetchArchetypeComparison(slug, deckCards, (msg) => set({ compareProgress: msg })),
+        get().loadCardStats(slug),
+      ]);
+      const { cardStats, cardStatsSource } = get();
+      const finalResult = cardStatsSource
+        ? attachCardDeltas(result, cardStats, cardStatsSource)
+        : result;
+      set({ comparisonResult: finalResult, isComparing: false, compareProgress: '' });
     } catch (err) {
       set({
         isComparing: false,
         compareProgress: '',
         compareError: err instanceof Error ? err.message : i18n.t('layout:compare.failed'),
       });
+    }
+  },
+
+  loadCardStats: async (archetypeSlug) => {
+    const requestId = ++cardStatsRequestSeq;
+    set({ isLoadingCardStats: true });
+    try {
+      const response = await fetchArchetypeCardStats(archetypeSlug);
+      // A newer call was issued while this one was in flight — its result
+      // already won (or will), so applying this stale response now would
+      // silently overwrite it. Discard.
+      if (requestId !== cardStatsRequestSeq) return;
+      set({
+        cardStats: response.cards,
+        cardStatsSource: {
+          computedAt: response.computedAt,
+          windowDays: response.windowDays,
+          listsAnalyzed: response.listsAnalyzed,
+        },
+        isLoadingCardStats: false,
+      });
+    } catch (err) {
+      if (requestId !== cardStatsRequestSeq) return;
+      console.warn('[DashboardStore] loadCardStats failed:', err);
+      set({ cardStats: [], cardStatsSource: null, isLoadingCardStats: false });
     }
   },
 }));
