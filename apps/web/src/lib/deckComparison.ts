@@ -198,6 +198,10 @@ export async function fetchArchetypeComparison(
   const statsMap = new Map<string, RawStat>();
 
   for (const list of allLists) {
+    // A card can appear as more than one printing (different set/number)
+    // within the same list — that must count as ONE inclusion for this
+    // list, with copies summed, or frequency can exceed 100%.
+    const countedInThisList = new Set<string>();
     for (const c of list.cards) {
       const s = statsMap.get(c.name) ?? {
         cardType: c.cardType,
@@ -207,16 +211,23 @@ export async function fetchArchetypeComparison(
         topCount: 0,
       };
       s.totalCount += c.count;
-      s.listsCount++;
+      if (!countedInThisList.has(c.name)) {
+        s.listsCount++;
+        countedInThisList.add(c.name);
+      }
       statsMap.set(c.name, s);
     }
   }
   for (const list of topListsToUse) {
+    const countedInThisList = new Set<string>();
     for (const c of list.cards) {
       const s = statsMap.get(c.name);
       if (s) {
         s.topTotal += c.count;
-        s.topCount++;
+        if (!countedInThisList.has(c.name)) {
+          s.topCount++;
+          countedInThisList.add(c.name);
+        }
       }
     }
   }
