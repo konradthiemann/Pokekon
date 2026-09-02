@@ -17,6 +17,7 @@ export function RecommendationsPage() {
     localMeta,
     activeDeckId,
     activeDeck,
+    cardStats,
   } = useDashboardStore();
   const playerName = localStorage.getItem('tcg-player-name') ?? '';
 
@@ -37,10 +38,7 @@ export function RecommendationsPage() {
     deckSnapshots,
     localMeta,
     deckStats,
-    // TODO(Slice C, plan §3.7): dashboardStore doesn't expose a card-delta
-    // field yet. Wire this to the real store field once Slice C lands so
-    // Rule 2's card-delta enrichment (plan §3.8) is fed live data.
-    cardDeltas: undefined,
+    cardDeltas: cardStats,
   });
 
   const highCount = recommendations.filter((r) => r.priority === 'high').length;

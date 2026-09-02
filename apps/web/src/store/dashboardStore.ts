@@ -169,6 +169,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         if (activeDeckId) setActiveDeckId(activeDeckId);
       }
 
+      const previousArchetype = get().activeDeck?.archetype;
       const activeDeck = decks.find((d) => d.id === activeDeckId) ?? null;
 
       const [deckCards, deckSnapshots, opponentLogs, metaSnapshots, archetypeStats] =
@@ -192,6 +193,18 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         lastRefreshed: new Date(),
         isLoading: false,
       });
+
+      // Precomputed card deltas are server-side and instant (plan
+      // recommendation-to-prognosis §3.7/decision 3: "sofort verfuegbar",
+      // no click required) — auto-load them whenever the active archetype
+      // actually changes, not on every unrelated refresh. Awaited (not
+      // fire-and-forget) for determinism, but it never fails `refresh()`:
+      // loadCardStats already catches and reports its own errors, and the
+      // main `isLoading` flag above is already false by this point, so it
+      // doesn't hold up the rest of the UI.
+      if (activeDeck && activeDeck.archetype !== previousArchetype) {
+        await get().loadCardStats(activeDeck.archetype);
+      }
     } catch (err) {
       console.error('[DashboardStore] refresh failed:', err);
       set({ isLoading: false });

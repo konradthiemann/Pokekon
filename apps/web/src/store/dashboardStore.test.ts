@@ -29,14 +29,33 @@ vi.mock('../lib/api', async (importOriginal) => {
   return { ...actual, fetchArchetypeCardStats: vi.fn() };
 });
 
+// Automocked for the `refresh()`/auto-load-on-archetype-change tests below —
+// `refresh()` pulls decks/cards/snapshots/logs from IndexedDB via this
+// module, which vitest/jsdom can't do for real.
+vi.mock('../db/queries');
+
 import { useDashboardStore } from './dashboardStore';
 import { fetchArchetypeComparison } from '../lib/deckComparison';
 import type { ComparisonResult } from '../lib/deckComparison';
 import { fetchArchetypeCardStats } from '../lib/api';
+import {
+  getDecks,
+  getDeckCards,
+  getDeckSnapshots,
+  getOpponentLogs,
+  getLatestMetaSnapshots,
+  getArchetypeStats,
+} from '../db/queries';
 import type { Deck } from '../types';
 
 const mockedFetchComparison = vi.mocked(fetchArchetypeComparison);
 const mockedFetchCardStats = vi.mocked(fetchArchetypeCardStats);
+const mockedGetDecks = vi.mocked(getDecks);
+const mockedGetDeckCards = vi.mocked(getDeckCards);
+const mockedGetDeckSnapshots = vi.mocked(getDeckSnapshots);
+const mockedGetOpponentLogs = vi.mocked(getOpponentLogs);
+const mockedGetLatestMetaSnapshots = vi.mocked(getLatestMetaSnapshots);
+const mockedGetArchetypeStats = vi.mocked(getArchetypeStats);
 
 const DECK: Deck = {
   id: 1,
@@ -73,9 +92,31 @@ const CARD_STATS: ArchetypeCardStat[] = [
   },
 ];
 
+const DECK_A: Deck = {
+  id: 1,
+  archetype: 'dragapult-ex',
+  archetypeName: 'Dragapult ex',
+  variant: 'Standard',
+  createdAt: '2026-01-01T00:00:00.000Z',
+};
+
+const DECK_B: Deck = {
+  id: 2,
+  archetype: 'gardevoir-ex',
+  archetypeName: 'Gardevoir ex',
+  variant: 'Standard',
+  createdAt: '2026-01-02T00:00:00.000Z',
+};
+
 beforeEach(() => {
   mockedFetchComparison.mockReset();
   mockedFetchCardStats.mockReset();
+  mockedGetDecks.mockReset();
+  mockedGetDeckCards.mockReset().mockResolvedValue([]);
+  mockedGetDeckSnapshots.mockReset().mockResolvedValue([]);
+  mockedGetOpponentLogs.mockReset().mockResolvedValue([]);
+  mockedGetLatestMetaSnapshots.mockReset().mockResolvedValue([]);
+  mockedGetArchetypeStats.mockReset().mockResolvedValue([]);
   // Reset the relevant store slice before every test — the store is a
   // module-level singleton shared across tests in this file.
   useDashboardStore.setState({
@@ -87,6 +128,7 @@ beforeEach(() => {
     cardStatsSource: null,
     isLoadingCardStats: false,
     activeDeck: null,
+    activeDeckId: null,
     deckArchSlug: '',
     deckCards: [],
   } as never);
@@ -182,5 +224,81 @@ describe('dashboardStore.runDeckComparison tolerates a delta-fetch failure (plan
     // side of the try/catch contract, not a crash, and not the stale
     // sentinel surviving because nothing ran.
     expect(state.cardStats).toEqual([]);
+  });
+});
+
+describe('dashboardStore.refresh auto-loads card deltas on archetype change (plan §3.7)', () => {
+  it('loads card deltas for the active deck archetype on first refresh (no click required)', async () => {
+    mockedGetDecks.mockResolvedValue([DECK_A]);
+    mockedFetchCardStats.mockResolvedValueOnce({
+      archetypeId: 'dragapult-ex',
+      windowDays: 14,
+      online: true,
+      bo1: true,
+      computedAt: '2026-06-01T00:00:00.000Z',
+      listsAnalyzed: 20,
+      cards: CARD_STATS,
+    });
+
+    await useDashboardStore.getState().refresh();
+
+    expect(mockedFetchCardStats).toHaveBeenCalledWith('dragapult-ex');
+    expect(useDashboardStore.getState().cardStats).toEqual(CARD_STATS);
+  });
+
+  it('reloads card deltas when the active deck switches to a different archetype', async () => {
+    mockedGetDecks.mockResolvedValue([DECK_A, DECK_B]);
+    mockedFetchCardStats.mockResolvedValue({
+      archetypeId: 'dragapult-ex',
+      windowDays: 14,
+      online: true,
+      bo1: true,
+      computedAt: '2026-06-01T00:00:00.000Z',
+      listsAnalyzed: 20,
+      cards: CARD_STATS,
+    });
+    useDashboardStore.setState({ activeDeckId: 1 });
+    await useDashboardStore.getState().refresh();
+    expect(mockedFetchCardStats).toHaveBeenCalledTimes(1);
+
+    mockedFetchCardStats.mockClear();
+    useDashboardStore.setState({ activeDeckId: 2 });
+    await useDashboardStore.getState().refresh();
+
+    expect(mockedFetchCardStats).toHaveBeenCalledWith('gardevoir-ex');
+  });
+
+  it('does not re-fetch card deltas on a refresh that keeps the same archetype', async () => {
+    mockedGetDecks.mockResolvedValue([DECK_A]);
+    mockedFetchCardStats.mockResolvedValue({
+      archetypeId: 'dragapult-ex',
+      windowDays: 14,
+      online: true,
+      bo1: true,
+      computedAt: '2026-06-01T00:00:00.000Z',
+      listsAnalyzed: 20,
+      cards: CARD_STATS,
+    });
+    useDashboardStore.setState({ activeDeckId: 1 });
+    await useDashboardStore.getState().refresh();
+    expect(mockedFetchCardStats).toHaveBeenCalledTimes(1);
+
+    mockedFetchCardStats.mockClear();
+    // Unrelated re-refresh (e.g. after a card-count edit) — same deck, same
+    // archetype. loadCardStats already exists to serve fresh data on demand;
+    // re-triggering it on every unrelated refresh would just be wasted
+    // network traffic for data that hasn't gone stale.
+    await useDashboardStore.getState().refresh();
+
+    expect(mockedFetchCardStats).not.toHaveBeenCalled();
+  });
+
+  it('does not attempt to load card deltas when there is no active deck', async () => {
+    mockedGetDecks.mockResolvedValue([]);
+
+    await useDashboardStore.getState().refresh();
+
+    expect(mockedFetchCardStats).not.toHaveBeenCalled();
+    expect(useDashboardStore.getState().activeDeck).toBeNull();
   });
 });
