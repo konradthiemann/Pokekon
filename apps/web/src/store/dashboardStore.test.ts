@@ -329,6 +329,93 @@ describe('dashboardStore.refresh auto-loads card deltas on archetype change (pla
   });
 });
 
+describe('dashboardStore.refresh runs loadCardStats concurrently with the other fetches', () => {
+  // Code review finding on the recommendation-to-prognosis branch
+  // (2026-09-02): loadCardStats only depends on the archetype slug, which is
+  // already known before the decks/cards/snapshots/logs Promise.all starts —
+  // awaiting it AFTER that Promise.all (as a separate step) adds a full
+  // unrelated network round-trip to every refresh() caller, including ones
+  // with no interest in card stats (e.g. WelcomeScreen's startDemo()).
+  it('issues the card-stats fetch before the other refresh fetches resolve, not after', async () => {
+    mockedGetDecks.mockResolvedValue([DECK_A]);
+
+    let resolveDeckCards!: (value: Awaited<ReturnType<typeof getDeckCards>>) => void;
+    mockedGetDeckCards.mockReset().mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveDeckCards = resolve;
+      }),
+    );
+
+    let resolveCardStats!: (value: Awaited<ReturnType<typeof fetchArchetypeCardStats>>) => void;
+    mockedFetchCardStats.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveCardStats = resolve;
+      }),
+    );
+
+    const refreshPromise = useDashboardStore.getState().refresh();
+
+    // Flush pending microtasks WITHOUT resolving the deck-cards fetch — if
+    // the card-stats fetch only fires after the Promise.all resolves, it
+    // cannot have been called yet at this point.
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockedFetchCardStats).toHaveBeenCalledWith('dragapult-ex');
+
+    resolveDeckCards([]);
+    resolveCardStats({
+      archetypeId: 'dragapult-ex',
+      windowDays: 14,
+      online: true,
+      bo1: true,
+      computedAt: '2026-06-01T00:00:00.000Z',
+      listsAnalyzed: 20,
+      cards: CARD_STATS,
+    });
+
+    await refreshPromise;
+
+    expect(useDashboardStore.getState().cardStats).toEqual(CARD_STATS);
+  });
+});
+
+describe('dashboardStore.runDeckComparison runs loadCardStats concurrently with the comparison fetch', () => {
+  it('issues the card-stats fetch before the comparison fetch resolves, not after', async () => {
+    useDashboardStore.setState({ activeDeck: DECK, deckArchSlug: 'dragapult-ex', deckCards: [] });
+
+    let resolveComparison!: (value: Awaited<ReturnType<typeof fetchArchetypeComparison>>) => void;
+    mockedFetchComparison.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveComparison = resolve;
+      }),
+    );
+    mockedFetchCardStats.mockResolvedValueOnce({
+      archetypeId: 'dragapult-ex',
+      windowDays: 14,
+      online: true,
+      bo1: true,
+      computedAt: '2026-06-01T00:00:00.000Z',
+      listsAnalyzed: 20,
+      cards: CARD_STATS,
+    });
+
+    const runPromise = useDashboardStore.getState().runDeckComparison();
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockedFetchCardStats).toHaveBeenCalledWith('dragapult-ex');
+
+    resolveComparison(comparisonResult());
+    await runPromise;
+
+    expect(useDashboardStore.getState().comparisonResult?.archetypeSlug).toBe('dragapult-ex');
+  });
+});
+
 describe('dashboardStore.loadCardStats discards a stale, out-of-order response', () => {
   // Two independent, network-timing-dependent callers (refresh() on an
   // archetype switch, runDeckComparison() after its own slower fetch) can

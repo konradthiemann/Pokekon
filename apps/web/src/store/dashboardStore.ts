@@ -181,6 +181,20 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const previousArchetype = get().activeDeck?.archetype;
       const activeDeck = decks.find((d) => d.id === activeDeckId) ?? null;
 
+      // Precomputed card deltas are server-side and instant (plan
+      // recommendation-to-prognosis §3.7/decision 3: "sofort verfuegbar",
+      // no click required) — auto-load them whenever the active archetype
+      // actually changes, not on every unrelated refresh. loadCardStats only
+      // depends on the archetype slug (already known here), so it runs
+      // alongside the other fetches below instead of after them — awaiting
+      // it as a separate step would add an unrelated network round-trip to
+      // every refresh() caller. It never fails `refresh()`: loadCardStats
+      // already catches and reports its own errors.
+      const cardStatsPromise =
+        activeDeck && activeDeck.archetype !== previousArchetype
+          ? get().loadCardStats(activeDeck.archetype)
+          : Promise.resolve();
+
       const [deckCards, deckSnapshots, opponentLogs, metaSnapshots, archetypeStats] =
         await Promise.all([
           getDeckCards(activeDeckId ?? undefined),
@@ -188,6 +202,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           getOpponentLogs(), // all logs for global archetype stats
           getLatestMetaSnapshots(),
           getArchetypeStats(),
+          cardStatsPromise,
         ]);
 
       set({
@@ -203,17 +218,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         isLoading: false,
       });
 
-      // Precomputed card deltas are server-side and instant (plan
-      // recommendation-to-prognosis §3.7/decision 3: "sofort verfuegbar",
-      // no click required) — auto-load them whenever the active archetype
-      // actually changes, not on every unrelated refresh. Awaited (not
-      // fire-and-forget) for determinism, but it never fails `refresh()`:
-      // loadCardStats already catches and reports its own errors, and the
-      // main `isLoading` flag above is already false by this point, so it
-      // doesn't hold up the rest of the UI.
-      if (activeDeck && activeDeck.archetype !== previousArchetype) {
-        await get().loadCardStats(activeDeck.archetype);
-      } else if (!activeDeck && previousArchetype !== undefined) {
+      if (!activeDeck && previousArchetype !== undefined) {
         // The active deck was removed (e.g. the user deleted their last
         // deck) — the previous archetype's deltas no longer apply to
         // anything and must not linger for Rule 2 to keep reading.
@@ -360,12 +365,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       compareProgress: i18n.t('layout:compare.starting'),
     });
     try {
-      const result = await fetchArchetypeComparison(slug, deckCards, (msg) =>
-        set({ compareProgress: msg }),
-      );
+      // Run concurrently — loadCardStats only depends on `slug`, not on the
+      // comparison result, so awaiting it after fetchArchetypeComparison
+      // would add an unrelated network round-trip to every comparison run.
       // loadCardStats never throws — its own try/catch keeps a delta-fetch
       // failure from ever reaching (and failing) this comparison run.
-      await get().loadCardStats(slug);
+      const [result] = await Promise.all([
+        fetchArchetypeComparison(slug, deckCards, (msg) => set({ compareProgress: msg })),
+        get().loadCardStats(slug),
+      ]);
       const { cardStats, cardStatsSource } = get();
       const finalResult = cardStatsSource
         ? attachCardDeltas(result, cardStats, cardStatsSource)
