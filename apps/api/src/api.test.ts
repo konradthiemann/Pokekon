@@ -2440,10 +2440,16 @@ describe('GET /api/meta/archetypes/:archetypeId/card-stats (plan §3.6, step 9)'
   it('serves cards[].delta and computedAt after a job run', async () => {
     await clearCardStatsTables();
     const players = 20;
+    // 5 of 8 lists include Ultra Ball, 3 don't — both delta groups must be
+    // non-empty for computeArchetypeCardStats to return a delta at all (plan
+    // §3.4: "4 Listen, alle mit 'Ultra Ball'" -> delta === null, a uniform
+    // 8/8 seed here would hit exactly that null case and this test would
+    // never be able to pass, regardless of the route/job wiring under test).
     const standings = Array.from({ length: 8 }, (_, i) =>
       cardStatsStanding('route-arch', {
         placing: i + 1,
-        decklist: decklistWithCard('Ultra Ball', 4),
+        decklist:
+          i < 5 ? decklistWithCard('Ultra Ball', 4) : { pokemon: [], trainer: [], energy: [] },
       }),
     );
     await seedCardStatsTournament('cs-route-1', cardStatsDaysAgo(1), players, standings);
