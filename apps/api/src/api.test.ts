@@ -2378,6 +2378,42 @@ describe('computeCardStats job (plan §3.6, step 7)', () => {
     expect(rows).toHaveLength(0);
   });
 
+  it('deletes previously written rows for an archetype that falls below minLists on a later run', async () => {
+    await clearCardStatsTables();
+    const players = 20;
+    const enoughStandings = Array.from({ length: 8 }, (_, i) =>
+      cardStatsStanding('shrink-arch', { placing: i + 1, decklist: decklistWithCard('Iono', 4) }),
+    );
+    await seedCardStatsTournament('cs-shrink-1', cardStatsDaysAgo(1), players, enoughStandings);
+
+    const first = await computeCardStats(db, { windows: [7], minLists: 8 });
+    expect(first.archetypesProcessed).toBe(1);
+    expect(first.rowsWritten).toBe(1);
+    const afterFirst = await db
+      .select()
+      .from(schema.archetypeCardStats)
+      .where(eq(schema.archetypeCardStats.archetypeId, 'shrink-arch'));
+    expect(afterFirst).toHaveLength(1);
+
+    // The archetype's meta share shrinks: its only tournament drops out and a
+    // new one gives it fewer than minLists usable lists.
+    await db.delete(schema.tournaments).where(eq(schema.tournaments.id, 'cs-shrink-1'));
+    const tooFewStandings = [1, 2, 3].map((placing) =>
+      cardStatsStanding('shrink-arch', { placing, decklist: decklistWithCard('Iono', 4) }),
+    );
+    await seedCardStatsTournament('cs-shrink-2', cardStatsDaysAgo(1), players, tooFewStandings);
+
+    const second = await computeCardStats(db, { windows: [7], minLists: 8 });
+    expect(second.archetypesSkipped).toBe(1);
+    expect(second.archetypesProcessed).toBe(0);
+
+    const afterSecond = await db
+      .select()
+      .from(schema.archetypeCardStats)
+      .where(eq(schema.archetypeCardStats.archetypeId, 'shrink-arch'));
+    expect(afterSecond).toHaveLength(0); // stale rows must be gone, not merely stale
+  });
+
   it('dryRun:true produces identical counters but writes nothing', async () => {
     await clearCardStatsTables();
     const players = 20;

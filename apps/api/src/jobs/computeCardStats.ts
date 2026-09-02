@@ -140,7 +140,8 @@ async function loadWindowEntries(
  *   3. Group by archetypeId; OTHER_ARCHETYPE_ID is skipped entirely — "other"
  *      is not a playable deck (mirrors routes/meta.ts's field-score filter).
  *   4. Archetypes below minLists usable lists → archetypesSkipped, no row
- *      written.
+ *      written; any existing (archetype, window) rows from an earlier run are
+ *      deleted so a shrinking archetype doesn't keep serving stale data.
  *   5. computeArchetypeCardStats(...) — the pure Slice-A engine.
  *   6. ONE computedAt for the whole run. Writes happen in one transaction per
  *      (archetype, window): DELETE + chunked INSERT (syncMeta.ts pattern), so
@@ -184,6 +185,19 @@ export async function computeCardStats(
 
       if (lists.length < minLists) {
         archetypesSkipped += 1;
+        // The archetype may have had >= minLists on an earlier run — its old
+        // rows for this window are now stale (not just outdated) and must not
+        // keep being served, so delete them rather than leaving them in place.
+        if (!dryRun) {
+          await db
+            .delete(archetypeCardStats)
+            .where(
+              and(
+                eq(archetypeCardStats.archetypeId, archetypeId),
+                eq(archetypeCardStats.windowDays, days),
+              ),
+            );
+        }
         continue;
       }
       archetypesProcessed += 1;
