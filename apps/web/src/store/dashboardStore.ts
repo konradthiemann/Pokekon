@@ -37,6 +37,15 @@ import {
   setActiveDeckId,
 } from '../lib/preferences';
 
+// `loadCardStats` can be in flight from two independent, network-timing-
+// dependent callers at once (`refresh()` on an archetype switch,
+// `runDeckComparison()` after its own slower fetch) — whichever HTTP
+// response resolves LAST would otherwise silently win, even if it was
+// issued FIRST (i.e. it's for a now-stale archetype). This sequence number
+// lets each call recognise when a newer call has superseded it, so the most
+// recently ISSUED call always wins, never the most recently RESOLVED one.
+let cardStatsRequestSeq = 0;
+
 interface DashboardState {
   // Data
   decks: Deck[];
@@ -204,6 +213,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       // doesn't hold up the rest of the UI.
       if (activeDeck && activeDeck.archetype !== previousArchetype) {
         await get().loadCardStats(activeDeck.archetype);
+      } else if (!activeDeck && previousArchetype !== undefined) {
+        // The active deck was removed (e.g. the user deleted their last
+        // deck) — the previous archetype's deltas no longer apply to
+        // anything and must not linger for Rule 2 to keep reading.
+        // Bumping the sequence also discards any load still in flight for
+        // the deck that just disappeared.
+        cardStatsRequestSeq++;
+        set({ cardStats: [], cardStatsSource: null });
       }
     } catch (err) {
       console.error('[DashboardStore] refresh failed:', err);
@@ -364,9 +381,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   loadCardStats: async (archetypeSlug) => {
+    const requestId = ++cardStatsRequestSeq;
     set({ isLoadingCardStats: true });
     try {
       const response = await fetchArchetypeCardStats(archetypeSlug);
+      // A newer call was issued while this one was in flight — its result
+      // already won (or will), so applying this stale response now would
+      // silently overwrite it. Discard.
+      if (requestId !== cardStatsRequestSeq) return;
       set({
         cardStats: response.cards,
         cardStatsSource: {
@@ -377,6 +399,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         isLoadingCardStats: false,
       });
     } catch (err) {
+      if (requestId !== cardStatsRequestSeq) return;
       console.warn('[DashboardStore] loadCardStats failed:', err);
       set({ cardStats: [], cardStatsSource: null, isLoadingCardStats: false });
     }

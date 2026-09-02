@@ -301,4 +301,91 @@ describe('dashboardStore.refresh auto-loads card deltas on archetype change (pla
     expect(mockedFetchCardStats).not.toHaveBeenCalled();
     expect(useDashboardStore.getState().activeDeck).toBeNull();
   });
+
+  it('clears cardStats/cardStatsSource when the active deck is deleted (no deck left)', async () => {
+    // First refresh: a deck exists, deltas load.
+    mockedGetDecks.mockResolvedValueOnce([DECK_A]);
+    mockedFetchCardStats.mockResolvedValueOnce({
+      archetypeId: 'dragapult-ex',
+      windowDays: 14,
+      online: true,
+      bo1: true,
+      computedAt: '2026-06-01T00:00:00.000Z',
+      listsAnalyzed: 20,
+      cards: CARD_STATS,
+    });
+    useDashboardStore.setState({ activeDeckId: 1 });
+    await useDashboardStore.getState().refresh();
+    expect(useDashboardStore.getState().cardStats).toEqual(CARD_STATS);
+
+    // Second refresh: the deck was deleted — no decks left at all.
+    mockedGetDecks.mockResolvedValueOnce([]);
+    await useDashboardStore.getState().refresh();
+
+    const state = useDashboardStore.getState();
+    expect(state.activeDeck).toBeNull();
+    expect(state.cardStats).toEqual([]);
+    expect(state.cardStatsSource).toBeNull();
+  });
+});
+
+describe('dashboardStore.loadCardStats discards a stale, out-of-order response', () => {
+  // Two independent, network-timing-dependent callers (refresh() on an
+  // archetype switch, runDeckComparison() after its own slower fetch) can
+  // both have loadCardStats in flight at once. Whichever HTTP response
+  // resolves LAST must not be allowed to silently overwrite a NEWER
+  // request's result just because its own network call happened to take
+  // longer — the most RECENTLY ISSUED call must always win, not the most
+  // recently RESOLVED one.
+  it('keeps the result of the most recently issued call, even if an earlier call resolves later', async () => {
+    let resolveFirst!: (value: Awaited<ReturnType<typeof fetchArchetypeCardStats>>) => void;
+    let resolveSecond!: (value: Awaited<ReturnType<typeof fetchArchetypeCardStats>>) => void;
+    const firstResponse = new Promise<Awaited<ReturnType<typeof fetchArchetypeCardStats>>>(
+      (resolve) => {
+        resolveFirst = resolve;
+      },
+    );
+    const secondResponse = new Promise<Awaited<ReturnType<typeof fetchArchetypeCardStats>>>(
+      (resolve) => {
+        resolveSecond = resolve;
+      },
+    );
+    mockedFetchCardStats.mockReturnValueOnce(firstResponse);
+    mockedFetchCardStats.mockReturnValueOnce(secondResponse);
+
+    // Call order: 'archetype-a' first, 'archetype-b' second — but let
+    // 'archetype-b' (the second, more recent call) resolve FIRST.
+    const firstCall = useDashboardStore.getState().loadCardStats('archetype-a');
+    const secondCall = useDashboardStore.getState().loadCardStats('archetype-b');
+
+    resolveSecond({
+      archetypeId: 'archetype-b',
+      windowDays: 14,
+      online: true,
+      bo1: true,
+      computedAt: '2026-06-02T00:00:00.000Z',
+      listsAnalyzed: 5,
+      cards: [],
+    });
+    await secondCall;
+
+    // The first (now-stale) call resolves AFTER the second one already won.
+    resolveFirst({
+      archetypeId: 'archetype-a',
+      windowDays: 14,
+      online: true,
+      bo1: true,
+      computedAt: '2026-06-01T00:00:00.000Z',
+      listsAnalyzed: 20,
+      cards: CARD_STATS,
+    });
+    await firstCall;
+
+    // 'archetype-b' was issued last and must be what's in the store —
+    // never overwritten back to the stale 'archetype-a' result.
+    expect(useDashboardStore.getState().cardStatsSource?.computedAt).toBe(
+      '2026-06-02T00:00:00.000Z',
+    );
+    expect(useDashboardStore.getState().cardStats).toEqual([]);
+  });
 });
