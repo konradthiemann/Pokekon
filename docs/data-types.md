@@ -445,3 +445,98 @@ interface DeckVariantStats {
 }
 ```
 Per-deck performance stats used in the `DeckAnalyticsPanel` to compare multiple variants of the same archetype. The `metaScore` is a frequency-weighted win rate: `Σ(metaFreq × WR) / Σ(metaFreq)`, computed only over matchups with at least 2 decisive games and a known meta frequency. `recentForm` is the last 10 match results, newest first.
+
+---
+
+## Card Performance Delta Types (Spec 5 — `packages/shared/src/cardPerformance.ts`)
+
+These types represent precomputed card performance analysis, bridging tournament placement data and card recommendations.
+
+### `CardPerformanceDelta`
+```typescript
+interface CardPerformanceDelta {
+  listsWith: number;
+  listsWithout: number;
+  superiorityPct: number;  // Mann-Whitney θ × 100, 1 decimal
+  deltaPp: number;         // superiorityPct - 50, the headline delta in pp
+  lowPct: number;          // Wilson band lower bound, 1 decimal
+  highPct: number;         // Wilson band upper bound, 1 decimal
+  widthPct: number;        // highPct - lowPct
+  significant: boolean;    // true when band excludes 50
+  effectiveN: number;      // 3*n1*n2/(n1+n2+1), 2 decimals
+  meanPercentileWithPct: number;     // descriptive only, 1 decimal
+  meanPercentileWithoutPct: number;  // descriptive only, 1 decimal
+}
+```
+
+The performance delta for one card within one archetype. **Method (plan §3.0):** 
+- Computes Mann-Whitney probability of superiority θ between two groups (lists with card vs. without)
+- θ is itself a proportion in [0,1], so Wilson score intervals are legitimately applicable to it
+- `effectiveN = 3·n1·n2/(n1+n2+1)` is the effective sample size that makes a Wilson interval on θ-hat reproduce the exact Mann-Whitney null variance
+- The band always uses 95% confidence (Spec 3 precedent)
+- `significant` is true when the **unrounded** bounds exclude 50% — not a cutoff, a binary expression of "does the band contain the null?"
+
+**Three critical approximations (also in code comments and in `docs/features.md` §17):**
+1. **Ties assumption:** The formula assumes no ties (identical percentiles). In practice, ties make the true variance smaller than predicted, so the band is **too wide, never too narrow** — conservative.
+2. **Null-point calibration:** The n_eff bridge makes the interval exact at θ = 0.5 (the decision boundary). Away from the null, it becomes a conservative approximation with credible coverage but not exact matching.
+3. **Correlation, not causation:** Lists are not randomly assigned to include/exclude cards. The delta measures **association** (lists with X ranked better), not causal effect (X makes lists better). No UI text ever claims causation.
+
+### `CardSignalTier`
+```typescript
+type CardSignalTier =
+  | 'insufficient'      // No prognosis: empty group or band too wide
+  | 'confirmed'         // Popular AND significantly positive
+  | 'hiddenGem'         // Rare AND significantly positive
+  | 'popularityParadox' // Popular BUT negative or not significant
+  | 'discouraged'       // Significantly negative
+  | 'neutral';          // Measurable but no strong signal
+```
+
+Classification of a card's signal tier, determined by `classifyCardSignal(inclusionPct, delta, opts)` — the single place in the codebase that decides which case the UI is looking at. **Classification rules (order matters — first match wins):**
+
+1. `delta === null` OR `delta.widthPct > maxBandPp` (default 40) → `'insufficient'`
+2. `delta.significant && delta.deltaPp > 0 && inclusionPct >= 55` → `'confirmed'`
+3. `delta.significant && delta.deltaPp > 0` → `'hiddenGem'`
+4. `inclusionPct >= 55 && (delta.deltaPp <= 0 || !delta.significant)` → `'popularityParadox'` (the core of Spec 5's fifth AC: "popular but not helping")
+5. `delta.significant && delta.deltaPp < 0` → `'discouraged'`
+6. Else → `'neutral'`
+
+Rule 1 has precedence over Rule 4 so a staple with only 3 usable lists doesn't falsely become "popularity paradox"; instead it honestly reports insufficient data.
+
+### `ArchetypeCardStat`
+```typescript
+interface ArchetypeCardStat {
+  cardName: string;
+  cardType: 'pokemon' | 'trainer' | 'energy';
+  listsAnalyzed: number;
+  listsWith: number;
+  inclusionPct: number;      // listsWith / listsAnalyzed × 100, 1 decimal
+  avgCount: number;          // Mean copies among including lists, 1 decimal
+  delta: CardPerformanceDelta | null;
+  tier: CardSignalTier;
+}
+```
+
+One card's complete stats within one archetype (for one time window). The `inclusionPct` is from the server's own tournament database (online-Bo1 scope only) — it is **purely informational** and does **not** drive the 55%/20% thresholds used in `suggestedAdds`/`suggestedRemoves` (those stay on the Limitless-based client fetch). This design separates two data sources explicitly so they never confuse.
+
+### `ListPerformanceEntry`
+```typescript
+interface ListPerformanceEntry {
+  counts: Record<string, number>;      // by normalizeCardName() key
+  displayNames: Record<string, string>;
+  cardTypes: Record<string, CardType>;
+  percentile: number;  // in [0,1], from placementPercentile()
+}
+```
+
+One published tournament list, reduced to what the analysis needs. The `counts` are summed across printings (two editions of the same card = one inclusion with summed count) — a deliberate correction to `deckComparison.ts`'s per-entry counting (plan §0.3 / §6 risk 5). The `displayNames` and `cardTypes` map each normalised key to its first-seen display form and type, deterministic and consistent.
+
+### `ListPerformanceEntry` to `ArchetypeCardStat` (the computation)
+
+`computeArchetypeCardStats(lists, opts?)` is the pure, I/O-free aggregation function that produces a list of `ArchetypeCardStat` from a list of tournament lists:
+1. **Deduplicate and normalise:** across all lists, collect every distinct card by `normalizeCardName()` key, tracking display names and types.
+2. **Split and compute delta:** for each card, partition the lists into `with` (list includes the card) and `without`, compute `placementPercentile()` for each, then `cardPerformanceDelta()`.
+3. **Classify tier:** apply `classifyCardSignal()` to the delta and `inclusionPct`.
+4. **Sort and return:** by `inclusionPct` descending, then `cardName` asc (stable and testable).
+
+Result is `[]` if the input is empty or all lists have invalid percentiles. A list with all cards means `delta === null` (same group for with/without), and the tier becomes `'insufficient'` — this is honest: you can't claim a card helps or hurts if it appears in every list.
