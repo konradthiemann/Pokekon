@@ -166,7 +166,7 @@ keys themselves are BYOK: entered by the user, stored encrypted, server-side onl
 ### Application Shell
 
 `App.tsx` renders the layout (`Sidebar` + `BottomNav`) and one page based on
-`store.activeTab` (overview · deck · recommendations · meta) — the match log has
+`store.activeTab` (overview · deck · meta) — the match log has
 no top-level tab of its own. Within `DeckPage`, opponent-log functionality is not
 its own section either (plan `personal-data-role-rework.md` §3.8): the page has
 two co-equal sections (Deck List / Analytics), a small always-visible "Log match"
@@ -192,19 +192,18 @@ graph TD
     App --> BottomNav
     App --> OverviewPage
     App --> DeckPage
-    App --> RecommendationsPage
     App --> MetaPage
 
     OverviewPage --> StatCard
     OverviewPage --> MetaShareChart
     OverviewPage --> WinRateChart
-    OverviewPage --> MetaTable_Overview["MetaTable (overview)"]
+    OverviewPage --> MyMatchupsTable["MyMatchupsTable"]
 
     DeckPage --> DeckSwitcher
     DeckPage --> DeckPanel
     DeckPage --> DeckAnalyticsPanel
+    DeckPage --> DeckTipsSection
     DeckPage --> OpponentLog
-    DeckPage --> LocalMetaPanel
     DeckPage --> SidePanel
 
     DeckPanel --> AddCardModal
@@ -213,15 +212,16 @@ graph TD
     DeckAnalyticsPanel --> DeckPerformancePanel
     DeckAnalyticsPanel --> MatchupMatrix_Deck["MatchupMatrix"]
 
+    DeckTipsSection --> RecommendationsPanel
+    DeckTipsSection --> DeckComparisonPanel
+
     OpponentLog --> AddLogModal
     OpponentLog --> MatchDetailModal
     OpponentLog --> MatchStatsTab
 
-    RecommendationsPage --> RecommendationsPanel
-    RecommendationsPage --> DeckComparisonPanel
-
+    MetaPage --> LocalMetaPanel
     MetaPage --> MatchupMatrix
-    MetaPage --> MetaTable_Meta["MetaTable (meta)"]
+    MetaPage --> TournamentMetaTable["TournamentMetaTable"]
     MetaPage --> CollapsibleSection
 ```
 
