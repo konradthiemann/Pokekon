@@ -13,7 +13,7 @@
     "typecheck": "npm run sync && astro check"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.40.0",
+    "@astrojs/starlight": "^0.41.11",
     "astro": "^7.1.1",
     "astro-mermaid": "^2.0.2",
     "mermaid": "^11.16.1"
