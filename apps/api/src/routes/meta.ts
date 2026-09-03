@@ -25,6 +25,7 @@ import {
 } from '../db/schema.js';
 import { runMetaSync } from '../jobs/syncMeta.js';
 import { loadCardStats } from '../lib/cardStatsData.js';
+import { loadEquilibrium } from '../lib/equilibriumData.js';
 import { ensureMatchups } from '../lib/matchupData.js';
 import { rateLimit } from '../lib/rateLimit.js';
 import { windowStartDays } from '../lib/timeWindow.js';
@@ -33,11 +34,13 @@ import {
   archetypeIdParamSchema,
   archetypeListsQuerySchema,
   cardStatsQuerySchema,
+  equilibriumQuerySchema,
   metaWindowQuerySchema,
   snapCardStatsWindow,
+  snapEquilibriumWindow,
 } from '../validation.js';
 
-interface WindowAggregates {
+export interface WindowAggregates {
   tournamentCount: number;
   totalPlayers: number;
   /** Per-archetype window stats (share, record, pilots), noise filtered. */
@@ -81,7 +84,7 @@ export function windowConditions({ days, online, bo1 }: MetaWindow) {
  * pilot count over all counted players, regardless of which tournament the
  * pilots sat in — so no per-tournament grouping is needed here.
  */
-async function loadWindowAggregates(db: Db, window: MetaWindow): Promise<WindowAggregates> {
+export async function loadWindowAggregates(db: Db, window: MetaWindow): Promise<WindowAggregates> {
   const rows = await db
     .select({
       tournamentId: tournamentStandings.tournamentId,
@@ -128,7 +131,7 @@ async function loadWindowAggregates(db: Db, window: MetaWindow): Promise<WindowA
 /** Own matchup data for the window (real online-Bo1 head-to-heads from
  *  tournament_matchups) blended with the external TrainerHill matrix as a
  *  fallback for pairs the own data doesn't cover with enough games. */
-interface MatchupData {
+export interface MatchupData {
   cells: MatchupCell[]; // fed to computeFieldScores
   rows: MatchupRow[]; // full directed rows for the matrix UI
   /** How the blend broke down, so the UI can flag real vs approximate coverage. */
@@ -164,7 +167,7 @@ function directedRow(
   };
 }
 
-async function loadMatchupData(db: Db, window: MetaWindow): Promise<MatchupData> {
+export async function loadMatchupData(db: Db, window: MetaWindow): Promise<MatchupData> {
   const [ownRows, trainerHill] = await Promise.all([
     db
       .select({
@@ -581,6 +584,37 @@ export function createMetaRoutes(): Hono<ApiEnv> {
       computedAt: batch.computedAt?.toISOString() ?? null,
       listsAnalyzed: batch.listsAnalyzed,
       cards: batch.cards,
+    });
+  });
+
+  // GET /api/meta/equilibrium?days — the precomputed meta-wide symmetric
+  // zero-sum Nash equilibrium, its robustness and the replicator trend (plan
+  // §3.7, step 17). Reads ONLY (jobs/computeEquilibrium.ts writes the two
+  // tables); `days` is snapped to the nearest precomputed window, and a
+  // window that was never computed serves 200 with `run: null`/
+  // `archetypes: []`/`computedAt: null` (cold start, no 404 — same reasoning
+  // as every other /api/meta/* reader). Meta-wide, not archetype-scoped, so
+  // there is no :archetypeId param; scope is always the default online-Bo1
+  // scope (plan section 5), so no online/bo1 query param either. No extra
+  // auth/rate-limit beyond the app-wide session middleware — same as the
+  // sibling card-stats route (plan §3.7: "keine Auth" means no ADDITIONAL
+  // gate, not that this route bypasses the baseline).
+  routes.get('/equilibrium', async (c) => {
+    const parsedQuery = equilibriumQuerySchema.safeParse(c.req.query());
+    if (!parsedQuery.success) {
+      return c.json({ error: 'Invalid query parameters', issues: parsedQuery.error.issues }, 400);
+    }
+    const windowDays = snapEquilibriumWindow(parsedQuery.data.days);
+
+    const batch = await loadEquilibrium(c.get('db'), windowDays);
+
+    return c.json({
+      windowDays: batch.windowDays,
+      online: true,
+      bo1: true,
+      computedAt: batch.computedAt?.toISOString() ?? null,
+      run: batch.run,
+      archetypes: batch.archetypes,
     });
   });
 
