@@ -37,7 +37,12 @@ import { computeEquilibrium } from './jobs/computeEquilibrium.js';
 // Slice B (plan §3.7, Spec 6): snapEquilibriumWindow does not exist yet —
 // expected to fail module resolution / be undefined until the implementer
 // extracts the shared snapToWindow helper and adds it.
-import { MAX_BATTLE_LOG_CHARS, snapCardStatsWindow, snapEquilibriumWindow } from './validation.js';
+import {
+  EQUILIBRIUM_WINDOWS,
+  MAX_BATTLE_LOG_CHARS,
+  snapCardStatsWindow,
+  snapEquilibriumWindow,
+} from './validation.js';
 
 // ─── Test harness ─────────────────────────────────────────────────────────────
 // Runs the real routes against an in-memory Postgres (PGlite) created from the
@@ -3047,6 +3052,24 @@ describe('computeEquilibrium job (plan §3.6/§3.7, step 15)', () => {
     expect(runsAfterSecond).toHaveLength(1); // replaced, not duplicated (unique index holds)
     const archAfterSecond = await db.select().from(schema.metaEquilibriumArchetypes);
     expect(archAfterSecond).toHaveLength(3); // cascade held: no orphans from the first run
+  });
+
+  it('with no `windows` option, precomputes exactly validation.ts EQUILIBRIUM_WINDOWS (single source of truth, not a second literal)', async () => {
+    await clearEquilibriumTables();
+    // One recent tournament falls inside every default window (7/14/21/28
+    // days back), so a single seed proves all of them were attempted.
+    await seedEquilibriumTournament('eq-defaults-1', equilibriumDaysAgo(1), 10, [
+      ...Array.from({ length: 5 }, () => equilibriumStanding('eq-def-a')),
+      ...Array.from({ length: 3 }, () => equilibriumStanding('eq-def-b')),
+      ...Array.from({ length: 2 }, () => equilibriumStanding('eq-def-c')),
+    ]);
+    await seedEquilibriumMatchup('eq-defaults-1', 'eq-def-a', 'eq-def-b', 60, 40);
+    await seedEquilibriumMatchup('eq-defaults-1', 'eq-def-b', 'eq-def-c', 60, 40);
+    await seedEquilibriumMatchup('eq-defaults-1', 'eq-def-c', 'eq-def-a', 60, 40);
+
+    const result = await computeEquilibrium(db, { resamples: 50, seed: 1 });
+    expect(result.windowsSkipped).toBe(0);
+    expect(result.windows).toEqual([...EQUILIBRIUM_WINDOWS]);
   });
 });
 

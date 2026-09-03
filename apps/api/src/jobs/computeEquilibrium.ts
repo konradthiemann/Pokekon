@@ -27,6 +27,7 @@ import {
 import { closeDb, getDb, type Db } from '../db/index.js';
 import { metaEquilibriumArchetypes, metaEquilibriumRuns, metaSnapshots } from '../db/schema.js';
 import { loadMatchupData, loadWindowAggregates } from '../routes/meta.js';
+import { EQUILIBRIUM_WINDOWS } from '../validation.js';
 
 export interface EquilibriumJobResult {
   computedAt: string; // ISO
@@ -53,7 +54,6 @@ export interface EquilibriumJobResult {
   dryRun: boolean;
 }
 
-const DEFAULT_WINDOWS = [7, 14, 21, 28];
 /** Pure job-economy floor (not a model cutoff, see the plan): below three
  *  strategies "the equilibrium" is trivial and the statement is worthless. */
 const DEFAULT_MIN_ARCHETYPES = 3;
@@ -136,7 +136,7 @@ export async function computeEquilibrium(
     dryRun?: boolean;
   },
 ): Promise<EquilibriumJobResult> {
-  const windowsInput = opts?.windows ?? DEFAULT_WINDOWS;
+  const windowsInput = opts?.windows ?? EQUILIBRIUM_WINDOWS;
   const online = opts?.online ?? true;
   const bo1 = opts?.bo1 ?? true;
   const minArchetypes = opts?.minArchetypes ?? DEFAULT_MIN_ARCHETYPES;
