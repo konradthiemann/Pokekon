@@ -631,7 +631,24 @@ export function replicatorStep(matrix: PayoffMatrix, sharePct: number[]): Replic
   return { archetypeIds, fitnessPct, meanFitnessPct, growthPct, projectedSharePct };
 }
 
-export type FitnessDirection = 'rising' | 'falling' | 'stable' | 'unknown';
+// Mirrors CARD_SIGNAL_TIER_VALUES's pattern (packages/shared/src/cardPerformance.ts) so
+// schema.ts can drive a Drizzle `{ enum }` column + CHECK constraint from the same source
+// of truth, instead of retyping this union at the DB layer (plan §3.6).
+export const FITNESS_DIRECTION_VALUES = [
+  /** Growth factor exceeds the stable band (see REPLICATOR_STABLE_BAND_PP) --
+   *  theory predicts this archetype's share should rise. */
+  'rising',
+  /** Growth factor below the negative stable band -- theory predicts this
+   *  archetype's share should shrink. */
+  'falling',
+  /** Growth factor within +/- REPLICATOR_STABLE_BAND_PP of zero. */
+  'stable',
+  /** No completed previous period to compare against (cold start) -- not a
+   *  fourth trend value in the spec's own AC wording, but a deliberate
+   *  addition so "no data yet" is never misread as "stable". */
+  'unknown',
+] as const;
+export type FitnessDirection = (typeof FITNESS_DIRECTION_VALUES)[number];
 
 export interface FitnessTrend {
   archetypeId: string;
