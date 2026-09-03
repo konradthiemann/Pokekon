@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDashboardStore } from '../store/dashboardStore';
+import { useDashboardStore, type DeckSection } from '../store/dashboardStore';
 import { DeckPanel } from '../components/deck/DeckPanel';
 import { LocalMetaPanel } from '../components/deck/LocalMetaPanel';
-import { DeckSwitcher, type DeckSection } from '../components/deck/DeckSwitcher';
+import { DeckSwitcher } from '../components/deck/DeckSwitcher';
 import { DeckAnalyticsPanel } from '../components/deck/DeckAnalyticsPanel';
 import { OpponentLog } from '../components/opponent/OpponentLog';
 import { AddLogModal } from '../components/opponent/AddLogModal';

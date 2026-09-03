@@ -8,8 +8,6 @@ import { CreateDeckModal } from './CreateDeckModal';
 import { ImportDeckModal } from './ImportDeckModal';
 import { KNOWN_ARCHETYPES } from '../../constants/archetypes';
 
-export type DeckSection = 'deck' | 'analytics';
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function WrPill({ rate, games }: { rate: number; games: number }) {
