@@ -4,6 +4,7 @@
 // Slice A1's `solveStandardFormLp` (./simplex.ts) as the single LP
 // implementation in the repo — no second solver lives here.
 import { solveStandardFormLp } from './simplex.js';
+import { sampleBeta, mulberry32 } from './deterministicRandom.js';
 import type { MatchupCellLike } from './wilsonInterval.js';
 
 const round1 = (n: number): number => Math.round(n * 10) / 10;
@@ -374,4 +375,342 @@ export function solveSymmetricZeroSumNash(
     iterations: lp.iterations,
     status: 'optimal',
   };
+}
+
+// ---------------------------------------------------------------------------
+// Deterministic Monte-Carlo robustness of the equilibrium support
+// (plan §3.0d/§3.4, Slice A3)
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_RESAMPLES = 2000;
+export const DEFAULT_SEED = 20260902;
+
+/**
+ * Draw ONE resampled payoff matrix. Sampling happens per UNORDERED pair; the
+ * mirror cell is set to 1 - p and the diagonal stays 0.5, so the resampled
+ * matrix is constant-sum by construction (plan §3.0d — resampling both
+ * directions independently would silently change the game being solved: the
+ * resampled matrix would no longer be constant-sum, the game value would
+ * drift away from 50 %, and the LP would solve a different game than the
+ * point-estimate LP).
+ *
+ * Distribution per pair (plan §3.4d):
+ *   games > 0 : Beta(s + 0.5, n - s + 0.5)  (Jeffreys posterior),
+ *               s = p * n, n = games. Chosen over reading the Wilson interval
+ *               directly because it is a real distribution on [0,1] (no atom
+ *               at the boundary the way a clamped split-normal reading of the
+ *               Wilson band would produce for e.g. a 1W/0L record), and its
+ *               s = w + t/2 construction mirrors exactly: the reverse
+ *               direction's posterior is the same distribution reflected
+ *               around 0.5, so p_ji = 1 - p_ij is the correct counter-
+ *               posterior, not just a bookkeeping convenience.
+ *   games = 0 : Beta(1, 1) = uniform on [0,1]  (honest "unknown", not the
+ *               U-shaped Jeffreys prior Beta(0.5, 0.5): that prior puts
+ *               mass at the extremes, i.e. it *asserts* an unobserved
+ *               matchup is probably lopsided, which is not something the
+ *               data supports).
+ */
+export function resamplePayoffMatrix(matrix: PayoffMatrix, rng: () => number): PayoffMatrix {
+  const n = matrix.archetypeIds.length;
+  const p: number[][] = matrix.p.map((row) => row.slice());
+
+  for (let i = 0; i < n; i++) {
+    p[i][i] = 0.5;
+    for (let j = i + 1; j < n; j++) {
+      const games = matrix.games[i][j];
+      let a: number;
+      let b: number;
+      if (games > 0) {
+        const s = matrix.p[i][j] * games;
+        a = s + 0.5;
+        b = games - s + 0.5;
+      } else {
+        a = 1;
+        b = 1;
+      }
+      const draw = sampleBeta(a, b, rng);
+      p[i][j] = draw;
+      p[j][i] = 1 - draw;
+    }
+  }
+
+  return {
+    archetypeIds: matrix.archetypeIds,
+    p,
+    games: matrix.games,
+    imputed: matrix.imputed,
+    imputedCellSharePct: matrix.imputedCellSharePct,
+    rowCoveragePct: matrix.rowCoveragePct,
+  };
+}
+
+export interface ArchetypeRobustness {
+  archetypeId: string;
+  /** Percentage of resamples in which the weight stayed at (numerically) zero. */
+  exclusionRatePct: number;
+  /** Mean equilibrium weight across resamples, percent. */
+  meanWeightPct: number;
+  /** 5th / 95th percentile of the weight across resamples, percent. */
+  weightP05Pct: number;
+  weightP95Pct: number;
+  /** Percentage of resamples in which the exclusion CERTIFICATE held
+   *  (payoff strictly below the value) — the strong statement, always <=
+   *  exclusionRatePct. */
+  certainExclusionRatePct: number;
+}
+
+export interface RobustnessResult {
+  resamples: number;
+  seed: number;
+  perArchetype: ArchetypeRobustness[];
+  /** Percentage of resamples whose SUPPORT SET equals the point estimate's —
+   *  the analogue of the reference paper's 2.1 % figure. */
+  exactSupportRatePct: number;
+  /** Resamples whose LP did not return 'optimal'. Reported, never silently
+   *  dropped; they are excluded from all rates and the denominator shrinks
+   *  accordingly. */
+  failedResamples: number;
+}
+
+function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
+  if (a.size !== b.size) return false;
+  for (const item of a) {
+    if (!b.has(item)) return false;
+  }
+  return true;
+}
+
+/** Nearest-rank percentile of a value list, pre-sorted ascending. Empty input
+ *  returns 0 — only reachable when there were zero successful resamples. */
+function percentile(sortedAsc: number[], p: number): number {
+  if (sortedAsc.length === 0) return 0;
+  const idx = Math.min(sortedAsc.length - 1, Math.floor(p * sortedAsc.length));
+  return sortedAsc[idx];
+}
+
+/** Monte-Carlo robustness of the equilibrium support. Deterministic given the
+ *  seed. Pure: the caller supplies the seed, this function creates no entropy.
+ *  Failed resamples (LP status !== 'optimal') are reported via
+ *  `failedResamples` and excluded from every rate's denominator. */
+export function equilibriumRobustness(
+  matrix: PayoffMatrix,
+  pointEstimate: NashEquilibrium,
+  opts?: { resamples?: number; seed?: number; maxIterations?: number },
+): RobustnessResult {
+  const resamples = opts?.resamples ?? DEFAULT_RESAMPLES;
+  const seed = opts?.seed ?? DEFAULT_SEED;
+  const rng = mulberry32(seed);
+  const archetypeIds = matrix.archetypeIds;
+  const n = archetypeIds.length;
+  const pointSupport = new Set(pointEstimate.support);
+
+  const weights: number[][] = Array.from({ length: n }, () => []);
+  const exclusionCount = new Array<number>(n).fill(0);
+  const certainExclusionCount = new Array<number>(n).fill(0);
+  let exactSupportCount = 0;
+  let failedResamples = 0;
+  let successfulResamples = 0;
+
+  for (let r = 0; r < resamples; r++) {
+    const resampled = resamplePayoffMatrix(matrix, rng);
+    const result = solveSymmetricZeroSumNash(resampled, { maxIterations: opts?.maxIterations });
+    if (result.status !== 'optimal') {
+      failedResamples++;
+      continue;
+    }
+    successfulResamples++;
+    const excludedSet = new Set(result.excludedCertain);
+    for (let i = 0; i < n; i++) {
+      const weight = result.weightsPct[i];
+      weights[i].push(weight);
+      if (weight <= SUPPORT_EPSILON_PCT) exclusionCount[i]++;
+      if (excludedSet.has(archetypeIds[i])) certainExclusionCount[i]++;
+    }
+    if (setsEqual(new Set(result.support), pointSupport)) exactSupportCount++;
+  }
+
+  const perArchetype: ArchetypeRobustness[] = archetypeIds.map((id, i) => {
+    const w = weights[i];
+    const count = w.length;
+    const sorted = w.slice().sort((a, b) => a - b);
+    return {
+      archetypeId: id,
+      exclusionRatePct: count > 0 ? (exclusionCount[i] / count) * 100 : 0,
+      meanWeightPct: count > 0 ? w.reduce((sum, v) => sum + v, 0) / count : 0,
+      weightP05Pct: percentile(sorted, 0.05),
+      weightP95Pct: percentile(sorted, 0.95),
+      certainExclusionRatePct: count > 0 ? (certainExclusionCount[i] / count) * 100 : 0,
+    };
+  });
+
+  return {
+    resamples,
+    seed,
+    perArchetype,
+    exactSupportRatePct:
+      successfulResamples > 0 ? (exactSupportCount / successfulResamples) * 100 : 0,
+    failedResamples,
+  };
+}
+
+/** Standard error of a Monte-Carlo rate, in percentage points:
+ *  sqrt(p(1-p)/R) * 100. At R = 2000 and p = 0.78 this is 0.93 pp — the
+ *  reported percentage is honest to about one decimal, no further. */
+export function monteCarloSePct(ratePct: number, resamples: number): number {
+  const p = ratePct / 100;
+  return Math.sqrt((p * (1 - p)) / resamples) * 100;
+}
+
+// ---------------------------------------------------------------------------
+// Replicator fitness and week-over-week trend direction (plan §3.0e/§3.5,
+// Slice A3)
+// ---------------------------------------------------------------------------
+
+/** Fitness change below this magnitude (percentage points) is reported as
+ *  'stable'. A DISPLAY threshold, not an inference rule: the number itself is
+ *  always shown next to the label. */
+export const REPLICATOR_STABLE_BAND_PP = 1;
+
+export interface ReplicatorStep {
+  archetypeIds: string[];
+  /** f_i(x) * 100 — expected win rate of i against the population x. */
+  fitnessPct: number[];
+  /** Mean population fitness * 100. EXACTLY 50 for a constant-sum matrix — a
+   *  built-in self check (plan §3.0e). */
+  meanFitnessPct: number;
+  /** (f_i/phi - 1) * 100 = one-week relative growth rate in percent. */
+  growthPct: number[];
+  /** Renormalised x_i' * 100. Sums to 100 by construction. */
+  projectedSharePct: number[];
+}
+
+/** Renormalises a share vector to fractions summing to 1. A non-positive
+ *  total (all zero / empty) returns all zeros rather than dividing by zero —
+ *  there is no meaningful distribution to renormalise. */
+function renormalizeShares(sharePct: number[]): number[] {
+  const total = sharePct.reduce((sum, v) => sum + v, 0);
+  if (!(total > 0)) return sharePct.map(() => 0);
+  return sharePct.map((v) => v / total);
+}
+
+/** One discrete replicator step. `sharePct` need not sum to 100 — it is
+ *  renormalised first (the archetype set excludes 'other', so it usually does
+ *  not). Returns empty arrays for an empty matrix.
+ *
+ *  phi(x) = meanFitnessPct/100 is exactly 1/2 for any x on a constant-sum
+ *  matrix (plan §3.0e), so growth_i = f_i/phi - 1 is parameter-free: no
+ *  background-fitness constant, no calibration. This function uses the
+ *  actually computed meanFitnessPct (not a hardcoded 50) as the denominator,
+ *  which coincides with 50 up to floating-point noise for any valid
+ *  constant-sum PayoffMatrix. */
+export function replicatorStep(matrix: PayoffMatrix, sharePct: number[]): ReplicatorStep {
+  const archetypeIds = matrix.archetypeIds;
+  const n = archetypeIds.length;
+
+  if (n === 0) {
+    return {
+      archetypeIds: [],
+      fitnessPct: [],
+      meanFitnessPct: 0,
+      growthPct: [],
+      projectedSharePct: [],
+    };
+  }
+
+  const x = renormalizeShares(sharePct);
+  const fitnessPct = matrix.p.map((row) => row.reduce((sum, pij, j) => sum + pij * x[j], 0) * 100);
+  const meanFitnessPct = x.reduce((sum, xi, i) => sum + xi * fitnessPct[i], 0);
+
+  const growthPct = fitnessPct.map((f) =>
+    meanFitnessPct !== 0 ? (f / meanFitnessPct - 1) * 100 : 0,
+  );
+  const projectedSharePct = x.map((xi, i) =>
+    meanFitnessPct !== 0 ? xi * 100 * (fitnessPct[i] / meanFitnessPct) : 0,
+  );
+
+  return { archetypeIds, fitnessPct, meanFitnessPct, growthPct, projectedSharePct };
+}
+
+export type FitnessDirection = 'rising' | 'falling' | 'stable' | 'unknown';
+
+export interface FitnessTrend {
+  archetypeId: string;
+  fitnessPct: number;
+  /** null when there is no previous-period data at all (cold start). */
+  previousFitnessPct: number | null;
+  fitnessDeltaPp: number | null;
+  /** Observed week-over-week share change, DESCRIPTIVE ONLY: it carries no
+   *  confidence statement and is never used to derive `direction`. It is there
+   *  so the UI can put "theory said grow" next to "reality: shrank". */
+  observedShareDeltaPp: number | null;
+  direction: FitnessDirection;
+}
+
+/**
+ * Fitness of each archetype against the current and the previous week's field,
+ * evaluated on the SAME payoff matrix (plan §3.0e): the delta then isolates
+ * the meta shift instead of mixing it with per-week matchup noise.
+ *
+ * `previousSharePct` entirely null means "fewer than one completed period"
+ * (plan §3.5) — a regular cold-start state, not an error: every archetype
+ * gets `previousFitnessPct: null`, `fitnessDeltaPp: null`,
+ * `observedShareDeltaPp: null`, `direction: 'unknown'`. Deciding WHICH week
+ * counts as "in progress" vs. "completed" is a caller/job-side concern, out
+ * of scope for this pure function (plan §3.5, "welche Wochen").
+ *
+ * A null entry for one specific archetype (while others are numeric) is
+ * treated as a real "0 % share that period" — that archetype existed in the
+ * matrix's archetype set but was below the noise floor, which is different
+ * from "no previous period exists at all".
+ */
+export function fitnessTrend(
+  matrix: PayoffMatrix,
+  currentSharePct: number[],
+  previousSharePct: (number | null)[],
+  opts?: { stableBandPp?: number },
+): FitnessTrend[] {
+  const archetypeIds = matrix.archetypeIds;
+  const stableBandPp = opts?.stableBandPp ?? REPLICATOR_STABLE_BAND_PP;
+
+  const xCur = renormalizeShares(currentSharePct);
+  const fitnessPct = matrix.p.map(
+    (row) => row.reduce((sum, pij, j) => sum + pij * xCur[j], 0) * 100,
+  );
+
+  const hasAnyPrevious = previousSharePct.some((v) => v !== null);
+  if (!hasAnyPrevious) {
+    return archetypeIds.map((id, i) => ({
+      archetypeId: id,
+      fitnessPct: fitnessPct[i],
+      previousFitnessPct: null,
+      fitnessDeltaPp: null,
+      observedShareDeltaPp: null,
+      direction: 'unknown' as const,
+    }));
+  }
+
+  const xPrev = renormalizeShares(previousSharePct.map((v) => v ?? 0));
+  const previousFitnessPct = matrix.p.map(
+    (row) => row.reduce((sum, pij, j) => sum + pij * xPrev[j], 0) * 100,
+  );
+
+  return archetypeIds.map((id, i) => {
+    const fitnessDeltaPp = fitnessPct[i] - previousFitnessPct[i];
+    const observedShareDeltaPp = xCur[i] * 100 - xPrev[i] * 100;
+    const direction: FitnessDirection =
+      Math.abs(fitnessDeltaPp) <= stableBandPp
+        ? 'stable'
+        : fitnessDeltaPp > 0
+          ? 'rising'
+          : 'falling';
+
+    return {
+      archetypeId: id,
+      fitnessPct: fitnessPct[i],
+      previousFitnessPct: previousFitnessPct[i],
+      fitnessDeltaPp,
+      observedShareDeltaPp,
+      direction,
+    };
+  });
 }
