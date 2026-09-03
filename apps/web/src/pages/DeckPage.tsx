@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDashboardStore, type DeckSection } from '../store/dashboardStore';
+import { useDashboardStore } from '../store/dashboardStore';
 import { DeckPanel } from '../components/deck/DeckPanel';
-import { LocalMetaPanel } from '../components/deck/LocalMetaPanel';
 import { DeckSwitcher } from '../components/deck/DeckSwitcher';
 import { DeckAnalyticsPanel } from '../components/deck/DeckAnalyticsPanel';
+import { DeckTipsSection } from '../components/deck/DeckTipsSection';
 import { OpponentLog } from '../components/opponent/OpponentLog';
 import { AddLogModal } from '../components/opponent/AddLogModal';
 import { CollapsibleSection } from '../components/layout/CollapsibleSection';
 import { SidePanel } from '../components/deck/SidePanel';
-import { Settings2, BarChart2, List, Plus, Copy, AlertTriangle } from 'lucide-react';
+import { Settings2, BarChart2, List, Lightbulb, Plus, Copy, AlertTriangle } from 'lucide-react';
 
 // ─── Deck Settings ────────────────────────────────────────────────────────────
 
@@ -165,22 +165,33 @@ function DeckSettingsWidget() {
 // ─── Section tabs ─────────────────────────────────────────────────────────────
 
 // Labels are i18n keys in the `deck` namespace, resolved at render time.
-// Two co-equal sections (plan personal-data-role-rework §3.8) — the match
-// log is no longer a third tab; it lives as a collapsed section inside
-// Analytics (below), and "Log match" is a small, always-visible action next
-// to the tabs instead.
+// Three co-equal sections (plan personal-data-role-rework §3.8, extended by
+// plan ui-ux-hub-rework.md §3.4) — the match log is no longer a tab; it
+// lives as a collapsed section inside Analytics (below), and "Log match" is
+// a small, always-visible action next to the tabs instead. "Tips" is the
+// migrated recommendations/deck-comparison content from the former
+// `recommendations` top-level tab.
 const SECTIONS = [
   { id: 'deck' as const, labelKey: 'page.tabs.deckList', Icon: List },
   { id: 'analytics' as const, labelKey: 'page.tabs.analytics', Icon: BarChart2 },
+  { id: 'tips' as const, labelKey: 'page.tabs.tips', Icon: Lightbulb },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function DeckPage() {
   const { t } = useTranslation('deck');
-  const { decks, activeDeckId, deckCards, opponentLogs, metaSnapshots, activeDeck, refresh } =
-    useDashboardStore();
-  const [activeSection, setActiveSection] = useState<DeckSection>('deck');
+  const {
+    decks,
+    activeDeckId,
+    deckCards,
+    opponentLogs,
+    metaSnapshots,
+    activeDeck,
+    refresh,
+    deckSection,
+    setDeckSection,
+  } = useDashboardStore();
   const [showAddLogModal, setShowAddLogModal] = useState(false);
 
   const totalCards = deckCards.reduce((s, c) => s + c.count, 0);
@@ -207,10 +218,10 @@ export function DeckPage() {
               {SECTIONS.map(({ id, labelKey, Icon }) => (
                 <button
                   key={id}
-                  onClick={() => setActiveSection(id)}
+                  onClick={() => setDeckSection(id)}
                   className={[
                     'flex-1 flex items-center justify-center gap-2 py-3 text-xs font-medium transition-all',
-                    activeSection === id
+                    deckSection === id
                       ? 'text-brand-800 bg-brand-50 shadow-[inset_0_-2px_0_0_rgba(96,165,250,0.6)]'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
                   ].join(' ')}
@@ -232,7 +243,7 @@ export function DeckPage() {
 
           {/* Tab content */}
           <div className="space-y-4">
-            {activeSection === 'deck' && (
+            {deckSection === 'deck' && (
               <>
                 <div className="grid grid-cols-3 gap-3">
                   {[
@@ -269,12 +280,11 @@ export function DeckPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
                   <DeckSettingsWidget />
-                  <LocalMetaPanel />
                 </div>
               </>
             )}
 
-            {activeSection === 'analytics' && (
+            {deckSection === 'analytics' && (
               <>
                 <DeckAnalyticsPanel
                   decks={decks}
@@ -299,6 +309,8 @@ export function DeckPage() {
                 </CollapsibleSection>
               </>
             )}
+
+            {deckSection === 'tips' && <DeckTipsSection />}
           </div>
         </>
       ) : /* No deck selected yet — shown only when deck list is empty */

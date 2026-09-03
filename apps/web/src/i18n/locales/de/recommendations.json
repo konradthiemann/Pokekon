@@ -10,7 +10,7 @@
     "basedOn_one": "Basierend auf <bold>{{count}} geloggten Match</bold> und aktuellen Meta-Daten.",
     "basedOn_other": "Basierend auf <bold>{{count}} geloggten Matches</bold> und aktuellen Meta-Daten.",
     "logMoreHint": "Logge 10+ Matches für verlässlichere Vorschläge.",
-    "localMetaNotice": "Lokales Meta ({{archetypes}}) wird gegenüber dem allgemeinen Meta priorisiert.",
+    "localMetaNotice": "<metaLink>Lokales Meta</metaLink> ({{archetypes}}) wird gegenüber dem allgemeinen Meta priorisiert.",
     "metaWorksWithoutLogs": {
       "title": "Meta-Analyse funktioniert auch ohne eigene Daten",
       "body": "Empfehlungen hier basieren auf deinen eigenen Logs — Matches loggen schaltet zusätzlich frei:",

@@ -1,8 +1,10 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { create } from 'zustand';
 import i18n from '../i18n';
 import { DeckPage } from './DeckPage';
 import type { Deck, OpponentLog } from '../types';
+import type { DeckSection } from '../store/dashboardStore';
 
 beforeAll(async () => {
   await i18n.changeLanguage('en');
@@ -31,26 +33,81 @@ function log(over: Partial<OpponentLog>): OpponentLog {
 
 const OPPONENT_LOGS: OpponentLog[] = [log({ id: 1 }), log({ id: 2, result: 'L' })];
 
-vi.mock('../store/dashboardStore', () => ({
-  useDashboardStore: () => ({
-    decks: [DECK],
-    activeDeckId: 1,
-    activeDeck: DECK,
-    deckCards: [],
-    opponentLogs: OPPONENT_LOGS,
-    metaSnapshots: [],
-    deckSnapshots: [],
-    localMeta: [],
-    archetypeStats: [],
-    setActiveDeck: vi.fn(),
-    removeDecks: vi.fn(),
-    updateCurrentDeck: vi.fn(),
-    duplicateDeckAsVariant: vi.fn(),
-    setLocalMeta: vi.fn(),
-    refresh: vi.fn(),
-    patchDeckCards: vi.fn(),
-  }),
+interface DeckPageStoreMock {
+  decks: Deck[];
+  activeDeckId: number | null;
+  activeDeck: Deck | null;
+  deckCards: unknown[];
+  opponentLogs: OpponentLog[];
+  metaSnapshots: unknown[];
+  deckSnapshots: unknown[];
+  localMeta: string[];
+  archetypeStats: unknown[];
+  deckSection: DeckSection;
+  cardStats: unknown[];
+  deckArchSlug: string | null;
+  comparisonResult: unknown;
+  isComparing: boolean;
+  compareProgress: unknown;
+  compareError: unknown;
+  runDeckComparison: () => void;
+  setActiveTab: () => void;
+  setDeckSection: (section: DeckSection) => void;
+  setActiveDeck: () => void;
+  removeDecks: () => void;
+  updateCurrentDeck: () => void;
+  duplicateDeckAsVariant: () => void;
+  setLocalMeta: () => void;
+  refresh: () => void;
+  patchDeckCards: () => void;
+}
+
+// Stateful mock (pattern: OverviewPage.test.tsx §30-40's mutable `storeState`
+// object) — backed by the real `zustand` `create()` instead of a plain
+// object, because the section tab now lives in the store (`deckSection` /
+// `setDeckSection`, plan ui-ux-hub-rework.md §3.4) instead of local
+// `useState`. A plain mutable object is read once per render and cannot make
+// a `setDeckSection` call from inside DeckPage re-render the tree — nothing
+// would subscribe to the mutation. A real zustand store gives the same
+// subscribe/notify behaviour the production store has, so a tab click is
+// actually visible in the same way it will be once `DeckPage` reads
+// `deckSection` from the (real) store instead of `useState`.
+const useTestStore = create<DeckPageStoreMock>((set) => ({
+  decks: [DECK],
+  activeDeckId: 1,
+  activeDeck: DECK,
+  deckCards: [],
+  opponentLogs: OPPONENT_LOGS,
+  metaSnapshots: [],
+  deckSnapshots: [],
+  localMeta: [],
+  archetypeStats: [],
+  deckSection: 'deck',
+  cardStats: [],
+  deckArchSlug: null,
+  comparisonResult: null,
+  isComparing: false,
+  compareProgress: null,
+  compareError: null,
+  runDeckComparison: vi.fn(),
+  setActiveTab: vi.fn(),
+  setDeckSection: (section) => set({ deckSection: section }),
+  setActiveDeck: vi.fn(),
+  removeDecks: vi.fn(),
+  updateCurrentDeck: vi.fn(),
+  duplicateDeckAsVariant: vi.fn(),
+  setLocalMeta: vi.fn(),
+  refresh: vi.fn(),
+  patchDeckCards: vi.fn(),
 }));
+
+vi.mock('../store/dashboardStore', () => ({
+  useDashboardStore: () => useTestStore(),
+}));
+
+beforeEach(() => {
+  useTestStore.setState({ deckSection: 'deck' });
+});
 
 // DeckPanel/DeckSwitcher/OpponentLog mutate via db/queries on user
 // interaction only (never at mount) — auto-mocked so no IndexedDB/API call
@@ -70,11 +127,17 @@ vi.mock('../lib/api', () => ({
   }),
 }));
 
-describe('DeckPage — information architecture (plan personal-data-role-rework §3.8)', () => {
-  it('has exactly two section tabs, and neither is labelled "Match Log"', () => {
+describe('DeckPage — information architecture (plan personal-data-role-rework §3.8, extended by plan ui-ux-hub-rework.md §3.4)', () => {
+  it('has exactly three section tabs (Deck List · Analytics · Tips), and none is labelled "Match Log"', () => {
+    // Deliberate, documented change (tdd.md, plan ui-ux-hub-rework.md §5
+    // risk 2): this used to assert "exactly two" tabs. "Mein Deck" gains a
+    // third "Tips" section for the migrated recommendations/comparison
+    // content. The invariant that Spec 4 actually protects — the match log
+    // is NOT a tab — is unchanged and still asserted below.
     render(<DeckPage />);
     expect(screen.getByRole('button', { name: /deck list/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /analytics/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^tips$/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /match log/i })).not.toBeInTheDocument();
   });
 
@@ -112,5 +175,31 @@ describe('DeckPage — information architecture (plan personal-data-role-rework 
     fireEvent.click(sectionHeader);
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(screen.getAllByText('Gardevoir').length).toBeGreaterThan(0);
+  });
+});
+
+describe('DeckPage — "Tips" section (plan ui-ux-hub-rework.md §3.4)', () => {
+  it('renders the deck comparison section when the "Tips" tab is clicked', () => {
+    render(<DeckPage />);
+    fireEvent.click(screen.getByRole('button', { name: /^tips$/i }));
+
+    // recommendations:comparison.sectionTitle — "List Comparison vs. Tournament Results"
+    expect(screen.getByText(/list comparison vs\. tournament results/i)).toBeInTheDocument();
+  });
+
+  it('keeps the "Log match" button visible in the Tips section', () => {
+    render(<DeckPage />);
+    fireEvent.click(screen.getByRole('button', { name: /^tips$/i }));
+
+    expect(screen.getByRole('button', { name: /log match/i })).toBeInTheDocument();
+  });
+});
+
+describe('DeckPage — Local Meta moved off the deck list (plan ui-ux-hub-rework.md §3.4, §3.5)', () => {
+  it('does not render the Local Meta panel in the "Deck List" section anymore', () => {
+    render(<DeckPage />);
+    // deck:localMeta.title — "Local Meta". The panel now lives on the Meta
+    // page (§3.5); "Deckliste" keeps only DeckSettingsWidget.
+    expect(screen.queryByText('Local Meta')).not.toBeInTheDocument();
   });
 });

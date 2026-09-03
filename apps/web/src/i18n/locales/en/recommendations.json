@@ -10,7 +10,7 @@
     "basedOn_one": "Based on <bold>{{count}} logged match</bold> and current meta data.",
     "basedOn_other": "Based on <bold>{{count}} logged matches</bold> and current meta data.",
     "logMoreHint": "Log 10+ matches for higher-confidence suggestions.",
-    "localMetaNotice": "Local meta ({{archetypes}}) is prioritized above general meta.",
+    "localMetaNotice": "<metaLink>Local meta</metaLink> ({{archetypes}}) is prioritized above general meta.",
     "metaWorksWithoutLogs": {
       "title": "Meta analysis works without your own data",
       "body": "Recommendations here are drawn from your own logs — log matches to unlock:",
