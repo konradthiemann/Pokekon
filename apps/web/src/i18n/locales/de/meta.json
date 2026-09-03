@@ -211,5 +211,42 @@
     "tooltipUnknown_one": "· {{count}} ausgeschlossen (Format unbekannt)",
     "tooltipUnknown_other": "· {{count}} ausgeschlossen (Format unbekannt)",
     "legend": "Grün = vorteilhaft (60%+)   Orange = ausgeglichen (40–60%)   Rot = unvorteilhaft (<40%)"
+  },
+  "equilibrium": {
+    "title": "Spieltheoretische Einordnung (experimentell)",
+    "intro": "Diese Ansicht zeigt, welche Decks laut Spieltheorie zur optimalen Mischung gehören sollten – nicht, wie beliebt sie gerade sind. Sie ergänzt den Feld-Score um eine zweite, robustheitsgeprüfte Perspektive und ersetzt ihn nicht.",
+    "experimentalBadge": "experimentell",
+    "notAReplacement": "Ergänzt den Feld-Score, ersetzt ihn nicht.",
+    "robust": {
+      "veryRobust": "{{name}} ist in fast allen Szenarien keine gute Wahl",
+      "robust": "{{name}} ist in den meisten Szenarien keine gute Wahl",
+      "unclear": "Bei {{name}} ist die Datenlage nicht eindeutig",
+      "likelyIn": "{{name}} gehört in den meisten Szenarien dazu",
+      "value": "in {{rate}} % der Durchläufe ({{se}} pp)",
+      "certain": "in KEINER optimalen Mischung enthalten (beweisbar)"
+    },
+    "composition": {
+      "title": "Exakte Zusammensetzung",
+      "fragile": "Diese exakte Zusammensetzung ist instabil: Kleine Abweichungen in den Matchup-Daten würden zu einer spürbar anderen Mischung führen. Verlass dich hier eher auf die robusten Aussagen oben als auf die genauen Prozentwerte.",
+      "weight": "{{weight}} % ({{low}}-{{high}} %)"
+    },
+    "paradox": {
+      "label": "Popularitäts-Paradox",
+      "text": "{{share}} % Meta-Anteil, aber {{weight}} % im Gleichgewicht"
+    },
+    "coverage": {
+      "thin": "stützt sich überwiegend auf fehlende Matchup-Daten"
+    },
+    "trend": {
+      "rising": "Fitness steigt",
+      "falling": "Fitness fällt",
+      "stable": "Fitness stabil",
+      "unknown": "keine Vorwoche zum Vergleich",
+      "observed": "beobachtete Anteilsänderung: {{delta}} pp"
+    },
+    "source": "Stand {{computedAt}}, Fenster {{days}} Tage, {{runs}} Durchläufe, Seed {{seed}}",
+    "sourceImputed": "{{pct}} % der Matchup-Zellen ohne Daten",
+    "empty": "Noch nicht berechnet.",
+    "methodNote": "Die Berechnung geht von einem Nullsummenspiel aus (Win-Rate + Gegner-Win-Rate = 100 %) und symmetrisiert widersprüchliche Matchup-Zahlen zwischen zwei Decks. Sie berücksichtigt keine Korrelationen zwischen Matchups und ist nur so gut wie die zugrunde liegenden Turnierdaten."
   }
 }

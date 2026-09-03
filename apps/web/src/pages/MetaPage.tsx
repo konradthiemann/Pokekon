@@ -16,12 +16,15 @@ import {
   Globe,
   AlertCircle,
   FlaskConical,
+  Scale,
 } from 'lucide-react';
 import type { RecentTournament } from '../types';
 import {
   getFieldAnalysis,
+  getMetaEquilibrium,
   type FieldAnalysis,
   type FieldAnalysisArchetype,
+  type MetaEquilibriumResponse,
   type MetaWindow,
 } from '../lib/api';
 import { ArchetypeDetail } from '../components/meta/ArchetypeDetail';
@@ -33,6 +36,7 @@ import { WinRateBadge } from '../components/meta/WinRateBadge';
 import { winRatePct1 } from '../components/meta/winRateColor';
 import { CollapsibleSection } from '../components/layout/CollapsibleSection';
 import { PokemonIcon } from '../components/shared/PokemonIcon';
+import { EquilibriumPanel } from '../components/meta/EquilibriumPanel';
 
 // ─── Meta table ───────────────────────────────────────────────────────────────
 
@@ -513,6 +517,40 @@ export function MetaPage() {
   const fieldError = failedKey === requestKey;
   const isLoadingField = fieldAnalysis === null && !fieldError;
 
+  // Game-theoretic equilibrium (plan .claude/plans/meta-game-theory-layer.md
+  // §3.8 / §4 step 21) — a separate, "experimental" section that reads its
+  // own precomputed window; independent of the field-analysis request above
+  // so a slow/failed equilibrium fetch never blocks the existing sections.
+  // Same requestKey pattern as `fieldAnalysis` above (days changed since the
+  // fetch was issued -> keep showing loading, never a stale window's data;
+  // days differs from the key that failed -> retry instead of staying
+  // stuck on the previous error).
+  const [loadedEquilibrium, setLoadedEquilibrium] = useState<{
+    key: string;
+    data: MetaEquilibriumResponse;
+  } | null>(null);
+  const [equilibriumFailedKey, setEquilibriumFailedKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const key = String(days);
+    getMetaEquilibrium(days)
+      .then((res) => {
+        if (!cancelled) setLoadedEquilibrium({ key, data: res });
+      })
+      .catch(() => {
+        if (!cancelled) setEquilibriumFailedKey(key);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [days]);
+
+  const equilibriumRequestKey = String(days);
+  const equilibrium =
+    loadedEquilibrium?.key === equilibriumRequestKey ? loadedEquilibrium.data : null;
+  const equilibriumError = equilibriumFailedKey === equilibriumRequestKey;
+
   // The "Sync Live Meta" action also lives in the desktop sidebar, but that is
   // hidden on mobile (`md:flex`) — so the meta page carries its own copy,
   // making the page self-sufficient on every viewport. Errors surface via the
@@ -655,6 +693,25 @@ export function MetaPage() {
           defaultOpen
         >
           <PredictionPanel archetypes={archetypes} window={metaWindow} />
+        </CollapsibleSection>
+
+        {/* Experimental, additive game-theoretic layer (plan §3.8, AC 5/6) —
+            collapsed by default, never a replacement for the field score
+            above. Explicit `defaultOpen={false}` (not just omitted): the
+            CollapsibleSection default parameter is `true`, so leaving the
+            prop out entirely would open this section by default. */}
+        <CollapsibleSection
+          title={t('equilibrium.title')}
+          icon={<Scale className="w-4 h-4 text-brand-700" />}
+          defaultOpen={false}
+        >
+          {equilibrium ? (
+            <EquilibriumPanel data={equilibrium} />
+          ) : equilibriumError ? (
+            <p className="text-sm text-slate-500">{t('metaTable.loadError')}</p>
+          ) : (
+            <p className="text-sm text-slate-500">{t('metaTable.loading')}</p>
+          )}
         </CollapsibleSection>
       </div>
 

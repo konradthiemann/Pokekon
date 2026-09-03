@@ -456,7 +456,108 @@ is only decrypted server-side for the analysis call — never returned to client
 | `encrypted_api_key` | text (nullable) | `v1:iv:tag:ciphertext`; null → no key configured |
 | `created_at` / `updated_at` | timestamptz | |
 
+### Tables: `meta_equilibrium_runs` and `meta_equilibrium_archetypes` (migration `0014`, Spec 6 Nash equilibrium)
+
+Precomputed Nash equilibrium analysis per analysis window, filled by the `computeEquilibrium` job. Two tables (not one) to avoid denormalizing run-level metadata across ~25 archetype rows. Foreign key with `onDelete: cascade` ensures full-replace-per-window atomicity.
+
+| `meta_equilibrium_runs` column | Type | Notes |
+|--------|------|-------|
+| `id` | serial PK | |
+| `window_days` | integer | Analysis window: 7, 14, 21, or 28 |
+| `computed_at` | timestamptz | Job run timestamp (same for all rows in a run) |
+| `archetype_count` | integer | How many archetypes in the equilibrium |
+| `value_pct` | real | Game value × 100; MUST be 50 for constant-sum input (self-check persisted to production data) |
+| `support_size` | integer | Number of archetypes with non-zero equilibrium weight |
+| `equalizer_count` | integer | `#{i : payoff_i == value}`, a heuristic fragility hint for non-unique equilibria (not a certificate) |
+| `imputed_cell_share_pct` | real | Percentage of off-diagonal cells with no data, 1 decimal |
+| `resamples` | integer | Number of Monte-Carlo resamples (default 2000) |
+| `seed` | integer | Random seed for reproducible robustness (default 20260902) |
+| `failed_resamples` | integer | Resamples where the LP did not return 'optimal'; always reported, never silently dropped |
+| `exact_support_rate_pct` | real | Percentage of resamples reproducing the exact point-estimate support set, 1 decimal |
+| `current_period` | text (nullable) | ISO week label of the most recent completed week used for the replicator trend (null on cold start with <2 weeks) |
+| `previous_period` | text (nullable) | ISO week label of the prior completed week (null on cold start) |
+| `duration_ms` | integer | Wall-clock milliseconds for the entire window computation |
+
+**Unique index:** `(window_days)` — one run per window per job cycle, no duplicates.
+
+| `meta_equilibrium_archetypes` column | Type | Notes |
+|--------|------|-------|
+| `id` | serial PK | |
+| `run_id` | integer FK → `meta_equilibrium_runs.id` | `onDelete: cascade` — entire run row cascades its archetype rows |
+| `archetype_id` | text | Limitless archetype slug |
+| `archetype_name` | text | Display name |
+| `share_pct` | real | Observed meta share in the analysis window, percent |
+| `weight_pct` | real | Equilibrium weight, percent, 2 decimals |
+| `equilibrium_payoff_pct` | real | Payoff `Σ_j x*_j P_ij` against the equilibrium mixture, percent |
+| `paradox_gap_pp` | real | `share_pct − weight_pct`: the "popularity paradox" headline number (positive = played more than equilibrium would justify) |
+| `in_support` | boolean | True if weight > SUPPORT_EPSILON_PCT (numerically non-zero) |
+| `excluded_certain` | boolean | True if payoff strictly below the game value (provably in no equilibrium, per the theorem) |
+| `row_coverage_pct` | real | Opponent-share-weighted coverage of this archetype's row (excludes mirror), 1 decimal |
+| `exclusion_rate_pct` | real | Percentage of resamples in which the archetype had weight near zero (numerically), 1 decimal |
+| `certain_exclusion_rate_pct` | real | Percentage of resamples in which the exclusion certificate held (payoff < value), ≤ `exclusion_rate_pct` |
+| `mean_weight_pct` | real | Mean equilibrium weight across resamples, percent, 1 decimal |
+| `weight_p05_pct`, `weight_p95_pct` | real | 5th/95th percentile of weight across resamples, percent, 1 decimal |
+| `fitness_pct` | real | Fitness against the observed field (`Σ_j observed_share_j × P_ij`), percent |
+| `replicator_growth_pct` | real | One-week relative growth rate in the replicator dynamic `(f_i/phi − 1) × 100`, percent |
+| `projected_share_pct` | real | Projected share after one replicator step, percent |
+| `week_fitness_pct` | real (nullable) | Fitness against the most recent completed ISO week's observed shares, percent; null on cold start |
+| `previous_week_fitness_pct` | real (nullable) | Fitness against the prior completed week, null on cold start |
+| `fitness_delta_pp` | real (nullable) | Week-over-week fitness change, null on cold start |
+| `observed_share_delta_pp` | real (nullable) | Observed week-over-week share change (descriptive only, not used for direction), null on cold start |
+| `direction` | text | `'rising'` / `'falling'` / `'stable'` / `'unknown'` (unknown when <2 complete weeks exist) |
+
+**Unique index:** `(run_id, archetype_id)` — no duplicate archetype rows per run.
+
+**Check constraint:** `direction IN ('rising','falling','stable','unknown')`
+
+### Job: `computeEquilibrium`
+
+Reads all tournament standings in the online-Bo1 scope for a given window (7/14/21/28 days), computes the Nash equilibrium over the matchup matrix, and persists to the two tables above. Runs via `npm run job:compute-equilibrium -w @pokekon/api` [--dry-run].
+
+**Process:**
+1. For each window, fetch tournament data and build the constant-sum payoff matrix via `buildPayoffMatrix()`
+2. Solve the symmetric zero-sum Nash equilibrium via `solveSymmetricZeroSumNash()` (plan §3.0b)
+3. Run Monte-Carlo robustness: resample the payoff matrix 2000 times (seeded, deterministic) and re-solve for each
+4. Compute replicator fitness and week-over-week trend via `replicatorStep()` and `fitnessTrend()` against the two most recent completed ISO weeks
+5. **Write in a transaction per window:** `DELETE FROM meta_equilibrium_runs WHERE window_days = ...` (cascade deletes archetype rows), `INSERT` the run row, `INSERT` archetype rows (chunked, size 200)
+6. All rows in a run share the same `computed_at` timestamp
+
+**Skips:**
+- Archetypes with fewer than 2 pilots (below the noise floor, same threshold as `meta_snapshots`)
+- The `'other'` archetype (unclassified decks are not playable strategies)
+- Windows with fewer than `minArchetypes` distinct archetypes; skipped windows have their old rows deleted (stale-row cleanup; this fixes a gap in Spec 5's `computeCardStats` which only deletes on full-window success — here we delete even on skip)
+
+**Dry-run mode:** Executes all computation, prints counters (archetype count, imputation rate, robustness numbers, duration), writes nothing; safe to run against production data (plan §5).
+
+**Result object:**
+```
+{
+  computedAt: string (ISO),
+  windows: number[],
+  windowsProcessed: number,
+  windowsSkipped: number,    // < minArchetypes
+  archetypesProcessed: number,
+  rowsWritten: number,
+  durationMs: { 7: ms, 14: ms, 21: ms, 28: ms },
+  dryRun: boolean
+}
+```
+
 ### Migrations
+
+Generated with `npm run db:generate -w @pokekon/api`: `0002_*` adds
+`match_log_parsed` + `meta_snapshots` + the `event_date` index; `0003_*` adds
+`user_ai_settings`; `0005_*` adds `tournaments`, `tournament_standings`,
+`matchup_matrix` and `meta_snapshots.archetype_id`; `0010_*` adds
+`meta_snapshots.ties`; `0011_*` adds `opponent_logs.best_of` + its `CHECK`
+constraint; `0012_*` adds `legacy_import_state` (security review addendum,
+closing the `POST /api/logs/import` once-per-account gap); `0013_*` adds
+`archetype_card_stats` (Spec 5 precomputed deltas); `0014_*` adds
+`meta_equilibrium_runs` and `meta_equilibrium_archetypes` (Spec 6 Nash
+equilibrium). All are purely additive (new tables or new nullable/defaulted
+columns, no rewrite of existing rows) so they are safe to apply before the
+matching code deploys (plan §5). The PGlite test harness applies the real
+migration SQL, so the generated schema is exercised in CI.
 
 Generated with `npm run db:generate -w @pokekon/api`: `0002_*` adds
 `match_log_parsed` + `meta_snapshots` + the `event_date` index; `0003_*` adds

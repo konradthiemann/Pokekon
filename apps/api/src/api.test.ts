@@ -10,11 +10,17 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+  buildPayoffMatrix,
   computeArchetypeCardStats,
+  equilibriumRobustness,
+  fitnessTrend,
   isoWeekLabel,
   normalizeCardName,
   placementPercentile,
+  replicatorStep,
+  solveSymmetricZeroSumNash,
   type ListPerformanceEntry,
+  type MatchupCell,
   type TournamentDecklist,
 } from '@pokekon/shared';
 import { createApp } from './app.js';
@@ -24,7 +30,14 @@ import { backfillMetaWinRates } from './jobs/backfillMetaWinRates.js';
 // Slice B (plan §3.6): the persistence job — does not exist yet, expected to
 // fail module resolution until the implementer adds it.
 import { computeCardStats } from './jobs/computeCardStats.js';
-import { MAX_BATTLE_LOG_CHARS, snapCardStatsWindow } from './validation.js';
+// Slice C (plan §3.6/§3.7, Spec 6): the persistence job — does not exist yet,
+// expected to fail module resolution until the implementer adds it (same
+// red-state pattern as computeCardStats above).
+import { computeEquilibrium } from './jobs/computeEquilibrium.js';
+// Slice B (plan §3.7, Spec 6): snapEquilibriumWindow does not exist yet —
+// expected to fail module resolution / be undefined until the implementer
+// extracts the shared snapToWindow helper and adds it.
+import { MAX_BATTLE_LOG_CHARS, snapCardStatsWindow, snapEquilibriumWindow } from './validation.js';
 
 // ─── Test harness ─────────────────────────────────────────────────────────────
 // Runs the real routes against an in-memory Postgres (PGlite) created from the
@@ -2595,6 +2608,536 @@ describe('snapCardStatsWindow (plan §3.6 — validation.ts)', () => {
     expect(snapCardStatsWindow(10.5)).toBe(14); // midpoint of 7 and 14
     expect(snapCardStatsWindow(17.5)).toBe(21); // midpoint of 14 and 21
     expect(snapCardStatsWindow(24.5)).toBe(28); // midpoint of 21 and 28
+  });
+});
+
+// Slice B (plan §3.7, Spec 6) — refactor safety net. §4 step 14 extracts a
+// generic `snapToWindow(days, windows)` out of `snapCardStatsWindow` and
+// re-implements `snapCardStatsWindow` on top of it. This describe block
+// re-asserts the EXACT same input -> output pairs as the
+// `describe('snapCardStatsWindow ...)` block above, pinned against the
+// current, unrefactored implementation, so the upcoming extraction cannot
+// silently change Spec 5's behaviour. This block is expected to PASS right
+// now (the function already exists) — it becomes meaningful once the
+// refactor lands.
+describe('snapCardStatsWindow refactor safety net (Slice B, plan §3.7)', () => {
+  it.each([
+    [1, 7],
+    [7, 7],
+    [10, 7],
+    [11, 14],
+    [14, 14],
+    [25, 28],
+    [30, 28],
+    [180, 28],
+  ])(
+    'still snaps %i days to the %i-day precomputed window after the snapToWindow extraction',
+    (input, expected) => {
+      expect(snapCardStatsWindow(input)).toBe(expected);
+    },
+  );
+
+  it('still breaks an exact tie in favour of the LARGER window after the snapToWindow extraction', () => {
+    expect(snapCardStatsWindow(10.5)).toBe(14); // midpoint of 7 and 14
+    expect(snapCardStatsWindow(17.5)).toBe(21); // midpoint of 14 and 21
+    expect(snapCardStatsWindow(24.5)).toBe(28); // midpoint of 21 and 28
+  });
+});
+
+// Slice B (plan §3.7, Spec 6) — snapEquilibriumWindow does not exist yet.
+// Value table copied verbatim from the plan's binding comment
+// (validation.ts, EQUILIBRIUM_WINDOWS/snapEquilibriumWindow, §3.7):
+// "1 -> 7 | 7 -> 7 | 10 -> 7 | 11 -> 14 | 25 -> 28 | 30 -> 28 | 180 -> 28".
+describe('snapEquilibriumWindow (plan §3.7 — validation.ts)', () => {
+  it.each([
+    [1, 7],
+    [7, 7],
+    [10, 7],
+    [11, 14],
+    [25, 28],
+    [30, 28],
+    [180, 28],
+  ])('snaps %i days to the %i-day precomputed window', (input, expected) => {
+    expect(snapEquilibriumWindow(input)).toBe(expected);
+  });
+});
+
+// ─── Spec 6 Slice C: equilibrium persistence job + read route (plan §3.6/§3.7,
+// step 15/17) ────────────────────────────────────────────────────────────────
+// schema.metaEquilibriumRuns/metaEquilibriumArchetypes,
+// jobs/computeEquilibrium.ts and the GET /api/meta/equilibrium route do not
+// exist yet. The `computeEquilibrium` import above is expected to fail module
+// resolution (same red-state pattern as computeCardStats) until the
+// implementer adds the job; the read-route tests below fail on their status/
+// body assertions once the file does load, until the route is added.
+
+function equilibriumDaysAgo(days: number): Date {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - days);
+  return d;
+}
+
+/** Mirrors seedCardStatsTournament: one online-Bo1 tournament (the job's
+ *  default scope) with the given standings. */
+async function seedEquilibriumTournament(
+  id: string,
+  date: Date,
+  players: number,
+  standings: (typeof schema.tournamentStandings.$inferInsert)[],
+): Promise<void> {
+  await db.insert(schema.tournaments).values({
+    id,
+    name: `Equilibrium Event ${id}`,
+    date,
+    players,
+    isOnline: true,
+    swissMode: 'BO1',
+  });
+  await db
+    .insert(schema.tournamentStandings)
+    .values(standings.map((s) => ({ ...s, tournamentId: id })));
+}
+
+const equilibriumStanding = (
+  archetypeId: string,
+  over: Partial<typeof schema.tournamentStandings.$inferInsert> = {},
+): typeof schema.tournamentStandings.$inferInsert => ({
+  tournamentId: '',
+  archetypeId,
+  archetypeName: archetypeId.toUpperCase(),
+  wins: 3,
+  losses: 2,
+  ties: 0,
+  ...over,
+});
+
+/** One tournament_matchups row: deckA won `aWins` of `aWins + bWins` games
+ *  against deckB, no ties. loadMatchupData (routes/meta.ts) derives BOTH
+ *  directed rows from this single row. */
+async function seedEquilibriumMatchup(
+  tournamentId: string,
+  deckA: string,
+  deckB: string,
+  aWins: number,
+  bWins: number,
+): Promise<void> {
+  await db.insert(schema.tournamentMatchups).values({
+    tournamentId,
+    deckA,
+    deckB,
+    aWins,
+    bWins,
+    ties: 0,
+  });
+}
+
+/** The two directed MatchupCell rows loadMatchupData would derive from ONE
+ *  seedEquilibriumMatchup(deckA, deckB, aWins, bWins) row — used to build the
+ *  exact same PayoffMatrix input the job sees, so the pure Slice A2/A3
+ *  engine can be called directly on it here (the statistics are not
+ *  reasserted, only reused, per plan §4 step 15). */
+function equilibriumCellPair(
+  deckA: string,
+  deckB: string,
+  aWins: number,
+  bWins: number,
+): MatchupCell[] {
+  const total = aWins + bWins;
+  return [
+    {
+      deck1: deckA,
+      deck2: deckB,
+      wins: aWins,
+      losses: bWins,
+      ties: 0,
+      total,
+      winRate: (aWins / total) * 100,
+    },
+    {
+      deck1: deckB,
+      deck2: deckA,
+      wins: bWins,
+      losses: aWins,
+      ties: 0,
+      total,
+      winRate: (bWins / total) * 100,
+    },
+  ];
+}
+
+/** Clears every table the equilibrium job reads from or writes to. */
+async function clearEquilibriumTables(): Promise<void> {
+  await db.delete(schema.tournaments); // standings + matchups cascade
+  await db.delete(schema.metaSnapshots);
+  await db.delete(schema.metaEquilibriumRuns); // archetype rows cascade
+}
+
+describe('computeEquilibrium job (plan §3.6/§3.7, step 15)', () => {
+  it('persists a run (valuePct===50) and archetype rows matching the pinned pure engine for a known small matrix, cold-started (direction unknown, currentPeriod null)', async () => {
+    await clearEquilibriumTables();
+    // A 3-cycle: a beats b 60/40, b beats c 60/40, c beats a 60/40 — a
+    // genuine (non-degenerate) symmetric constant-sum game. Shares are
+    // deliberately UNEQUAL (50/30/20 via pilot counts) so fitnessPct/
+    // replicatorGrowthPct/projectedSharePct differ per archetype, even
+    // though the payoff matrix itself is rotationally symmetric.
+    await seedEquilibriumTournament('eq-main-1', equilibriumDaysAgo(1), 10, [
+      ...Array.from({ length: 5 }, () => equilibriumStanding('eq-main-a')),
+      ...Array.from({ length: 3 }, () => equilibriumStanding('eq-main-b')),
+      ...Array.from({ length: 2 }, () => equilibriumStanding('eq-main-c')),
+    ]);
+    await seedEquilibriumMatchup('eq-main-1', 'eq-main-a', 'eq-main-b', 60, 40);
+    await seedEquilibriumMatchup('eq-main-1', 'eq-main-b', 'eq-main-c', 60, 40);
+    await seedEquilibriumMatchup('eq-main-1', 'eq-main-c', 'eq-main-a', 60, 40);
+
+    // Expected values: call the ALREADY-PINNED pure engine (Slice A2/A3)
+    // directly on the equivalent input — the statistics are not re-derived
+    // or re-asserted here, only reused (plan §4 step 15).
+    const archetypes = [
+      { archetypeId: 'eq-main-a', sharePct: 50 },
+      { archetypeId: 'eq-main-b', sharePct: 30 },
+      { archetypeId: 'eq-main-c', sharePct: 20 },
+    ];
+    const cells: MatchupCell[] = [
+      ...equilibriumCellPair('eq-main-a', 'eq-main-b', 60, 40),
+      ...equilibriumCellPair('eq-main-b', 'eq-main-c', 60, 40),
+      ...equilibriumCellPair('eq-main-c', 'eq-main-a', 60, 40),
+    ];
+    const matrix = buildPayoffMatrix(archetypes, cells);
+    const equilibrium = solveSymmetricZeroSumNash(matrix);
+    expect(equilibrium.status).toBe('optimal');
+    const robustness = equilibriumRobustness(matrix, equilibrium, { resamples: 200, seed: 42 });
+    const windowShares = archetypes.map((a) => a.sharePct);
+    const replicator = replicatorStep(matrix, windowShares);
+    const trend = fitnessTrend(
+      matrix,
+      windowShares,
+      archetypes.map(() => null), // cold start: no completed ISO weeks at all
+    );
+    expect(trend.every((t) => t.direction === 'unknown')).toBe(true);
+
+    const result = await computeEquilibrium(db, { windows: [7], resamples: 200, seed: 42 });
+    expect(result.dryRun).toBe(false);
+    expect(result.windows).toEqual([7]);
+    expect(result.windowsSkipped).toBe(0);
+    expect(result.rowsWritten).toBe(3);
+    expect(result.perWindow).toHaveLength(1);
+    const pw = result.perWindow[0]!;
+    expect(pw.windowDays).toBe(7);
+    expect(pw.archetypeCount).toBe(3);
+    expect(pw.valuePct).toBeCloseTo(50, 6);
+    expect(pw.supportSize).toBe(equilibrium.support.length);
+    expect(pw.equalizerCount).toBe(equilibrium.equalizerCount);
+    expect(pw.imputedCellSharePct).toBeCloseTo(matrix.imputedCellSharePct, 1);
+    expect(pw.exactSupportRatePct).toBeCloseTo(robustness.exactSupportRatePct, 4);
+    expect(pw.failedResamples).toBe(robustness.failedResamples);
+    expect(pw.currentPeriod).toBeNull();
+    expect(pw.previousPeriod).toBeNull();
+    expect(typeof pw.durationMs).toBe('number');
+
+    const runRows = await db
+      .select()
+      .from(schema.metaEquilibriumRuns)
+      .where(eq(schema.metaEquilibriumRuns.windowDays, 7));
+    expect(runRows).toHaveLength(1);
+    const run = runRows[0]!;
+    expect(run.valuePct).toBeCloseTo(50, 6);
+    expect(run.archetypeCount).toBe(3);
+    expect(run.supportSize).toBe(equilibrium.support.length);
+    expect(run.equalizerCount).toBe(equilibrium.equalizerCount);
+    expect(run.imputedCellSharePct).toBeCloseTo(matrix.imputedCellSharePct, 1);
+    expect(run.resamples).toBe(200);
+    expect(run.seed).toBe(42);
+    expect(run.failedResamples).toBe(robustness.failedResamples);
+    expect(run.exactSupportRatePct).toBeCloseTo(robustness.exactSupportRatePct, 4);
+    expect(run.currentPeriod).toBeNull();
+    expect(run.previousPeriod).toBeNull();
+    expect(run.computedAt).not.toBeNull();
+
+    const archRows = await db
+      .select()
+      .from(schema.metaEquilibriumArchetypes)
+      .where(eq(schema.metaEquilibriumArchetypes.runId, run.id));
+    expect(archRows).toHaveLength(3);
+    for (const row of archRows) {
+      const i = matrix.archetypeIds.indexOf(row.archetypeId);
+      expect(i).toBeGreaterThanOrEqual(0);
+      const expectedShare = archetypes.find((a) => a.archetypeId === row.archetypeId)!.sharePct;
+      const rob = robustness.perArchetype.find((r) => r.archetypeId === row.archetypeId)!;
+      const rep = replicator.archetypeIds.indexOf(row.archetypeId);
+      const tr = trend.find((t) => t.archetypeId === row.archetypeId)!;
+
+      expect(row.sharePct).toBeCloseTo(expectedShare, 1);
+      expect(row.weightPct).toBeCloseTo(equilibrium.weightsPct[i]!, 1);
+      expect(row.equilibriumPayoffPct).toBeCloseTo(equilibrium.payoffsPct[i]!, 1);
+      expect(row.paradoxGapPp).toBeCloseTo(expectedShare - equilibrium.weightsPct[i]!, 1);
+      expect(row.inSupport).toBe(equilibrium.support.includes(row.archetypeId));
+      expect(row.excludedCertain).toBe(equilibrium.excludedCertain.includes(row.archetypeId));
+      expect(row.rowCoveragePct).toBeCloseTo(matrix.rowCoveragePct[i]!, 1);
+
+      expect(row.exclusionRatePct).toBeCloseTo(rob.exclusionRatePct, 1);
+      expect(row.certainExclusionRatePct).toBeCloseTo(rob.certainExclusionRatePct, 1);
+      expect(row.meanWeightPct).toBeCloseTo(rob.meanWeightPct, 1);
+      expect(row.weightP05Pct).toBeCloseTo(rob.weightP05Pct, 1);
+      expect(row.weightP95Pct).toBeCloseTo(rob.weightP95Pct, 1);
+
+      expect(row.fitnessPct).toBeCloseTo(replicator.fitnessPct[rep]!, 1);
+      expect(row.replicatorGrowthPct).toBeCloseTo(replicator.growthPct[rep]!, 1);
+      expect(row.projectedSharePct).toBeCloseTo(replicator.projectedSharePct[rep]!, 1);
+
+      // Cold start (no meta_snapshots at all): the week-over-week trend has
+      // nothing to compare against. previousFitnessPct/fitnessDeltaPp/
+      // observedShareDeltaPp are unambiguously null per fitnessTrend's own
+      // cold-start contract (plan §3.0e), and direction is 'unknown' —
+      // both pinned here. `weekFitnessPct` itself is NOT asserted: the plan
+      // does not specify which share vector ("currentSharePct") the job
+      // uses to call fitnessTrend when zero (not just one) completed ISO
+      // weeks exist, so its exact cold-start value is an implementer
+      // decision, not a test fixture to guess at (see handoff notes).
+      expect(tr.direction).toBe('unknown');
+      expect(row.previousWeekFitnessPct).toBeNull();
+      expect(row.fitnessDeltaPp).toBeNull();
+      expect(row.observedShareDeltaPp).toBeNull();
+      expect(row.direction).toBe('unknown');
+    }
+  });
+
+  it("excludes the 'other' archetype from archetypeCount and the persisted rows", async () => {
+    await clearEquilibriumTables();
+    await seedEquilibriumTournament('eq-other-1', equilibriumDaysAgo(1), 14, [
+      ...Array.from({ length: 5 }, () => equilibriumStanding('eq-other-a')),
+      ...Array.from({ length: 3 }, () => equilibriumStanding('eq-other-b')),
+      ...Array.from({ length: 2 }, () => equilibriumStanding('eq-other-c')),
+      ...Array.from({ length: 4 }, () => equilibriumStanding('other', { archetypeName: 'Other' })),
+    ]);
+    await seedEquilibriumMatchup('eq-other-1', 'eq-other-a', 'eq-other-b', 60, 40);
+    await seedEquilibriumMatchup('eq-other-1', 'eq-other-b', 'eq-other-c', 60, 40);
+    await seedEquilibriumMatchup('eq-other-1', 'eq-other-c', 'eq-other-a', 60, 40);
+
+    const result = await computeEquilibrium(db, { windows: [7], resamples: 50, seed: 1 });
+    expect(result.windowsSkipped).toBe(0);
+    expect(result.perWindow[0]?.archetypeCount).toBe(3); // 'other' never counted
+    expect(result.rowsWritten).toBe(3);
+
+    const archRows = await db.select().from(schema.metaEquilibriumArchetypes);
+    expect(archRows).toHaveLength(3);
+    expect(archRows.some((r) => r.archetypeId === 'other')).toBe(false);
+  });
+
+  it('a window under minArchetypes lands in windowsSkipped and DELETES previously written rows for that window', async () => {
+    await clearEquilibriumTables();
+    await seedEquilibriumTournament('eq-shrink-1', equilibriumDaysAgo(1), 10, [
+      ...Array.from({ length: 5 }, () => equilibriumStanding('eq-shrink-a')),
+      ...Array.from({ length: 3 }, () => equilibriumStanding('eq-shrink-b')),
+      ...Array.from({ length: 2 }, () => equilibriumStanding('eq-shrink-c')),
+    ]);
+    await seedEquilibriumMatchup('eq-shrink-1', 'eq-shrink-a', 'eq-shrink-b', 60, 40);
+    await seedEquilibriumMatchup('eq-shrink-1', 'eq-shrink-b', 'eq-shrink-c', 60, 40);
+    await seedEquilibriumMatchup('eq-shrink-1', 'eq-shrink-c', 'eq-shrink-a', 60, 40);
+
+    const first = await computeEquilibrium(db, { windows: [7], resamples: 50, seed: 1 });
+    expect(first.windowsSkipped).toBe(0);
+    expect(first.rowsWritten).toBe(3);
+    const runsAfterFirst = await db.select().from(schema.metaEquilibriumRuns);
+    expect(runsAfterFirst).toHaveLength(1);
+    const archAfterFirst = await db.select().from(schema.metaEquilibriumArchetypes);
+    expect(archAfterFirst).toHaveLength(3);
+
+    // The field shrinks below minArchetypes=3: only two archetypes remain in
+    // the window (the old tournament, and with it eq-shrink-c, is gone).
+    await db.delete(schema.tournaments).where(eq(schema.tournaments.id, 'eq-shrink-1'));
+    await seedEquilibriumTournament('eq-shrink-2', equilibriumDaysAgo(1), 5, [
+      ...Array.from({ length: 3 }, () => equilibriumStanding('eq-shrink-a')),
+      ...Array.from({ length: 2 }, () => equilibriumStanding('eq-shrink-b')),
+    ]);
+
+    const second = await computeEquilibrium(db, { windows: [7], resamples: 50, seed: 1 });
+    expect(second.windowsSkipped).toBe(1);
+    expect(second.rowsWritten).toBe(0);
+    expect(second.windows).toEqual([]); // never "actually computed" (skipped)
+    expect(second.perWindow).toHaveLength(0);
+
+    const runsAfterSecond = await db.select().from(schema.metaEquilibriumRuns);
+    expect(runsAfterSecond).toHaveLength(0); // stale run row DELETED, not merely stale
+    const archAfterSecond = await db.select().from(schema.metaEquilibriumArchetypes);
+    expect(archAfterSecond).toHaveLength(0); // cascade held
+  });
+
+  it('dryRun:true produces identical counters but writes nothing', async () => {
+    await clearEquilibriumTables();
+    await seedEquilibriumTournament('eq-dry-1', equilibriumDaysAgo(1), 10, [
+      ...Array.from({ length: 5 }, () => equilibriumStanding('eq-dry-a')),
+      ...Array.from({ length: 3 }, () => equilibriumStanding('eq-dry-b')),
+      ...Array.from({ length: 2 }, () => equilibriumStanding('eq-dry-c')),
+    ]);
+    await seedEquilibriumMatchup('eq-dry-1', 'eq-dry-a', 'eq-dry-b', 60, 40);
+    await seedEquilibriumMatchup('eq-dry-1', 'eq-dry-b', 'eq-dry-c', 60, 40);
+    await seedEquilibriumMatchup('eq-dry-1', 'eq-dry-c', 'eq-dry-a', 60, 40);
+
+    const dry = await computeEquilibrium(db, {
+      windows: [7],
+      resamples: 50,
+      seed: 1,
+      dryRun: true,
+    });
+    expect(dry.dryRun).toBe(true);
+    expect(dry.windowsSkipped).toBe(0);
+    expect(dry.rowsWritten).toBe(3);
+
+    const afterDry = await db.select().from(schema.metaEquilibriumRuns);
+    expect(afterDry).toHaveLength(0);
+
+    const real = await computeEquilibrium(db, {
+      windows: [7],
+      resamples: 50,
+      seed: 1,
+      dryRun: false,
+    });
+    expect(real.dryRun).toBe(false);
+    expect(real.windowsSkipped).toBe(dry.windowsSkipped);
+    expect(real.rowsWritten).toBe(dry.rowsWritten);
+    expect(real.perWindow[0]?.archetypeCount).toBe(dry.perWindow[0]?.archetypeCount);
+    expect(real.perWindow[0]?.valuePct).toBeCloseTo(dry.perWindow[0]?.valuePct ?? Number.NaN, 6);
+    expect(real.perWindow[0]?.supportSize).toBe(dry.perWindow[0]?.supportSize);
+    expect(real.perWindow[0]?.equalizerCount).toBe(dry.perWindow[0]?.equalizerCount);
+    expect(real.perWindow[0]?.imputedCellSharePct).toBeCloseTo(
+      dry.perWindow[0]?.imputedCellSharePct ?? Number.NaN,
+      1,
+    );
+    expect(real.perWindow[0]?.exactSupportRatePct).toBeCloseTo(
+      dry.perWindow[0]?.exactSupportRatePct ?? Number.NaN,
+      4,
+    );
+    expect(real.perWindow[0]?.failedResamples).toBe(dry.perWindow[0]?.failedResamples);
+    // durationMs is a genuine wall-clock measurement of each run (plan §3.7
+    // step 10) — both a dry and a real run report one, but they are NOT
+    // expected to be numerically identical between two separate invocations.
+    expect(typeof dry.perWindow[0]?.durationMs).toBe('number');
+    expect(typeof real.perWindow[0]?.durationMs).toBe('number');
+
+    const afterReal = await db.select().from(schema.metaEquilibriumRuns);
+    expect(afterReal).toHaveLength(1);
+    const archRows = await db
+      .select()
+      .from(schema.metaEquilibriumArchetypes)
+      .where(eq(schema.metaEquilibriumArchetypes.runId, afterReal[0]!.id));
+    expect(archRows).toHaveLength(3);
+  });
+
+  it('a second run REPLACES the run and archetype rows for the same window instead of duplicating them', async () => {
+    await clearEquilibriumTables();
+    await seedEquilibriumTournament('eq-replace-1', equilibriumDaysAgo(1), 10, [
+      ...Array.from({ length: 5 }, () => equilibriumStanding('eq-rep-a')),
+      ...Array.from({ length: 3 }, () => equilibriumStanding('eq-rep-b')),
+      ...Array.from({ length: 2 }, () => equilibriumStanding('eq-rep-c')),
+    ]);
+    await seedEquilibriumMatchup('eq-replace-1', 'eq-rep-a', 'eq-rep-b', 60, 40);
+    await seedEquilibriumMatchup('eq-replace-1', 'eq-rep-b', 'eq-rep-c', 60, 40);
+    await seedEquilibriumMatchup('eq-replace-1', 'eq-rep-c', 'eq-rep-a', 60, 40);
+
+    const r1 = await computeEquilibrium(db, { windows: [7], resamples: 50, seed: 1 });
+    expect(r1.rowsWritten).toBe(3);
+    const runsAfterFirst = await db.select().from(schema.metaEquilibriumRuns);
+    expect(runsAfterFirst).toHaveLength(1);
+    const archAfterFirst = await db.select().from(schema.metaEquilibriumArchetypes);
+    expect(archAfterFirst).toHaveLength(3);
+
+    const r2 = await computeEquilibrium(db, { windows: [7], resamples: 50, seed: 1 });
+    expect(r2.rowsWritten).toBe(3);
+    const runsAfterSecond = await db.select().from(schema.metaEquilibriumRuns);
+    expect(runsAfterSecond).toHaveLength(1); // replaced, not duplicated (unique index holds)
+    const archAfterSecond = await db.select().from(schema.metaEquilibriumArchetypes);
+    expect(archAfterSecond).toHaveLength(3); // cascade held: no orphans from the first run
+  });
+});
+
+describe('GET /api/meta/equilibrium (plan §3.7, step 17)', () => {
+  it('after a job run, returns run and archetypes sorted by weightPct desc', async () => {
+    await clearEquilibriumTables();
+    // r strictly dominates p and q (90% each); p vs q is an even 50/50. r
+    // also has the SMALLEST observed share (2 of 10 pilots) and is inserted
+    // LAST in the standings array — so a route that forwards insertion/
+    // sharePct order instead of sorting by weightPct would list it last,
+    // not first. The exact "popularity paradox" this layer exists to surface.
+    await seedEquilibriumTournament('eq-route-1', equilibriumDaysAgo(1), 10, [
+      ...Array.from({ length: 5 }, () => equilibriumStanding('eq-route-p')),
+      ...Array.from({ length: 3 }, () => equilibriumStanding('eq-route-q')),
+      ...Array.from({ length: 2 }, () => equilibriumStanding('eq-route-r')),
+    ]);
+    await seedEquilibriumMatchup('eq-route-1', 'eq-route-r', 'eq-route-p', 90, 10);
+    await seedEquilibriumMatchup('eq-route-1', 'eq-route-r', 'eq-route-q', 90, 10);
+    await seedEquilibriumMatchup('eq-route-1', 'eq-route-p', 'eq-route-q', 5, 5);
+
+    await computeEquilibrium(db, { windows: [7], resamples: 50, seed: 1 });
+
+    const res = await request('/api/meta/equilibrium?days=7', { user: USER_A });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      windowDays: number;
+      online: boolean;
+      bo1: boolean;
+      computedAt: string | null;
+      run: { archetypeCount: number; valuePct: number } | null;
+      archetypes: { archetypeId: string; weightPct: number; sharePct: number }[];
+    };
+    expect(body.windowDays).toBe(7);
+    expect(body.online).toBe(true);
+    expect(body.bo1).toBe(true);
+    expect(body.computedAt).not.toBeNull();
+    expect(body.run).not.toBeNull();
+    expect(body.run?.archetypeCount).toBe(3);
+    expect(body.run?.valuePct).toBeCloseTo(50, 6);
+    expect(body.archetypes).toHaveLength(3);
+    for (let i = 1; i < body.archetypes.length; i++) {
+      expect(body.archetypes[i - 1]!.weightPct).toBeGreaterThanOrEqual(
+        body.archetypes[i]!.weightPct,
+      );
+    }
+    expect(body.archetypes[0]?.archetypeId).toBe('eq-route-r');
+  });
+
+  it('returns 200 with run:null/archetypes:[]/computedAt:null for a window that was never computed (no 404)', async () => {
+    await clearEquilibriumTables();
+    const res = await request('/api/meta/equilibrium?days=7', { user: USER_A });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      computedAt: string | null;
+      run: unknown;
+      archetypes: unknown[];
+    };
+    expect(body.computedAt).toBeNull();
+    expect(body.run).toBeNull();
+    expect(body.archetypes).toEqual([]);
+  });
+
+  it('snaps days=30 to the 28-day precomputed window', async () => {
+    const res = await request('/api/meta/equilibrium?days=30', { user: USER_A });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { windowDays: number };
+    expect(body.windowDays).toBe(28);
+  });
+
+  it('snaps days=10 to the 7-day precomputed window', async () => {
+    const res = await request('/api/meta/equilibrium?days=10', { user: USER_A });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { windowDays: number };
+    expect(body.windowDays).toBe(7);
+  });
+
+  it('rejects days=999 (outside the 1..180 range) with 400', async () => {
+    const res = await request('/api/meta/equilibrium?days=999', { user: USER_A });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; issues?: unknown };
+    expect(body.error).toBeDefined();
+  });
+
+  // Every other /api/meta/* reader requires a session (app.ts mounts
+  // sessionMiddleware over the whole /api sub-app) — the plan's "keine Auth"
+  // (§3.7) means no ADDITIONAL per-route authorization/rate-limit on top of
+  // that baseline, not that this route bypasses the global session gate
+  // (same reasoning as the card-stats route's identical test above).
+  it('requires a session, like every other /api/meta/* reader', async () => {
+    const res = await request('/api/meta/equilibrium');
+    expect(res.status).toBe(401);
   });
 });
 

@@ -18,6 +18,7 @@ import {
   SWISS_MODE_VALUES,
   CARD_KIND_VALUES,
   CARD_SIGNAL_TIER_VALUES,
+  FITNESS_DIRECTION_VALUES,
 } from '@pokekon/shared';
 import type {
   ParsedTurn,
@@ -478,6 +479,113 @@ export const archetypeCardStats = pgTable(
       sql`${table.tier} in ('insufficient','confirmed','hiddenGem','popularityParadox','discouraged','neutral')`,
     ),
   ],
+);
+
+// ─── Meta game-theory layer (plan .claude/plans/meta-game-theory-layer.md
+// §3.6) ─────────────────────────────────────────────────────────────────────
+// Two tables, not one: about a dozen genuinely run-scaled fields (game value,
+// seed, resample count, imputed share, periods, support size, replicator
+// mean fitness...) would be error-prone to denormalise onto every archetype
+// row (the archetype_card_stats.listsAnalyzed pattern). The FK with
+// `onDelete: 'cascade'` also turns the full-replace into ONE DELETE.
+// Precomputed by jobs/computeEquilibrium.ts, one run row per windowDays, full
+// -replace on every job run — same Postgres-cache-not-materialized-view
+// reasoning as archetype_card_stats (the expensive part is an LP plus 2000
+// Monte-Carlo resamples, not an aggregate SQL can express). Scope is always
+// the default online-Bo1 scope (plan section 5).
+
+export const metaEquilibriumRuns = pgTable(
+  'meta_equilibrium_runs',
+  {
+    id: serial('id').primaryKey(),
+    /** Analysis window in days (7 | 14 | 21 | 28). */
+    windowDays: integer('window_days').notNull(),
+    computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
+    archetypeCount: integer('archetype_count').notNull(),
+    /** MUST be 50 for a constant-sum matrix — persisted as a self check that
+     *  survives into production data. */
+    valuePct: real('value_pct').notNull(),
+    supportSize: integer('support_size').notNull(),
+    /** #{i : payoff_i == value}; larger than supportSize means other equilibria
+     *  cannot be ruled out (plan section 3.0c — a hint, not a certificate). */
+    equalizerCount: integer('equalizer_count').notNull(),
+    /** Share of off-diagonal cells with no data at all, 1 decimal. */
+    imputedCellSharePct: real('imputed_cell_share_pct').notNull(),
+    resamples: integer('resamples').notNull(),
+    seed: integer('seed').notNull(),
+    failedResamples: integer('failed_resamples').notNull(),
+    /** Percentage of resamples reproducing the exact support set. */
+    exactSupportRatePct: real('exact_support_rate_pct').notNull(),
+    /** The two completed ISO weeks the replicator trend used; null on a cold
+     *  start with fewer than two completed weeks. */
+    currentPeriod: text('current_period'),
+    previousPeriod: text('previous_period'),
+    /** Wall-clock milliseconds of the whole window computation, so the cron's
+     *  cost stays visible without extra tooling. */
+    durationMs: integer('duration_ms').notNull(),
+  },
+  (table) => [uniqueIndex('meta_equilibrium_runs_window_uq').on(table.windowDays)],
+);
+
+export const metaEquilibriumArchetypes = pgTable(
+  'meta_equilibrium_archetypes',
+  {
+    id: serial('id').primaryKey(),
+    runId: integer('run_id')
+      .notNull()
+      .references(() => metaEquilibriumRuns.id, { onDelete: 'cascade' }),
+    archetypeId: text('archetype_id').notNull(),
+    archetypeName: text('archetype_name').notNull(),
+    /** Observed share in the day window, percent. */
+    sharePct: real('share_pct').notNull(),
+    /** Equilibrium weight, percent, 2 decimals. */
+    weightPct: real('weight_pct').notNull(),
+    /** Expected win rate against the equilibrium mixture, percent. */
+    equilibriumPayoffPct: real('equilibrium_payoff_pct').notNull(),
+    /** sharePct - weightPct: positive = played more than the equilibrium
+     *  would justify. The headline "popularity paradox" number. */
+    paradoxGapPp: real('paradox_gap_pp').notNull(),
+    inSupport: boolean('in_support').notNull(),
+    /** Payoff strictly below the value: in the support of NO equilibrium. */
+    excludedCertain: boolean('excluded_certain').notNull(),
+    /** Opponent-share-weighted share of this row backed by real data. */
+    rowCoveragePct: real('row_coverage_pct').notNull(),
+    exclusionRatePct: real('exclusion_rate_pct').notNull(),
+    certainExclusionRatePct: real('certain_exclusion_rate_pct').notNull(),
+    meanWeightPct: real('mean_weight_pct').notNull(),
+    weightP05Pct: real('weight_p05_pct').notNull(),
+    weightP95Pct: real('weight_p95_pct').notNull(),
+    fitnessPct: real('fitness_pct').notNull(),
+    replicatorGrowthPct: real('replicator_growth_pct').notNull(),
+    projectedSharePct: real('projected_share_pct').notNull(),
+    weekFitnessPct: real('week_fitness_pct'),
+    previousWeekFitnessPct: real('previous_week_fitness_pct'),
+    fitnessDeltaPp: real('fitness_delta_pp'),
+    observedShareDeltaPp: real('observed_share_delta_pp'),
+    direction: text('direction', { enum: FITNESS_DIRECTION_VALUES }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('meta_equilibrium_archetypes_uq').on(table.runId, table.archetypeId),
+    index('meta_equilibrium_archetypes_run_idx').on(table.runId),
+    check(
+      'meta_equilibrium_direction_chk',
+      sql`${table.direction} in ('rising','falling','stable','unknown')`,
+    ),
+  ],
+);
+
+export const metaEquilibriumRunsRelations = relations(metaEquilibriumRuns, ({ many }) => ({
+  archetypes: many(metaEquilibriumArchetypes),
+}));
+
+export const metaEquilibriumArchetypesRelations = relations(
+  metaEquilibriumArchetypes,
+  ({ one }) => ({
+    run: one(metaEquilibriumRuns, {
+      fields: [metaEquilibriumArchetypes.runId],
+      references: [metaEquilibriumRuns.id],
+    }),
+  }),
 );
 
 export const decksRelations = relations(decks, ({ one, many }) => ({
