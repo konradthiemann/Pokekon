@@ -491,3 +491,62 @@ This is honest communication: acknowledge the noise, show the uncertainty, let t
 ### Data pipeline
 
 `GET /api/meta/archetypes/:archetypeId/card-stats?days=7..180` returns precomputed deltas from the `archetype_card_stats` table. The job `computeCardStats` runs once per sync window (separate from `syncMeta`, typically after it) and rewrites the table for each (archetype, window) pair in a single transaction. Cold start (empty table) yields `computedAt: null` and `cards: []`; the UI tolerates this gracefully.
+
+---
+
+## 18. Game-Theoretic Meta Layer (Experimental)
+
+**Page:** `MetaPage` — "Equilibrium Analysis" section (collapsed by default)
+
+A second, independent analysis layer built atop the Field Score. Instead of answering "how does deck A perform against the *observed* field", this section answers "what deck mixture would be optimal against itself, and which decks fall out of that optimal mix regardless of their popularity". This is **experimental** and does **not** replace the Field Score feature.
+
+### The problem and the method
+
+Every archetype has a win rate against every other archetype, stored in the matchup matrix. If we treat this as a **constant-sum game** (a symmetric zero-sum payoff matrix), we can solve for the Nash equilibrium mixture — the deck distribution where **no single-game prediction player can unilaterally improve by switching decks**. For a symmetric game, the equilibrium is unique, and we can ask: "which decks belong in that optimal mix?"
+
+The matchup matrix in `meta_snapshots` uses the tournament tie convention (a tie = ⅓ of a win), which makes `p_ij + p_ji = 1 − t/(3n)` — slightly less than 1 per pair. For the equilibrium calculation, this matrix is **symmetrized** into a zero-sum game via the formula `p_sym(i,j) = (1 + p_ij − p_ji) / 2`, which is mathematically identical to the "half-tie" convention `(w + t/2) / n` and ensures `p_sym(i,j) + p_sym(j,i) = 1` exactly. This is the same symmetrization the reference paper uses.
+
+The equilibrium is computed via **linear programming** (Phase-II simplex with Bland's rule, standard form `max 1·q` subject to `P q ≤ 1, q ≥ 0`). The resulting weights `x = q/Σq` form the optimal mixed strategy. A byproduct is an **exclusion certificate**: any archetype whose payoff against the equilibrium is strictly below the game value is provably excluded from every equilibrium, not just this one.
+
+### Robustness: Monte-Carlo resampling over uncertainty
+
+A single equilibrium composition is fragile — small changes in data can reshuffle the support (which decks are in the mix). To quantify this, the system runs a Monte-Carlo resampling over the matchup matrix's **Wilson-interval uncertainty**: each unordered pair `{i, j}` is sampled **once** from its Jeffreys-Beta posterior (reflecting the observed win-rate uncertainty), and the mirror cell is set to `1 − p` to maintain constant-sum-ness. The equilibrium is re-solved for each resample (2000 by default), and we report per archetype **in what percentage of resamples** that archetype was **excluded** (payoff strictly below the value). This "exclusion robustness" is the strong claim: "this deck falls out of the optimal mix in X% of reasonable scenarios, even accounting for sampling uncertainty."
+
+**Three mathematical assumptions documented in code and [`docs/data-types.md`](./data-types.md):**
+1. **Symmetrization:** The matchup matrix is not naturally zero-sum under the tie convention, so it must be symmetrized first — this restores the minimax theorem's applicability.
+2. **Jeffreys-Beta resampling distribution:** We sample from the Jeffreys posterior `Beta(s + 0.5, n − s + 0.5)` rather than uniform over the Wilson band, because it is the Bayesian dual of the Wilson interval and is consistent with the symmetrization (its mirror is the exact posterior of the opposite direction). At thin sample sizes, Jeffreys differs from the Wilson band at the tails, so the reported robustness percentages are **not** identical to "resampling uniformly in the Wilson interval"—a distinction that matters for reproducibility.
+3. **Exclusion is one-directional:** The certificate proves exclusion (payoff < value ⇒ not in any equilibrium), but **does not prove inclusion**—equal payoff does not guarantee a deck is in equilibrium, because the equilibrium can be non-unique in degenerate cases. The UI reports the exclusion robustness for decks that are excluded, and shows the equilibrium composition (with a fragility warning if exact-support reproducibility is low) for decks in the point estimate.
+
+### Three easily-confused numbers
+
+After implementing this feature, **three different win-rate-shaped numbers exist** and must not be conflated. They have different meanings, use different weight vectors, and handle missing data differently:
+
+| Number | Definition | Weight vector | Remis convention | Missing data | Used in |
+|--------|-----------|---------------|------------------|--------------|---------|
+| `fieldWinRatePct` | Share-weighted EV against the **observed field** | Observed archetype shares | ⅓ of a win (tournament) | Excluded from coverage | Field Score panel, Spec 3 |
+| `fitnessPct` | Fitness `Σ_j x_j P_ij` against the **observed field** with a **constant-sum** payoff matrix | Observed archetype shares | ½ of a win (symmetrized) | Imputed as 50% | Replicator fitness display, this feature |
+| `equilibriumPayoffPct` | Payoff `Σ_j x*_j P_ij` against the **equilibrium**, where `x*` is the Nash mix | Nash equilibrium weights `x*` | ½ of a win (symmetrized) | Imputed as 50% | Deck strength report in equilibrium composition, this feature |
+
+All three are valid metrics for different questions, but showing one in place of another would mislead. The UI labels each distinctly and carries tooltips explaining the difference.
+
+### Replicator fitness and week-over-week direction
+
+From the equilibrium weights `x*`, we compute each archetype's **fitness** `f_i = Σ_j x_j P_ij` against the equilibrium mixture. Mean fitness for a constant-sum game is exactly 50% — a built-in self-check.
+
+To track whether the meta is favoring a deck, we compare the **week-over-week fitness delta**: the fitness of archetype `i` against **the most recent completed full week's observed shares** minus its fitness against **the prior completed week's shares**, both evaluated on the same payoff matrix (so the delta isolates meta shifts, not sampling noise). This gives a direction (rising / falling / stable / unknown — unknown when fewer than two complete weeks exist). The delta is shown alongside the observed share change (descriptive only, never used for the direction, so theory and reality can diverge visibly).
+
+### Data and computation
+
+**Precomputed weekly:** The job `computeEquilibrium` runs once per week (Monday recommended, after `syncMeta` completes), reads the default-scope (online, Bo1) tournament data for four analysis windows (7 / 14 / 21 / 28 days), computes the equilibrium for each, and persists to two tables: `meta_equilibrium_runs` (one row per window, carrying run-level metadata: game value, support size, robustness counters, imputation rate) and `meta_equilibrium_archetypes` (one row per archetype per window, with weights, payoffs, coverage, robustness percentiles, and trend data).
+
+**API:** `GET /api/meta/equilibrium?days=7..180` returns the precomputed run for a snapped window (7 / 14 / 21 / 28 days). Cold start (before first job run) returns `computedAt: null`, `run: null`, `archetypes: []` — an honest empty state, never an error.
+
+**UI placement:** The section is a **`CollapsibleSection` without `defaultOpen`**, titled with an "experimental" badge, appearing after the Field Score and Matchup Matrix sections on the Meta page. It includes:
+- **Robust exclusions** (archetypes with `exclusionBand !== 'likelyIn'`): plain-language sentence ("Dragapult is in the most scenarios not a good choice — in 77.9% of 2000 resamples not part of the optimal mix (±0.9 pp)") plus raw percentage and confidence band
+- **Exact composition** (the point-estimate equilibrium weights, shown only with a fragility warning if the exact support was reproduced in fewer than 50% of resamples, or if the equalizerCount suggests non-uniqueness)
+- **Week-over-week trend** (arrow icon + direction label + fitness delta, with observed share change noted as descriptive context)
+- **Source and limits** (computation timestamp, window, resample count, seed, imputation percentage)
+
+### The "popularity paradox" framing
+
+Decks in equilibrium are not necessarily popular, and popular decks are not necessarily in equilibrium. When a deck has high observed meta share but zero equilibrium weight (or a very low weight), that's the "popularity paradox"—played by many pilots despite being suboptimal to play against the current distribution. This is flagged with an icon and label pair (not color alone, for accessibility) in the equilibrium composition display, and the exclusion robustness for such a deck reinforces the statement: "in X% of scenarios, this deck drops out entirely."

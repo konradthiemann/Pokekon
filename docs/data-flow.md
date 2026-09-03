@@ -508,3 +508,95 @@ The window filter is served by the new plain `event_date` index. The aggregation
 covers plan §3.7.1: going-first/second win rate, clean-setup-by-turn-2 share,
 dead-turn rate, and the average remaining-prize curve of won games. The response
 shape is the shared `DeckAnalytics` contract in `@pokekon/shared`.
+
+---
+
+## Meta Equilibrium Computation (Weekly Job)
+
+```mermaid
+sequenceDiagram
+    participant Cron as Railway Cron (Monday)
+    participant Job as computeEquilibrium
+    participant DB as PostgreSQL
+    participant SharedLib as @pokekon/shared
+
+    Cron->>Job: invoke (daily or weekly, post-syncMeta)
+    Job->>DB: For each window (7/14/21/28 days):
+    Note over Job: Load tournament_standings + tournaments (online, bo1 scope)
+    DB-->>Job: Match data (wins, losses, ties per pair)
+    
+    Job->>SharedLib: buildPayoffMatrix(archetypes, cells)
+    Note over SharedLib: Symmetrize p_ij + p_ji = 1 exactly
+    SharedLib-->>Job: PayoffMatrix
+    
+    Job->>SharedLib: solveSymmetricZeroSumNash(matrix)
+    Note over SharedLib: Phase-II simplex, Bland's rule
+    SharedLib-->>Job: NashEquilibrium (weights, payoffs, support, excludedCertain)
+    
+    Job->>SharedLib: equilibriumRobustness(matrix, pointEstimate, resamples=2000, seed)
+    Note over SharedLib: Monte-Carlo: resample 2000x from Jeffreys-Beta, re-solve, collect stats
+    SharedLib-->>Job: RobustnessResult (exclusion rates, mean weights, confidence bands)
+    
+    Job->>SharedLib: fitnessTrend(matrix, currentShares, priorWeekShares)
+    Note over SharedLib: Compare fitness against two completed ISO weeks
+    SharedLib-->>Job: FitnessTrend[] (direction, delta, observed share change)
+    
+    Note over Job: Write in one transaction per window:
+    Job->>DB: DELETE FROM meta_equilibrium_runs WHERE window_days = ?
+    Note over DB: Cascade deletes meta_equilibrium_archetypes
+    DB-->>Job: Done
+    Job->>DB: INSERT meta_equilibrium_runs (valuePct, support_size, robustness counts, ...)
+    DB-->>Job: run_id
+    Job->>DB: INSERT meta_equilibrium_archetypes (chunked, 200 per batch)
+    Note over DB: All rows share same computed_at timestamp
+    DB-->>Job: Done
+    
+    Job-->>Cron: Result {windows, archetypesProcessed, rowsWritten, durationMs per window}
+```
+
+**Dry-run mode:** Executes all steps above, prints counters and durations, writes nothing to DB — safe to test against production data.
+
+**Data sources:** The job reads `tournament_standings` joined with `tournaments` (filtering `is_online=true, swiss_mode='BO1'`), aggregates by unordered archetype pair, and invokes the pure computation functions from `@pokekon/shared`.
+
+---
+
+## Meta Equilibrium Read Path
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Web as MetaPage.tsx
+    participant API as GET /api/meta/equilibrium?days=
+    participant DB as PostgreSQL
+    participant EquilPanel as EquilibriumPanel.tsx
+
+    Browser->>Web: Navigate to Meta page
+    Web->>API: getMetaEquilibrium(days)
+    API->>API: snapEquilibriumWindow(days)
+    Note over API: Snap 1→7, 11→14, 25→28, etc.
+    API->>DB: SELECT * FROM meta_equilibrium_runs WHERE window_days = ?
+    alt Run exists
+        DB-->>API: One row with valuePct, support_size, robustness counts
+        API->>DB: SELECT * FROM meta_equilibrium_archetypes WHERE run_id = ? ORDER BY weight_pct DESC, share_pct DESC
+        DB-->>API: Archetype rows
+        API-->>Web: MetaEquilibriumResponse {computedAt, run, archetypes[]}
+    else Cold start (no run yet)
+        DB-->>API: No rows
+        API-->>Web: MetaEquilibriumResponse {computedAt: null, run: null, archetypes: []}
+    end
+    
+    Web->>EquilPanel: Pass response
+    EquilPanel->>EquilPanel: exclusionBand(exclusionRatePct)
+    Note over EquilPanel: Band tier: veryRobust (≥90%), robust (≥70%), unclear (≥30%), likelyIn (<30%)
+    EquilPanel->>EquilPanel: isCompositionFragile(exactSupportRatePct, equalizerCount, supportSize)
+    Note over EquilPanel: true if exactSupportRatePct < 50% OR equalizerCount > supportSize
+    
+    EquilPanel-->>Browser: Render three blocks:
+    Note over EquilPanel: Block 1: Robust exclusions (plain-language + %) for each archetype
+    Note over EquilPanel: Block 2: Exact composition (with/without fragility warning + confidence bands)
+    Note over EquilPanel: Block 3: Week-over-week trend (arrow + label + delta + observed share change)
+```
+
+**Placement:** The section is a collapsed `CollapsibleSection` (no `defaultOpen`) on the Meta page, appearing after Field Score and Matchup Matrix. An "experimental" badge signals this is additional analysis, not a replacement.
+
+**Cold start:** `computedAt === null` displays a neutral message ("Not yet computed") — no error, no spinner, just honest acknowledgement that the weekly job hasn't run yet.

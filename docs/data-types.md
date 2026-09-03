@@ -539,4 +539,142 @@ One published tournament list, reduced to what the analysis needs. The `counts` 
 3. **Classify tier:** apply `classifyCardSignal()` to the delta and `inclusionPct`.
 4. **Sort and return:** by `inclusionPct` descending, then `cardName` asc (stable and testable).
 
+---
+
+## Game-Theoretic Meta Layer Types (Spec 6)
+
+The Nash equilibrium analysis rests on a **constant-sum payoff matrix** and several pure-function types from `@pokekon/shared/nashEquilibrium.ts`.
+
+### `PayoffMatrix`
+```typescript
+interface PayoffMatrix {
+  archetypeIds: string[];
+  /** p[i][j] = probability that i beats j, in [0,1]. Guaranteed:
+   *  p[i][j] + p[j][i] === 1 and p[i][i] === 0.5. */
+  p: number[][];
+  /** Sample size behind the unordered pair {i,j}; 0 when imputed. Symmetric. */
+  games: number[][];
+  /** true where the cell carries NO data and was imputed as 0.5. Symmetric,
+   *  false on the diagonal (the mirror is definitional, not imputed). */
+  imputed: boolean[][];
+  /** Share of the n*(n-1) off-diagonal cells that were imputed, 1 decimal. */
+  imputedCellSharePct: number;
+  /** Per archetype: opponent-share-weighted coverage of its own row (excludes
+   *  mirror). DELIBERATELY NOT the same as FieldScore.coveragePct — see
+   *  fieldWinRate.ts:58-64 vs here. */
+  rowCoveragePct: number[];
+}
+```
+
+The payload passed to the LP solver. Built from matchup cells via `buildPayoffMatrix()`, which applies symmetrization `p_sym(i,j) = (1 + p_ij − p_ji) / 2` to restore constant-sum-ness — this is equivalent to the "half-tie" convention and is **identical to the formula used by the reference paper**. Mirror cells (`i === j`) are always `0.5` with `games = 0` and `imputed = false` (the mirror is definitional, not imputed).
+
+**Critical assumption (documented in code and `features.md` §18):** The original tournament-weighted win rates use "tie = ⅓ of a win", which makes `p_ij + p_ji = 1 − t/(3n) < 1` — not a constant-sum game. The symmetrization is **mandatory** for the minimax theorem and LP solution to apply. Persisting this matrix would be wrong; instead, we symmetrize on read and pass it to the solver.
+
+### `LpResult`
+```typescript
+interface LpResult {
+  status: 'optimal' | 'unbounded' | 'iterationLimit';
+  objective: number;    // Objective value at the optimum; 0 when not 'optimal'
+  x: number[];          // Primal solution, length n; all zeros when not 'optimal'
+  iterations: number;   // Pivots performed (exposed for cost visibility)
+}
+```
+
+Result of the Phase-II simplex solver `solveStandardFormLp(c, A, b)`. The `status` values:
+- **`'optimal'`:** Standard solution found; `objective` and `x` are valid.
+- **`'unbounded'`:** The LP is unbounded (rare; means the payoff matrix is broken and not constant-sum).
+- **`'iterationLimit'`:** Hit the pivot limit before finding an optimum (safety valve for malformed input).
+
+### `NashEquilibrium`
+```typescript
+interface NashEquilibrium {
+  archetypeIds: string[];
+  weightsPct: number[];         // Equilibrium weights, summing to 100
+  payoffsPct: number[];         // (P x*)_i × 100 — payoff of playing i against x*
+  valuePct: number;             // Game value × 100; MUST be 50 for constant-sum input
+  support: string[];            // archetypeIds with weight > SUPPORT_EPSILON_PCT (1e-6)
+  excludedCertain: string[];    // Payoff strictly below value; in NO equilibrium (proven)
+  equalizerCount: number;       // #{i : |payoff_i - value| <= PAYOFF_EPSILON_PP} — heuristic fragility hint
+  iterations: number;
+  status: 'optimal' | 'failed';
+}
+```
+
+Solution of `solveSymmetricZeroSumNash(matrix)`, the symmetric zero-sum game equilibrium. Key fields:
+
+- **`valuePct`:** Must be 50 for a correct constant-sum matrix (self-check persisted to production). Deviation signals the input was not symmetric or constant-sum.
+- **`excludedCertain`:** These archetypes have payoff strictly below the game value. By the theorem (plan §3.0c), they are in the support of **no** equilibrium — this is a provable exclusion, not a heuristic. The converse does NOT hold: equal payoff does not prove inclusion, because equilibria can be non-unique.
+- **`equalizerCount`:** Archetypes whose payoff equals the value (within `PAYOFF_EPSILON_PP`). When this count exceeds `support.length`, the exact composition is non-unique — a sign to show robustness numbers instead of claiming a definitive mix.
+
+### `ArchetypeRobustness`
+```typescript
+interface ArchetypeRobustness {
+  archetypeId: string;
+  exclusionRatePct: number;              // % of resamples with weight ≈ zero (numerically)
+  meanWeightPct: number;                 // Mean weight across resamples
+  weightP05Pct: number;                  // 5th percentile of weight
+  weightP95Pct: number;                  // 95th percentile of weight
+  certainExclusionRatePct: number;       // % of resamples where payoff < value (≤ exclusionRatePct)
+}
+```
+
+Per-archetype robustness over Monte-Carlo resamples. The `certainExclusionRatePct` is the strong claim: "in X% of scenarios, this archetype's payoff against the equilibrium was strictly below the value, so it is excluded from every equilibrium in those scenarios."
+
+**Documentation of the Jeffreys-Beta resampling choice (plan §3.0d):** Each unordered matchup pair is sampled **once** from its Jeffreys posterior `Beta(s + 0.5, n − s + 0.5)`, where `s = w + t/2` (half-tie score) and `n = w + l + t`. This distribution is the Bayesian dual of the Wilson interval; at thin sample sizes it differs from uniform sampling in the Wilson band (more conservative at the tails), so **reported percentages are not identical to "resampling uniformly in the Wilson interval"** — this distinction matters for reproducibility and is load-bearing in test fixtures.
+
+### `RobustnessResult`
+```typescript
+interface RobustnessResult {
+  resamples: number;
+  seed: number;
+  perArchetype: ArchetypeRobustness[];
+  exactSupportRatePct: number;  // % of resamples reproducing the point estimate's support set
+  failedResamples: number;      // LP did not return 'optimal'; reported, never silently dropped
+}
+```
+
+Aggregate robustness data from `equilibriumRobustness(matrix, pointEstimate, opts)`. The `exactSupportRatePct` is the percentage of the 2000 resamples in which re-solving the equilibrium yielded the exact same set of non-zero-weight archetypes as the point estimate. Low values (e.g., 2.1% in the reference paper) indicate the composition is fragile and should be shown with a warning.
+
+### `ReplicatorStep`
+```typescript
+interface ReplicatorStep {
+  archetypeIds: string[];
+  fitnessPct: number[];         // f_i(x) × 100
+  meanFitnessPct: number;       // Σ x_i f_i; exactly 50 for constant-sum matrix
+  growthPct: number[];          // (f_i / phi − 1) × 100 = relative growth rate
+  projectedSharePct: number[];  // x_i' × 100 (renormalised for next step)
+}
+```
+
+One discrete step of the replicator dynamic `x_i' = x_i · f_i / φ`, where `φ = Σ_i x_i f_i = 0.5` exactly for constant-sum games (a self-check). Used to show the theoretical "what if the meta shifts according to replicator dynamics" trajectory.
+
+### `FitnessDirection`
+```typescript
+type FitnessDirection = 'rising' | 'falling' | 'stable' | 'unknown';
+```
+
+Week-over-week trend of an archetype's fitness against the field, computed by `fitnessTrend()`. Directions:
+- **`'rising'`:** Fitness increased by > `stableBandPp` (default 1 pp) from the prior week
+- **`'falling'`:** Fitness decreased by > `stableBandPp`
+- **`'stable'`:** Absolute delta ≤ `stableBandPp`
+- **`'unknown'`:** No prior week available (cold start with <2 complete weeks)
+
+The delta is always computed on the **same payoff matrix** against **two separate complete ISO weeks**; this isolates meta shifts from sampling noise per week.
+
+### `FitnessTrend`
+```typescript
+interface FitnessTrend {
+  archetypeId: string;
+  fitnessPct: number;                    // Current week's fitness
+  previousFitnessPct: number | null;     // Prior week's fitness (null on cold start)
+  fitnessDeltaPp: number | null;         // Week-over-week change in pp (null on cold start)
+  observedShareDeltaPp: number | null;   // Observed share change (descriptive, not used for direction)
+  direction: FitnessDirection;
+}
+```
+
+Per-archetype week-over-week trend. The `observedShareDeltaPp` is **purely descriptive** and never affects the computed `direction` — theory can diverge from observation (fitness says it should grow, but it shrank), and that divergence is meaningful to show.
+
+**Key assumption (documented in code and `features.md` §18):** The two complete weeks are derived from `meta_snapshots`, excluding the current ISO week (which is continuously re-synced and thus a partial aggregate). This is the only honest way to compare: finished data against finished data.
+
 Result is `[]` if the input is empty or all lists have invalid percentiles. A list with all cards means `delta === null` (same group for with/without), and the tier becomes `'insufficient'` — this is honest: you can't claim a card helps or hurts if it appears in every list.
