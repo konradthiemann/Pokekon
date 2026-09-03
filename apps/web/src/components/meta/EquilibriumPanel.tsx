@@ -23,10 +23,14 @@ import { exclusionBand, isCompositionFragile } from './equilibriumFraming';
  *  conservative cutoff only fires well below any row with real signal. */
 const ROW_COVERAGE_THIN_PCT = 20;
 
-/** Large positive `paradoxGapPp` combined with a zero equilibrium weight is
- *  the "popular but mathematically worthless" case (plan §3.8 bullet 4). */
+/** Large positive `paradoxGapPp` combined with exclusion from the equilibrium
+ *  support is the "popular but mathematically worthless" case (plan §3.8
+ *  bullet 4). Checked via `!inSupport`, NOT `weightPct === 0` — `weightPct`
+ *  is already rounded to 2 decimals by the job, so a genuinely in-support
+ *  archetype with a tiny real weight also reads as "0" on the wire; only
+ *  `inSupport` reflects the actual (unrounded) LP result. */
 function isPopularityParadox(row: EquilibriumArchetypeRow): boolean {
-  return row.weightPct === 0 && row.paradoxGapPp > 0;
+  return !row.inSupport && row.paradoxGapPp > 0;
 }
 
 function DirectionIcon({ direction }: { direction: EquilibriumArchetypeRow['direction'] }) {
@@ -64,10 +68,17 @@ function ArchetypeRow({ row, resamples }: { row: EquilibriumArchetypeRow; resamp
               se: monteCarloSePct(row.exclusionRatePct, resamples).toFixed(1),
             })}
           </p>
-          {row.excludedCertain && (
-            <p className="font-semibold text-red-700">{t('equilibrium.robust.certain')}</p>
-          )}
         </div>
+      )}
+      {/* Deliberately OUTSIDE the `band` gate: `excludedCertain` is a
+          deterministic LP fact (plan §3.0c's exclusion certificate), not
+          derived from the Monte-Carlo resampling `band` comes from. The two
+          can disagree (resampling noise can push exclusionRatePct low even
+          when the point-estimate payoff is certainly below the equilibrium
+          value) — the one hard, provable claim this feature makes must
+          never be hidden by the band's own uncertainty. */}
+      {row.excludedCertain && (
+        <p className="text-xs font-semibold text-red-700">{t('equilibrium.robust.certain')}</p>
       )}
 
       {paradox && (

@@ -521,21 +521,35 @@ export function MetaPage() {
   // §3.8 / §4 step 21) — a separate, "experimental" section that reads its
   // own precomputed window; independent of the field-analysis request above
   // so a slow/failed equilibrium fetch never blocks the existing sections.
-  const [equilibrium, setEquilibrium] = useState<MetaEquilibriumResponse | null>(null);
+  // Same requestKey pattern as `fieldAnalysis` above (days changed since the
+  // fetch was issued -> keep showing loading, never a stale window's data;
+  // days differs from the key that failed -> retry instead of staying
+  // stuck on the previous error).
+  const [loadedEquilibrium, setLoadedEquilibrium] = useState<{
+    key: string;
+    data: MetaEquilibriumResponse;
+  } | null>(null);
+  const [equilibriumFailedKey, setEquilibriumFailedKey] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    const key = String(days);
     getMetaEquilibrium(days)
       .then((res) => {
-        if (!cancelled) setEquilibrium(res);
+        if (!cancelled) setLoadedEquilibrium({ key, data: res });
       })
       .catch(() => {
-        /* the section renders its own cold-start/empty state; no error UI needed here */
+        if (!cancelled) setEquilibriumFailedKey(key);
       });
     return () => {
       cancelled = true;
     };
   }, [days]);
+
+  const equilibriumRequestKey = String(days);
+  const equilibrium =
+    loadedEquilibrium?.key === equilibriumRequestKey ? loadedEquilibrium.data : null;
+  const equilibriumError = equilibriumFailedKey === equilibriumRequestKey;
 
   // The "Sync Live Meta" action also lives in the desktop sidebar, but that is
   // hidden on mobile (`md:flex`) — so the meta page carries its own copy,
@@ -693,6 +707,8 @@ export function MetaPage() {
         >
           {equilibrium ? (
             <EquilibriumPanel data={equilibrium} />
+          ) : equilibriumError ? (
+            <p className="text-sm text-slate-500">{t('metaTable.loadError')}</p>
           ) : (
             <p className="text-sm text-slate-500">{t('metaTable.loading')}</p>
           )}

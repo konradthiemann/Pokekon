@@ -203,6 +203,53 @@ describe('EquilibriumPanel — robust plain-language text + percentage (plan §3
   });
 });
 
+describe('EquilibriumPanel — certain exclusion is never hidden by the robustness band (bug found in code review)', () => {
+  // The band gate (`band !== 'likelyIn'`) exists to declutter Block 1 for
+  // decks that are clearly fine — but `excludedCertain` is a DETERMINISTIC
+  // LP fact (plan §3.0c's exclusion certificate), independent of the
+  // Monte-Carlo resampling that `exclusionRatePct`/`band` are derived from.
+  // The two CAN disagree (resampling noise pushes exclusionRatePct low even
+  // though the point-estimate payoff is certainly below the equilibrium
+  // value) — when they do, the one hard, provable claim this feature makes
+  // must still be visible, not silently swallowed by the band gate.
+  it('shows the certain-exclusion sentence even when the robustness band itself reads "likelyIn"', () => {
+    const certainButLikelyIn = makeArchetypeRow({
+      archetypeId: 'certain-but-likely-in',
+      archetypeName: 'Certain But Likely In',
+      excludedCertain: true,
+      exclusionRatePct: 3.5, // -> exclusionBand 'likelyIn' despite the certificate
+    });
+    render(<EquilibriumPanel data={makeResponse({ archetypes: [certainButLikelyIn] })} />);
+    const row = screen.getByTestId('equilibrium-archetype-certain-but-likely-in');
+
+    const certainSentence = i18n.t('meta:equilibrium.robust.certain');
+    expect(within(row).getByText(certainSentence)).toBeInTheDocument();
+  });
+});
+
+describe('EquilibriumPanel — popularity paradox uses inSupport, not rounded weightPct (bug found in code review)', () => {
+  // weightPct is already rounded to 2 decimals by the job (computeEquilibrium.ts).
+  // A genuinely in-support archetype with a tiny real weight rounds to
+  // "0.00" on the wire — checking `weightPct === 0` instead of `!inSupport`
+  // misreads that as "excluded from the equilibrium", the opposite of what
+  // `inSupport` actually says.
+  it('does NOT flag an archetype as the popularity paradox when it IS in the equilibrium support, even if its rounded weight is 0', () => {
+    const tinyButInSupport = makeArchetypeRow({
+      archetypeId: 'tiny-but-in-support',
+      archetypeName: 'Tiny But In Support',
+      weightPct: 0, // rounds to 0.00 on the wire, but still...
+      inSupport: true, // ...genuinely in the equilibrium support.
+      paradoxGapPp: 10.0,
+    });
+    render(<EquilibriumPanel data={makeResponse({ archetypes: [tinyButInSupport] })} />);
+    const row = screen.getByTestId('equilibrium-archetype-tiny-but-in-support');
+    const paradoxLabel = i18n.t('meta:equilibrium.paradox.label');
+
+    expect(within(row).queryByText(paradoxLabel)).not.toBeInTheDocument();
+    expect(within(row).queryByTestId('paradox-icon')).not.toBeInTheDocument();
+  });
+});
+
 describe('EquilibriumPanel — composition fragility warning (plan §3.8 bullet 3 / §6 risk 2)', () => {
   it('shows the fragility warning when isCompositionFragile is true (paper value: 2.1 % exact-support rate)', () => {
     const data = makeResponse({

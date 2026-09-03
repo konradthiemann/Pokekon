@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import i18n from '../i18n';
 import { MetaPage } from './MetaPage';
+import { getMetaEquilibrium } from '../lib/api';
+import type { MetaEquilibriumResponse } from '../lib/api';
+import { META_DEFAULT_DAYS } from '../components/meta/metaWindow';
 
 /** Lets the mocked getFieldAnalysis/getMetaMatchups promises (and their
  *  effect callbacks) settle before assertions run, so React doesn't warn
@@ -46,6 +49,9 @@ beforeAll(async () => {
 
 beforeEach(() => {
   localStorage.clear();
+  vi.mocked(getMetaEquilibrium)
+    .mockReset()
+    .mockResolvedValue(equilibriumResponse(META_DEFAULT_DAYS, '2020-06-15T00:00:00.000Z'));
 });
 
 vi.mock('../store/dashboardStore', () => ({
@@ -97,8 +103,35 @@ vi.mock('../lib/api', async (importOriginal) => {
       },
       rows: [],
     }),
+    // Explicit mock (not left to `...actual`) so individual tests below can
+    // control resolution timing/failure per call — a real fetch would hang
+    // or reject unpredictably in jsdom.
+    getMetaEquilibrium: vi.fn(),
   };
 });
+
+function equilibriumResponse(windowDays: number, computedAt: string): MetaEquilibriumResponse {
+  return {
+    windowDays,
+    online: true,
+    bo1: true,
+    computedAt,
+    run: {
+      archetypeCount: 3,
+      valuePct: 50.0,
+      supportSize: 3,
+      equalizerCount: 3,
+      imputedCellSharePct: 0,
+      resamples: 2000,
+      seed: 1,
+      failedResamples: 0,
+      exactSupportRatePct: 100,
+      currentPeriod: null,
+      previousPeriod: null,
+    },
+    archetypes: [],
+  };
+}
 
 vi.mock('../components/layout/CollapsibleSection', () => ({
   CollapsibleSection: ({
@@ -153,5 +186,77 @@ describe('MetaPage — equilibrium section is collapsed by default (plan §4 ste
       expect(section, `expected a section titled "${titleText}"`).toBeDefined();
       expect(section).toHaveAttribute('data-default-open', 'true');
     }
+  });
+});
+
+function experimentalSectionBody() {
+  const sections = screen.getAllByTestId('collapsible-section');
+  const section = sections.find((s) =>
+    /experiment/i.test(
+      s.querySelector('[data-testid="collapsible-section-title"]')?.textContent ?? '',
+    ),
+  );
+  if (!section) throw new Error('experimental section not found');
+  const body = section.querySelector('[data-testid="collapsible-section-body"]');
+  if (!body) throw new Error('experimental section body not found');
+  return body as HTMLElement;
+}
+
+// Bug found in code review of feat/meta-game-theory-layer (2026-09-03): the
+// equilibrium fetch's .catch() was empty, leaving the section stuck on
+// "loading" forever on a genuine fetch error — unlike the sibling
+// fieldAnalysis effect a few lines above, which already distinguishes a
+// failed request from a still-loading one.
+describe('MetaPage — equilibrium fetch failure does not loop forever on "loading" (bug found in code review)', () => {
+  it('shows an error state instead of the loading indicator when the equilibrium fetch rejects', async () => {
+    vi.mocked(getMetaEquilibrium).mockReset().mockRejectedValue(new Error('network down'));
+
+    render(<MetaPage />);
+    await flushEffects();
+
+    const body = experimentalSectionBody();
+    expect(body.textContent).not.toContain(i18n.t('meta:metaTable.loading'));
+    expect(body.textContent).toContain(i18n.t('meta:metaTable.loadError'));
+  });
+});
+
+// Bug found in code review of feat/meta-game-theory-layer (2026-09-03): the
+// equilibrium effect had no staleness guard (unlike the sibling
+// fieldAnalysis effect, which tags each result with a requestKey), so a
+// slow, stale in-flight request for a PREVIOUS window could overwrite the
+// data for the window the user has since switched to.
+describe('MetaPage — equilibrium data does not go stale across a window switch (bug found in code review)', () => {
+  it("keeps the newer window's data when an older, slower request resolves last", async () => {
+    let resolveOldWindow!: (value: MetaEquilibriumResponse) => void;
+    const oldWindowPromise = new Promise<MetaEquilibriumResponse>((resolve) => {
+      resolveOldWindow = resolve;
+    });
+    vi.mocked(getMetaEquilibrium)
+      .mockReset()
+      .mockImplementation((days) => {
+        if (days === META_DEFAULT_DAYS) return oldWindowPromise;
+        if (days === 7) {
+          return Promise.resolve(equilibriumResponse(7, '2021-03-10T00:00:00.000Z'));
+        }
+        return Promise.reject(new Error(`unexpected days: ${String(days)}`));
+      });
+
+    render(<MetaPage />);
+    await flushEffects();
+    // Initial (default-window) request is still pending — loading, not stale.
+    expect(experimentalSectionBody().textContent).toContain(i18n.t('meta:metaTable.loading'));
+
+    // Switch windows before the old request resolves.
+    fireEvent.click(screen.getByRole('button', { name: '7' }));
+    await flushEffects();
+    expect(experimentalSectionBody().textContent).toContain('2021');
+
+    // The stale, slower request for the OLD window now finally resolves.
+    resolveOldWindow(equilibriumResponse(META_DEFAULT_DAYS, '2020-06-15T00:00:00.000Z'));
+    await flushEffects();
+
+    // Must still show the current (7-day) window's data, never the stale one.
+    expect(experimentalSectionBody().textContent).toContain('2021');
+    expect(experimentalSectionBody().textContent).not.toContain('2020');
   });
 });
