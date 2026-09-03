@@ -582,6 +582,16 @@ export interface ReplicatorStep {
   growthPct: number[];
   /** Renormalised x_i' * 100. Sums to 100 by construction. */
   projectedSharePct: number[];
+  /** 'failed' when `meanFitnessPct` deviates from its required 50 by more
+   *  than `PAYOFF_EPSILON_PP` for a non-degenerate sharePct -- the same
+   *  constant-sum self-check solveSymmetricZeroSumNash runs on `valuePct`,
+   *  applied here to `meanFitnessPct` (plan §3.0e). buildPayoffMatrix can
+   *  never produce this, but this function accepts a bare PayoffMatrix and
+   *  must defend against a future second producer that gets it wrong, or a
+   *  caller invoking it directly without going through
+   *  solveSymmetricZeroSumNash first. Skipped (always 'optimal') when
+   *  sharePct sums to <= 0 -- there is no population to evaluate. */
+  status: 'optimal' | 'failed';
 }
 
 /** Renormalises a share vector to fractions summing to 1. A non-positive
@@ -614,9 +624,11 @@ export function replicatorStep(matrix: PayoffMatrix, sharePct: number[]): Replic
       meanFitnessPct: 0,
       growthPct: [],
       projectedSharePct: [],
+      status: 'optimal',
     };
   }
 
+  const totalShare = sharePct.reduce((sum, v) => sum + v, 0);
   const x = renormalizeShares(sharePct);
   const fitnessPct = matrix.p.map((row) => row.reduce((sum, pij, j) => sum + pij * x[j], 0) * 100);
   const meanFitnessPct = x.reduce((sum, xi, i) => sum + xi * fitnessPct[i], 0);
@@ -628,7 +640,14 @@ export function replicatorStep(matrix: PayoffMatrix, sharePct: number[]): Replic
     meanFitnessPct !== 0 ? xi * 100 * (fitnessPct[i] / meanFitnessPct) : 0,
   );
 
-  return { archetypeIds, fitnessPct, meanFitnessPct, growthPct, projectedSharePct };
+  // Binding self-check (plan §3.0e): a constant-sum matrix.p always yields
+  // meanFitnessPct === 50, for ANY non-degenerate x. A larger deviation means
+  // P was not constant-sum -- same class of check as
+  // solveSymmetricZeroSumNash's valuePct check above.
+  const status: ReplicatorStep['status'] =
+    totalShare > 0 && Math.abs(meanFitnessPct - 50) > PAYOFF_EPSILON_PP ? 'failed' : 'optimal';
+
+  return { archetypeIds, fitnessPct, meanFitnessPct, growthPct, projectedSharePct, status };
 }
 
 // Mirrors CARD_SIGNAL_TIER_VALUES's pattern (packages/shared/src/cardPerformance.ts) so
@@ -693,6 +712,25 @@ export function fitnessTrend(
   const fitnessPct = matrix.p.map(
     (row) => row.reduce((sum, pij, j) => sum + pij * xCur[j], 0) * 100,
   );
+
+  // Binding self-check (plan §3.0e), same invariant as
+  // solveSymmetricZeroSumNash/replicatorStep: a constant-sum matrix.p always
+  // yields mean fitness 50 for ANY non-degenerate x. Skipped when
+  // currentSharePct sums to <= 0 (no population to evaluate). Unlike
+  // replicatorStep/solveSymmetricZeroSumNash, this function returns
+  // FitnessTrend[] (one entry per archetype, no single result object to
+  // attach a `status` field to) -- throwing matches this package's other
+  // convention for a violated structural invariant (solveStandardFormLp in
+  // ./simplex.ts).
+  const totalCurrentShare = currentSharePct.reduce((sum, v) => sum + v, 0);
+  if (totalCurrentShare > 0) {
+    const meanFitnessPct = xCur.reduce((sum, xi, i) => sum + xi * fitnessPct[i], 0);
+    if (Math.abs(meanFitnessPct - 50) > PAYOFF_EPSILON_PP) {
+      throw new Error(
+        'fitnessTrend: matrix.p is not constant-sum (mean fitness deviates from 50); buildPayoffMatrix cannot produce this -- check the matrix producer',
+      );
+    }
+  }
 
   const hasAnyPrevious = previousSharePct.some((v) => v !== null);
   if (!hasAnyPrevious) {
