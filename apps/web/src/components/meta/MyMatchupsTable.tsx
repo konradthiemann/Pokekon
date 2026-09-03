@@ -62,7 +62,7 @@ function WinRateBadge({
   );
 }
 
-export function MetaTable({ stats }: Props) {
+export function MyMatchupsTable({ stats }: Props) {
   const { t } = useTranslation('meta');
   const [namesOpen, setNamesOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);

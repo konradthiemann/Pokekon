@@ -4,13 +4,10 @@
   "localMetaBadge": "📍 local meta",
   "snapshotFallback": "Snapshot #{{id}}",
   "page": {
-    "title": "Recommendations",
-    "subtitleForDeck": "For: <deck>{{deckName}}</deck> — based on your matches and the current meta",
-    "subtitleGeneric": "Data-driven deck adjustment suggestions based on your match history and tournament data",
     "basedOn_one": "Based on <bold>{{count}} logged match</bold> and current meta data.",
     "basedOn_other": "Based on <bold>{{count}} logged matches</bold> and current meta data.",
     "logMoreHint": "Log 10+ matches for higher-confidence suggestions.",
-    "localMetaNotice": "Local meta ({{archetypes}}) is prioritized above general meta.",
+    "localMetaNotice": "<metaLink>Local meta</metaLink> ({{archetypes}}) is prioritized above general meta.",
     "metaWorksWithoutLogs": {
       "title": "Meta analysis works without your own data",
       "body": "Recommendations here are drawn from your own logs — log matches to unlock:",
@@ -49,7 +46,7 @@
     "refresh": "Refresh",
     "comparing": "Comparing…",
     "notSetUp": "Deck comparison not set up",
-    "setupHint": "Go to <myDeck>My Deck</myDeck> and set your archetype slug (e.g. <slug>n-zoroark</slug>) to compare your list against tournament results.",
+    "setupHint": "Open the <deckSettings>Deck List</deckSettings> section and set your archetype slug there (e.g. <slug>n-zoroark</slug>) to compare your list against tournament results.",
     "compareHint": "Click \"Compare\" to analyze your list against tournament-winning <slug>{{slug}}</slug> lists from Limitless TCG.",
     "considerAdding": "Consider Adding ({{count}})",
     "considerRemoving": "Consider Removing ({{count}})",

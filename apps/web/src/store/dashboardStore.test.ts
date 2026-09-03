@@ -134,6 +134,38 @@ beforeEach(() => {
   } as never);
 });
 
+/**
+ * Plan .claude/plans/ui-ux-hub-rework.md §3.1, Slice A (§4) — the store
+ * contract for the new "Mein Deck" sections: `deckSection`, `setDeckSection`,
+ * `openDeckComparison`. None of these exist yet — this is expected to fail
+ * with "not a function" / `undefined` until the implementer adds them.
+ */
+describe('dashboardStore deckSection contract (plan ui-ux-hub-rework.md §3.1, Slice A)', () => {
+  it('defaults deckSection to "deck"', () => {
+    expect(useDashboardStore.getState().deckSection).toBe('deck');
+  });
+
+  it('setDeckSection updates only deckSection, leaving activeTab untouched', () => {
+    useDashboardStore.setState({ activeTab: 'overview', deckSection: 'deck' } as never);
+
+    useDashboardStore.getState().setDeckSection('analytics');
+
+    const state = useDashboardStore.getState();
+    expect(state.deckSection).toBe('analytics');
+    expect(state.activeTab).toBe('overview');
+  });
+
+  it('openDeckComparison sets activeTab="deck" and deckSection="tips" in a single update, starting from activeTab="overview"', () => {
+    useDashboardStore.setState({ activeTab: 'overview', deckSection: 'deck' } as never);
+
+    useDashboardStore.getState().openDeckComparison();
+
+    const state = useDashboardStore.getState();
+    expect(state.activeTab).toBe('deck');
+    expect(state.deckSection).toBe('tips');
+  });
+});
+
 describe('dashboardStore.loadCardStats (plan §3.7)', () => {
   it('populates cardStats and cardStatsSource from the response', async () => {
     mockedFetchCardStats.mockResolvedValueOnce({

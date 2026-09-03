@@ -142,7 +142,7 @@ export function DeckComparisonPanel() {
     compareProgress,
     compareError,
     runDeckComparison,
-    setActiveTab,
+    setDeckSection,
   } = useDashboardStore();
 
   if (!deckArchSlug) {
@@ -156,9 +156,9 @@ export function DeckComparisonPanel() {
               t={t}
               i18nKey="comparison.setupHint"
               components={{
-                myDeck: (
+                deckSettings: (
                   <button
-                    onClick={() => setActiveTab('deck')}
+                    onClick={() => setDeckSection('deck')}
                     className="text-brand-700 underline"
                   />
                 ),

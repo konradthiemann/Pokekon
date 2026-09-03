@@ -1,28 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  LayoutDashboard,
-  Layers,
-  Lightbulb,
-  RefreshCw,
-  Globe,
-  CheckCircle2,
-  AlertCircle,
-  BarChart2,
-} from 'lucide-react';
+import { RefreshCw, Globe, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useDashboardStore } from '../../store/dashboardStore';
+import { NAV_ITEMS } from './navItems';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { LegalLinks } from './LegalLinks';
 import { UserMenu } from '../auth/UserMenu';
 import { PokeballMark } from '../shared/PokeballMark';
-
-// Labels are i18n keys in the `layout` namespace, resolved at render time.
-const NAV_ITEMS = [
-  { id: 'overview', labelKey: 'nav.overview', Icon: LayoutDashboard },
-  { id: 'meta', labelKey: 'nav.meta', Icon: BarChart2 },
-  { id: 'deck', labelKey: 'nav.myDeck', Icon: Layers },
-  { id: 'recommendations', labelKey: 'nav.recommendations', Icon: Lightbulb },
-] as const;
 
 export function Sidebar() {
   const { t } = useTranslation('layout');

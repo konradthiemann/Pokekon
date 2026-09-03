@@ -1,3 +1,7 @@
+// Stays under `components/deck/` with the `deck` i18n namespace even though
+// `MetaPage` renders it since Spec 7 (plan ui-ux-hub-rework.md §3.5) — a
+// screen-only move, kept here to avoid a file/i18n-key diff for zero visible
+// benefit (plan §5 risk 6).
 import { useTranslation } from 'react-i18next';
 import { MapPin, X } from 'lucide-react';
 import { useDashboardStore } from '../../store/dashboardStore';

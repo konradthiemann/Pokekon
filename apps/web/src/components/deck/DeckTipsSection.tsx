@@ -1,13 +1,19 @@
 import { useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { useDashboardStore } from '../store/dashboardStore';
-import { RecommendationsPanel } from '../components/recommendations/RecommendationsPanel';
-import { DeckComparisonPanel } from '../components/recommendations/DeckComparisonPanel';
-import { useRecommendations } from '../hooks/useRecommendations';
-import { computeDeckPerformanceStats } from '../lib/deckPerformanceStats';
+import { useDashboardStore } from '../../store/dashboardStore';
+import { RecommendationsPanel } from '../recommendations/RecommendationsPanel';
+import { DeckComparisonPanel } from '../recommendations/DeckComparisonPanel';
+import { useRecommendations } from '../../hooks/useRecommendations';
+import { computeDeckPerformanceStats } from '../../lib/deckPerformanceStats';
 import { Info, MapPin } from 'lucide-react';
 
-export function RecommendationsPage() {
+/**
+ * The "Tips" section of "My Deck" (plan ui-ux-hub-rework.md §3.4.1) — the
+ * former `RecommendationsPage` content, migrated here without its own page
+ * title (this is a section, not a page). Props-free: reads everything from
+ * the store, exactly like the page did before it.
+ */
+export function DeckTipsSection() {
   const { t } = useTranslation('recommendations');
   const {
     deckCards,
@@ -16,8 +22,8 @@ export function RecommendationsPage() {
     deckSnapshots,
     localMeta,
     activeDeckId,
-    activeDeck,
     cardStats,
+    setActiveTab,
   } = useDashboardStore();
   const playerName = localStorage.getItem('tcg-player-name') ?? '';
 
@@ -47,24 +53,6 @@ export function RecommendationsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 mb-0.5">
-          {t('page.title')}
-        </h1>
-        <p className="text-slate-500 text-sm">
-          {activeDeck ? (
-            <Trans
-              t={t}
-              i18nKey="page.subtitleForDeck"
-              values={{ deckName: activeDeck.archetypeName }}
-              components={{ deck: <span className="text-slate-700 font-medium" /> }}
-            />
-          ) : (
-            t('page.subtitleGeneric')
-          )}
-        </p>
-      </div>
-
       {/* Meta works without logs (plan personal-data-role-rework §3.8): a
           zero-log account should not read as "broken" — the same static
           thresholds as OverviewPage, in place of the usual "based on N logs"
@@ -102,7 +90,19 @@ export function RecommendationsPage() {
               <div className="flex items-center gap-1.5 text-amber-700">
                 <MapPin className="w-3 h-3 shrink-0" />
                 <span className="text-xs">
-                  {t('page.localMetaNotice', { archetypes: localMeta.join(', ') })}
+                  <Trans
+                    t={t}
+                    i18nKey="page.localMetaNotice"
+                    values={{ archetypes: localMeta.join(', ') }}
+                    components={{
+                      metaLink: (
+                        <button
+                          onClick={() => setActiveTab('meta')}
+                          className="underline hover:text-amber-800"
+                        />
+                      ),
+                    }}
+                  />
                 </span>
               </div>
             )}

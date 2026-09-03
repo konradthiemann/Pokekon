@@ -37,6 +37,7 @@ import { winRatePct1 } from '../components/meta/winRateColor';
 import { CollapsibleSection } from '../components/layout/CollapsibleSection';
 import { PokemonIcon } from '../components/shared/PokemonIcon';
 import { EquilibriumPanel } from '../components/meta/EquilibriumPanel';
+import { LocalMetaPanel } from '../components/deck/LocalMetaPanel';
 
 // ─── Meta table ───────────────────────────────────────────────────────────────
 
@@ -101,7 +102,7 @@ function TH({
 
 const PAGE_SIZE = 10;
 
-function MetaTable({
+function TournamentMetaTable({
   archetypes,
   onSelect,
 }: {
@@ -683,7 +684,7 @@ export function MetaPage() {
               {t('metaTable.loading')}
             </div>
           ) : (
-            <MetaTable archetypes={archetypes} onSelect={setSelected} />
+            <TournamentMetaTable archetypes={archetypes} onSelect={setSelected} />
           )}
         </CollapsibleSection>
 
@@ -714,6 +715,14 @@ export function MetaPage() {
           )}
         </CollapsibleSection>
       </div>
+
+      {/* Local-meta configuration moved here from "My Deck" (plan
+          ui-ux-hub-rework.md §3.5): it feeds the field score above, so it
+          belongs on the axis that consumes it. Not wrapped in a
+          CollapsibleSection — SidePanel already brings its own title/icon/
+          description, and the defaultOpen contract for the section list
+          above stays untouched. */}
+      <LocalMetaPanel />
 
       <RecentTournaments />
     </div>

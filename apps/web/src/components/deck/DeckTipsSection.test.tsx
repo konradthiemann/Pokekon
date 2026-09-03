@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import i18n from '../i18n';
-import { RecommendationsPage } from './RecommendationsPage';
-import type { OpponentLog } from '../types';
+import i18n from '../../i18n';
+import { DeckTipsSection } from './DeckTipsSection';
+import type { OpponentLog } from '../../types';
 
 beforeAll(async () => {
   await i18n.changeLanguage('en');
@@ -26,7 +26,9 @@ function log(over: Partial<OpponentLog>): OpponentLog {
 
 let opponentLogs: OpponentLog[];
 
-vi.mock('../store/dashboardStore', () => ({
+// Same store surface RecommendationsPage.test.tsx used (plan §3.4.1: the
+// section reads everything from the store, same as the page did before it).
+vi.mock('../../store/dashboardStore', () => ({
   useDashboardStore: () => ({
     deckCards: [],
     archetypeStats: [],
@@ -35,13 +37,22 @@ vi.mock('../store/dashboardStore', () => ({
     localMeta: [],
     activeDeckId: null,
     activeDeck: null,
+    cardStats: [],
+    deckArchSlug: null,
+    comparisonResult: null,
+    isComparing: false,
+    compareProgress: null,
+    compareError: null,
+    runDeckComparison: vi.fn(),
+    setActiveTab: vi.fn(),
+    setDeckSection: vi.fn(),
   }),
 }));
 
-describe('RecommendationsPage — meta works without personal logs (plan personal-data-role-rework §3.8)', () => {
+describe('DeckTipsSection — meta works without personal logs (plan ui-ux-hub-rework §3.4.1, migrated from RecommendationsPage.test.tsx §41-58)', () => {
   it('shows a notice explaining meta analysis works without logs, listing the three real thresholds, when there are zero logs', () => {
     opponentLogs = [];
-    render(<RecommendationsPage />);
+    render(<DeckTipsSection />);
 
     expect(screen.getByText(/5.*(encounters|games).*per archetype/i)).toBeInTheDocument();
     expect(screen.getByText(/3.*games.*(battle log|log)/i)).toBeInTheDocument();
@@ -50,10 +61,20 @@ describe('RecommendationsPage — meta works without personal logs (plan persona
 
   it('does not show the zero-logs notice once at least one log exists (the existing <10-logs hint may still show)', () => {
     opponentLogs = [log({})];
-    render(<RecommendationsPage />);
+    render(<DeckTipsSection />);
 
     expect(screen.queryByText(/works without/i)).not.toBeInTheDocument();
     // The pre-existing "log more matches" hint (< 10 logs) must still work.
     expect(screen.getByText(/log 10\+ matches/i)).toBeInTheDocument();
+  });
+});
+
+describe('DeckTipsSection — deck comparison lives here (plan ui-ux-hub-rework §3.4.1, item 5)', () => {
+  it('renders the comparison section title', () => {
+    opponentLogs = [];
+    render(<DeckTipsSection />);
+
+    // recommendations:comparison.sectionTitle — "List Comparison vs. Tournament Results"
+    expect(screen.getByText(/list comparison vs\. tournament results/i)).toBeInTheDocument();
   });
 });

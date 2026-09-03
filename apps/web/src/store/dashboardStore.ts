@@ -46,6 +46,12 @@ import {
 // recently ISSUED call always wins, never the most recently RESOLVED one.
 let cardStatsRequestSeq = 0;
 
+/** The three top-level axes of the IA (plan ui-ux-hub-rework.md §3.1, §3.9). */
+export type DashboardTab = 'overview' | 'meta' | 'deck';
+
+/** Sections within "My Deck" (plan ui-ux-hub-rework.md §3.1). */
+export type DeckSection = 'deck' | 'analytics' | 'tips';
+
 interface DashboardState {
   // Data
   decks: Deck[];
@@ -81,7 +87,8 @@ interface DashboardState {
   // UI state
   isLoading: boolean;
   lastRefreshed: Date | null;
-  activeTab: 'overview' | 'deck' | 'recommendations' | 'meta';
+  activeTab: DashboardTab;
+  deckSection: DeckSection;
 
   // Live meta sync
   isSyncing: boolean;
@@ -95,7 +102,13 @@ interface DashboardState {
 
   // Actions
   refresh: () => Promise<void>;
-  setActiveTab: (tab: DashboardState['activeTab']) => void;
+  setActiveTab: (tab: DashboardTab) => void;
+  setDeckSection: (section: DeckSection) => void;
+  /** Jumps directly into the deck comparison: sets activeTab='deck' AND
+   *  deckSection='tips' in a single store update (plan ui-ux-hub-rework.md
+   *  §3.1) — never two sequential calls, which would produce a visible
+   *  intermediate "My Deck / Deck List" render. */
+  openDeckComparison: () => void;
   syncMeta: () => Promise<MetaSyncResult>;
   loadRecentTournaments: (opts?: {
     days?: number;
@@ -147,6 +160,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   isLoading: false,
   lastRefreshed: null,
   activeTab: 'overview',
+  deckSection: 'deck',
   isSyncing: false,
   syncProgress: '',
   lastSynced: null,
@@ -234,6 +248,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   setActiveTab: (tab) => set({ activeTab: tab }),
+
+  setDeckSection: (section) => set({ deckSection: section }),
+
+  openDeckComparison: () => set({ activeTab: 'deck', deckSection: 'tips' }),
 
   setActiveDeck: async (id) => {
     setActiveDeckId(id);

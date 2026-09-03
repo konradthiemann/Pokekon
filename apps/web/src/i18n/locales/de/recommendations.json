@@ -4,13 +4,10 @@
   "localMetaBadge": "📍 lokales Meta",
   "snapshotFallback": "Snapshot #{{id}}",
   "page": {
-    "title": "Empfehlungen",
-    "subtitleForDeck": "Für: <deck>{{deckName}}</deck> — basierend auf deinen Matches und dem aktuellen Meta",
-    "subtitleGeneric": "Datenbasierte Vorschläge zur Deck-Anpassung auf Grundlage deiner Match-Historie und Turnierdaten",
     "basedOn_one": "Basierend auf <bold>{{count}} geloggten Match</bold> und aktuellen Meta-Daten.",
     "basedOn_other": "Basierend auf <bold>{{count}} geloggten Matches</bold> und aktuellen Meta-Daten.",
     "logMoreHint": "Logge 10+ Matches für verlässlichere Vorschläge.",
-    "localMetaNotice": "Lokales Meta ({{archetypes}}) wird gegenüber dem allgemeinen Meta priorisiert.",
+    "localMetaNotice": "<metaLink>Lokales Meta</metaLink> ({{archetypes}}) wird gegenüber dem allgemeinen Meta priorisiert.",
     "metaWorksWithoutLogs": {
       "title": "Meta-Analyse funktioniert auch ohne eigene Daten",
       "body": "Empfehlungen hier basieren auf deinen eigenen Logs — Matches loggen schaltet zusätzlich frei:",
@@ -49,7 +46,7 @@
     "refresh": "Aktualisieren",
     "comparing": "Vergleiche…",
     "notSetUp": "Deck-Vergleich nicht eingerichtet",
-    "setupHint": "Gehe zu <myDeck>Mein Deck</myDeck> und hinterlege deinen Archetype-Slug (z. B. <slug>n-zoroark</slug>), um deine Liste mit Turnierergebnissen zu vergleichen.",
+    "setupHint": "Öffne die <deckSettings>Deckliste</deckSettings> und hinterlege dort deinen Archetype-Slug (z. B. <slug>n-zoroark</slug>), um deine Liste mit Turnierergebnissen zu vergleichen.",
     "compareHint": "Klicke auf \"Vergleichen\", um deine Liste mit erfolgreichen <slug>{{slug}}</slug>-Turnierlisten von Limitless TCG zu vergleichen.",
     "considerAdding": "Hinzufügen erwägen ({{count}})",
     "considerRemoving": "Entfernen erwägen ({{count}})",

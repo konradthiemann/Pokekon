@@ -65,6 +65,12 @@ vi.mock('../store/dashboardStore', () => ({
     isFetchingTournaments: false,
     tournamentsError: null,
     loadRecentTournaments: vi.fn(),
+    // `LocalMetaPanel` (plan ui-ux-hub-rework.md §3.5) reads these three
+    // fields directly from the store (components/deck/LocalMetaPanel.tsx:24)
+    // — required once MetaPage renders it.
+    localMeta: [],
+    setLocalMeta: vi.fn(),
+    archetypeStats: [],
   }),
 }));
 
@@ -186,6 +192,19 @@ describe('MetaPage — equilibrium section is collapsed by default (plan §4 ste
       expect(section, `expected a section titled "${titleText}"`).toBeDefined();
       expect(section).toHaveAttribute('data-default-open', 'true');
     }
+  });
+});
+
+// Plan ui-ux-hub-rework.md §3.5 / §4 Slice C: the local-meta configuration
+// moves onto the Meta page (LocalMetaPanel is rendered by MetaPage, after
+// the four existing CollapsibleSections and before RecentTournaments) — its
+// own screen migrated, not its file or i18n namespace (still `deck:localMeta.*`).
+describe('MetaPage — renders the local-meta panel (plan §3.5, Slice C)', () => {
+  it('renders the local-meta panel title', async () => {
+    render(<MetaPage />);
+    await flushEffects();
+
+    expect(screen.getByText(i18n.t('deck:localMeta.title'))).toBeInTheDocument();
   });
 });
 

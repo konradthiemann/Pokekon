@@ -23,7 +23,8 @@
   "page": {
     "tabs": {
       "deckList": "Deck List",
-      "analytics": "Analytics"
+      "analytics": "Analytics",
+      "tips": "Tips"
     },
     "matchLogSection": "Match Log ({{count}})",
     "logMatch": "Log Match",

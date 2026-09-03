@@ -61,10 +61,10 @@ sequenceDiagram
     Store-->>AddLogModal: opponentLogs updated
     AddLogModal-->>User: Modal closes, table refreshes
     Hook->>Store: archetypeStats (recompute)
-    Hook-->>RecommendationsPage: Updated recommendations
+    Hook-->>DeckTipsSection: Updated recommendations
 ```
 
-After the log is written to IndexedDB, `refresh()` reloads both the raw logs and the derived `archetypeStats`. The `useRecommendations` hook in `RecommendationsPage` reacts automatically because it depends on `archetypeStats` from the store.
+After the log is written to IndexedDB, `refresh()` reloads both the raw logs and the derived `archetypeStats`. The `useRecommendations` hook in `DeckTipsSection` reacts automatically because it depends on `archetypeStats` from the store.
 
 **Where the pre-fill happens (plan `personal-data-role-rework.md` §3.5/§3.6):**
 entirely on the client, entirely before submit — `prefillFromBattleLog` lives in
@@ -274,14 +274,14 @@ sequenceDiagram
     participant Store as dashboardStore
     participant PerfStats as deckPerformanceStats.ts
     participant Hook as useRecommendations
-    participant RecsPage as RecommendationsPage
+    participant RecsSection as DeckTipsSection
 
-    RecsPage->>PerfStats: computeDeckPerformanceStats(opponentLogs)
+    RecsSection->>PerfStats: computeDeckPerformanceStats(opponentLogs)
     PerfStats->>PerfStats: Filter logs with battleLog text
     PerfStats->>BattleParser: parseBattleLog() for each
-    PerfStats-->>RecsPage: DeckPerformanceStats | null
+    PerfStats-->>RecsSection: DeckPerformanceStats | null
 
-    RecsPage->>Hook: useRecommendations({archetypeStats, deckCards, opponentLogs, deckSnapshots, localMeta, deckStats})
+    RecsSection->>Hook: useRecommendations({archetypeStats, deckCards, opponentLogs, deckSnapshots, localMeta, deckStats})
     Note over Hook: Runs entirely in useMemo — no async, no DB calls
 
     Hook->>Hook: 1. Deck version comparison (snapshot WR deltas)
@@ -294,7 +294,7 @@ sequenceDiagram
     Hook->>Hook: 7. Meta blind spots (>10% frequency, 0 encounters)
     Hook->>Hook: 8. Data sparsity warning
     Hook->>Hook: 9-14. Battle log performance signals (if deckStats present)
-    Hook-->>RecsPage: DeckRecommendation[] sorted by priority then dataPoints
+    Hook-->>RecsSection: DeckRecommendation[] sorted by priority then dataPoints
 ```
 
 The hook is a pure `useMemo` computation — no side effects, no DB calls. It recomputes whenever any of its inputs change. The 14 recommendation rules run in sequence, each appending to a shared `recs` array. Final sort: `high → medium → low`, then within each priority by `dataPoints` descending.
@@ -465,10 +465,10 @@ Rule 2 (weak matchup) is enriched when card performance deltas are available:
 sequenceDiagram
     participant Store as dashboardStore
     participant Hook as useRecommendations
-    participant RecPage as RecommendationsPage
+    participant RecSection as DeckTipsSection
 
-    RecPage->>Store: Read archetypeStats, deckCards, cardStats
-    RecPage->>Hook: useRecommendations({..., cardDeltas: cardStats})
+    RecSection->>Store: Read archetypeStats, deckCards, cardStats
+    RecSection->>Hook: useRecommendations({..., cardDeltas: cardStats})
 
     Hook->>Hook: Rule 2: Weak matchup check (≥5 encounters, ≤50% WR)
     Note over Hook: If cardDeltas provided and not empty:
@@ -479,7 +479,7 @@ sequenceDiagram
     Hook->>Hook: Append text: "In your archetype, [Card1] (+Xpp, 95% Y–Z) and [Card2] (+Aap, 95% B–C) correlate with better placements; you play neither."
     Note over Hook: Archetype-wide correlation claim, never matchup-specific
 
-    Hook-->>RecPage: DeckRecommendation (same priority/id/category as before, enriched reasoning)
+    Hook-->>RecSection: DeckRecommendation (same priority/id/category as before, enriched reasoning)
 ```
 
 The enrichment is purely textual — it does not change priority, category, or data points.
