@@ -75,16 +75,28 @@ gewachsene, fachlich überlappende Tabs.
 - Spec 6s spieltheoretische Ansicht bekommt hier höchstens einen vorgesehenen *Platz* in der
   IA, falls Spec 6 bereits umgesetzt ist — die Funktion selbst ist nicht Teil dieser Spec.
 
-## Offene Fragen
+## Offene Fragen (entschieden, 2026-09-03)
 
-- **Konkrete Tab-Struktur:** Reichen zwei Haupt-Tabs ("Meta" / "Mein Deck") plus Overview als
-  Landingpage, oder soll Overview ganz entfallen zugunsten eines der beiden Haupt-Tabs als
-  Startpunkt? Bevorzugst du eine grobe Skizze vorab (z. B. als Mockup/Wireframe), bevor das in
-  die technische Planung geht?
-- **Benennung:** "Meta"/"Mein Deck" ist ein Arbeitstitel aus dieser Spec — gibt es eine
-  bevorzugte Terminologie (z. B. angelehnt an eingeführte Begriffe wie "Field Score",
-  "Prognose")?
-- **Reihenfolge relativ zu Spec 6:** Diese Spec geht davon aus, dass Spec 6 (spieltheoretische
-  Schicht) noch nicht zwingend umgesetzt sein muss, aber einen Platz vorbereitet bekommt.
-  Ist das gewünscht, oder soll Spec 7 grundsätzlich erst nach Spec 6 in Angriff genommen
-  werden, damit die IA nicht zweimal für eine neue Ansicht angepasst wird?
+- **Konkrete Tab-Struktur: zwei Haupt-Tabs plus Overview als Landingpage.** Die Navigation
+  hat nach dem Umbau drei Einträge — `overview` bleibt als Einstieg erhalten, darunter die
+  zwei tragenden Achsen `meta` und `deck`. `recommendations` entfällt als eigener Tab; seine
+  Inhalte werden auf die zwei Achsen aufgeteilt (Local-Meta-Konfiguration → Meta,
+  Deck-Comparison und Prognosen → Mein Deck, siehe AC 2). Begründung: Overview ist der
+  einzige Screen, der ohne eigene Daten sofort etwas zeigt — ihn zu streichen würde den
+  Demo-/Neu-Nutzer-Einstieg schwächen, den Spec 4 gerade erst gestärkt hat. Das beantwortet
+  zugleich AC 4 (Overview bleibt, als bewusster Einstiegspunkt statt als dritte Mischansicht).
+- **Wireframe vor der Planung: ja.** Vor `planner` entsteht eine grobe visuelle Skizze der
+  neuen IA (Desktop-Sidebar **und** mobile BottomNav, siehe AC 6) zur Freigabe. Erst danach
+  beginnt die technische Planung. Begründung: die Aufteilung der `recommendations`-Inhalte auf
+  zwei Achsen ist die eigentliche Design-Entscheidung dieser Spec — sie am Bild zu klären ist
+  billiger, als sie mitten in der Umsetzung umzuplanen.
+- **Benennung: "Meta" / "Mein Deck".** Die Arbeitstitel bleiben. "Meta" ist unter TCG-Spielern
+  etabliert, "Mein Deck" ist ohne Vorwissen verständlich — passend zur Zielgruppe ab 8 Jahren
+  (`todo/todo.md`, Altbestand) und zum Demo-Modus-Anspruch. Analytischere Begriffe wie
+  "Prognose" oder "Field Score" bleiben Überschriften **innerhalb** der Seiten, nicht in der
+  Top-Level-Navigation.
+- **Reihenfolge relativ zu Spec 6: hinfällig.** Spec 6 ist seit PR #58 (2026-09-03) auf
+  `main`. Die spieltheoretische Ansicht existiert also bereits und bekommt in dieser Spec
+  keinen reservierten Platzhalter, sondern einen echten Platz unter "Meta" — der in Spec 6
+  bewusst als "experimenteller Abschnitt" angelegte Bereich wird dabei in die neue IA
+  eingeordnet, inhaltlich aber nicht verändert (siehe Out of Scope).
