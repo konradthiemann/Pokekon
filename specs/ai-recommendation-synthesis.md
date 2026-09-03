@@ -73,16 +73,21 @@ formuliert, dass sie ohne Vorwissen über Konrads eigene Decks verständlich ist
 - Neue LLM-Provider über GitHub Models hinaus (bleibt wie heute providerunabhängig
   vorbereitet, aber ohne neuen konkreten Provider in dieser Spec).
 
-## Offene Fragen
+## Offene Fragen (entschieden, 2026-09-03)
 
-- **Auslöse-Zeitpunkt:** Automatisch bei jedem Seitenaufruf (verbraucht ggf. unnötig Tokens
-  bei unveränderten Daten) oder nutzergetriggert per Button (wie die bestehende
-  Battle-Log-Analyse, `docs/features.md` §8: "User triggers + API key")? Letzteres passt zum
-  bestehenden Muster.
-- **Caching/Wiederverwendung:** Soll ein einmal generierter Text zwischengespeichert werden,
-  bis sich die zugrunde liegenden Zahlen ändern (spart Tokens), oder wird er bei jedem Trigger
-  neu erzeugt?
-- **Umfang der Validierungsfunktion:** Reicht eine strukturelle Prüfung (referenzierte
-  `archetypeId`/Kennzahl existiert im Input), oder soll zusätzlich geprüft werden, ob die
-  *Richtung* der Aussage (positiv/negativ) zum tatsächlichen Vorzeichen der Zahl passt? Mehr
-  Prüftiefe erhöht die Verlässlichkeit, aber auch den Implementierungsaufwand.
+- **Auslöse-Zeitpunkt:** **Entschieden: nutzergetriggert per Button**, wie die bestehende
+  Battle-Log-Analyse (`docs/features.md` §8: "User triggers + API key"). Kein automatischer
+  Lauf bei jedem Seitenaufruf — kein unnötiger Token-Verbrauch bei unveränderten Daten,
+  konsistent mit dem etablierten Muster.
+- **Caching/Wiederverwendung:** **Entschieden: cachen, bis sich die zugrunde liegenden Zahlen
+  ändern.** Ein einmal generierter Text wird wiederverwendet, solange sich die Eingabe-Daten
+  (Field-Score, Konfidenzbänder, Prognose-Deltas, ggf. Gleichgewichts-/Replicator-Signale) für
+  den jeweiligen Kontext nicht geändert haben — spart Tokens, im Sinne von CLAUDE.md Golden
+  Rule 2 ("Kostenlos bleiben"). Cache-Invalidierung ist Teil der Plan-Kontrakte, nicht dieser
+  Spec.
+- **Umfang der Validierungsfunktion:** **Entschieden: strukturell + Richtung.** Zusätzlich zur
+  strukturellen Prüfung (referenzierte `archetypeId`/Kennzahl existiert im Input) prüft die
+  Validierung, ob positiv/negativ formulierte Aussagen zum tatsächlichen Vorzeichen der
+  referenzierten Zahl passen. Höherer Implementierungsaufwand, aber konsistent mit CLAUDE.md
+  Golden Rule 6 ("dürfen nicht aufgeweicht werden") — dieselbe Prüftiefe wie der Anspruch an
+  die bestehende Battle-Log-Analyse.
