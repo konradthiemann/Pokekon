@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useDashboardStore } from './store/dashboardStore';
+import type { DashboardTab } from './store/dashboardStore';
 import { authClient } from './lib/authClient';
 import { Sidebar } from './components/layout/Sidebar';
 import { BottomNav } from './components/layout/BottomNav';
@@ -19,9 +21,6 @@ const OverviewPage = lazy(() =>
   import('./pages/OverviewPage').then((m) => ({ default: m.OverviewPage })),
 );
 const DeckPage = lazy(() => import('./pages/DeckPage').then((m) => ({ default: m.DeckPage })));
-const RecommendationsPage = lazy(() =>
-  import('./pages/RecommendationsPage').then((m) => ({ default: m.RecommendationsPage })),
-);
 const MetaPage = lazy(() => import('./pages/MetaPage').then((m) => ({ default: m.MetaPage })));
 
 /**
@@ -41,10 +40,9 @@ function Dashboard() {
     })();
   }, [refresh]);
 
-  const PAGE = {
+  const PAGE: Record<DashboardTab, ReactNode> = {
     overview: <OverviewPage />,
     deck: <DeckPage />,
-    recommendations: <RecommendationsPage />,
     meta: <MetaPage />,
   };
 

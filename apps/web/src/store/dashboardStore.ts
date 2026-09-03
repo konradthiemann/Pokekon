@@ -46,8 +46,8 @@ import {
 // recently ISSUED call always wins, never the most recently RESOLVED one.
 let cardStatsRequestSeq = 0;
 
-/** The three top-level axes of the IA (plan ui-ux-hub-rework.md §3.1). */
-export type DashboardTab = 'overview' | 'deck' | 'recommendations' | 'meta';
+/** The three top-level axes of the IA (plan ui-ux-hub-rework.md §3.1, §3.9). */
+export type DashboardTab = 'overview' | 'meta' | 'deck';
 
 /** Sections within "My Deck" (plan ui-ux-hub-rework.md §3.1). */
 export type DeckSection = 'deck' | 'analytics' | 'tips';

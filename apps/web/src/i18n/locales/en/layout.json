@@ -2,9 +2,7 @@
   "nav": {
     "overview": "Overview",
     "meta": "Meta",
-    "myDeck": "My Deck",
-    "recommendations": "Recommendations",
-    "tips": "Tips"
+    "myDeck": "My Deck"
   },
   "sidebar": {
     "dashboard": "Dashboard",

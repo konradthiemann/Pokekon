@@ -1,17 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, Layers, Lightbulb, BarChart2, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useDashboardStore } from '../../store/dashboardStore';
+import { NAV_ITEMS } from './navItems';
 import { AddLogModal } from '../opponent/AddLogModal';
-
-// Labels are i18n keys in the `layout` namespace, resolved at render time.
-const NAV_ITEMS = [
-  { id: 'overview', labelKey: 'nav.overview', Icon: LayoutDashboard },
-  { id: 'meta', labelKey: 'nav.meta', Icon: BarChart2 },
-  // center slot is the FAB
-  { id: 'deck', labelKey: 'nav.myDeck', Icon: Layers },
-  { id: 'recommendations', labelKey: 'nav.tips', Icon: Lightbulb },
-] as const;
 
 export function BottomNav() {
   const { t } = useTranslation('layout');
