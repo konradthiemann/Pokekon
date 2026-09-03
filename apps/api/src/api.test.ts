@@ -24,7 +24,10 @@ import { backfillMetaWinRates } from './jobs/backfillMetaWinRates.js';
 // Slice B (plan §3.6): the persistence job — does not exist yet, expected to
 // fail module resolution until the implementer adds it.
 import { computeCardStats } from './jobs/computeCardStats.js';
-import { MAX_BATTLE_LOG_CHARS, snapCardStatsWindow } from './validation.js';
+// Slice B (plan §3.7, Spec 6): snapEquilibriumWindow does not exist yet —
+// expected to fail module resolution / be undefined until the implementer
+// extracts the shared snapToWindow helper and adds it.
+import { MAX_BATTLE_LOG_CHARS, snapCardStatsWindow, snapEquilibriumWindow } from './validation.js';
 
 // ─── Test harness ─────────────────────────────────────────────────────────────
 // Runs the real routes against an in-memory Postgres (PGlite) created from the
@@ -2595,6 +2598,57 @@ describe('snapCardStatsWindow (plan §3.6 — validation.ts)', () => {
     expect(snapCardStatsWindow(10.5)).toBe(14); // midpoint of 7 and 14
     expect(snapCardStatsWindow(17.5)).toBe(21); // midpoint of 14 and 21
     expect(snapCardStatsWindow(24.5)).toBe(28); // midpoint of 21 and 28
+  });
+});
+
+// Slice B (plan §3.7, Spec 6) — refactor safety net. §4 step 14 extracts a
+// generic `snapToWindow(days, windows)` out of `snapCardStatsWindow` and
+// re-implements `snapCardStatsWindow` on top of it. This describe block
+// re-asserts the EXACT same input -> output pairs as the
+// `describe('snapCardStatsWindow ...)` block above, pinned against the
+// current, unrefactored implementation, so the upcoming extraction cannot
+// silently change Spec 5's behaviour. This block is expected to PASS right
+// now (the function already exists) — it becomes meaningful once the
+// refactor lands.
+describe('snapCardStatsWindow refactor safety net (Slice B, plan §3.7)', () => {
+  it.each([
+    [1, 7],
+    [7, 7],
+    [10, 7],
+    [11, 14],
+    [14, 14],
+    [25, 28],
+    [30, 28],
+    [180, 28],
+  ])(
+    'still snaps %i days to the %i-day precomputed window after the snapToWindow extraction',
+    (input, expected) => {
+      expect(snapCardStatsWindow(input)).toBe(expected);
+    },
+  );
+
+  it('still breaks an exact tie in favour of the LARGER window after the snapToWindow extraction', () => {
+    expect(snapCardStatsWindow(10.5)).toBe(14); // midpoint of 7 and 14
+    expect(snapCardStatsWindow(17.5)).toBe(21); // midpoint of 14 and 21
+    expect(snapCardStatsWindow(24.5)).toBe(28); // midpoint of 21 and 28
+  });
+});
+
+// Slice B (plan §3.7, Spec 6) — snapEquilibriumWindow does not exist yet.
+// Value table copied verbatim from the plan's binding comment
+// (validation.ts, EQUILIBRIUM_WINDOWS/snapEquilibriumWindow, §3.7):
+// "1 -> 7 | 7 -> 7 | 10 -> 7 | 11 -> 14 | 25 -> 28 | 30 -> 28 | 180 -> 28".
+describe('snapEquilibriumWindow (plan §3.7 — validation.ts)', () => {
+  it.each([
+    [1, 7],
+    [7, 7],
+    [10, 7],
+    [11, 14],
+    [25, 28],
+    [30, 28],
+    [180, 28],
+  ])('snaps %i days to the %i-day precomputed window', (input, expected) => {
+    expect(snapEquilibriumWindow(input)).toBe(expected);
   });
 });
 
