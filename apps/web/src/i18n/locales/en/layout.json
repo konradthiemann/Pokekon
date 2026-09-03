@@ -2,7 +2,8 @@
   "nav": {
     "overview": "Overview",
     "meta": "Meta",
-    "myDeck": "My Deck"
+    "myDeck": "My Deck",
+    "comparison": "Compare"
   },
   "sidebar": {
     "dashboard": "Dashboard",

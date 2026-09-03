@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus } from 'lucide-react';
+import { Plus, GitCompare } from 'lucide-react';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { NAV_ITEMS } from './navItems';
 import { AddLogModal } from '../opponent/AddLogModal';
 
 export function BottomNav() {
   const { t } = useTranslation('layout');
-  const { activeTab, setActiveTab, refresh } = useDashboardStore();
+  const { activeTab, setActiveTab, openDeckComparison, refresh } = useDashboardStore();
   const [showLogModal, setShowLogModal] = useState(false);
 
   // Split nav into left half and right half around the FAB
@@ -63,6 +63,15 @@ export function BottomNav() {
             </button>
           );
         })}
+
+        {/* Deck comparison shortcut — not a tab, never gets aria-current. */}
+        <button
+          onClick={openDeckComparison}
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[11px] font-bold min-h-[56px] transition-colors text-slate-500 hover:text-slate-800"
+        >
+          <GitCompare className="w-5 h-5" aria-hidden="true" />
+          {t('nav.comparison')}
+        </button>
       </nav>
 
       {showLogModal && (
