@@ -16,3 +16,4 @@ export * from './bestOf.js';
 export * from './matchupConflict.js';
 export * from './simplex.js';
 export * from './nashEquilibrium.js';
+export * from './deterministicRandom.js';
