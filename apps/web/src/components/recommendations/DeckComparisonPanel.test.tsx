@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import i18n from '../../i18n';
 import { DeckComparisonPanel } from './DeckComparisonPanel';
 import type { CardStat, ComparisonResult } from '../../lib/deckComparison';
@@ -107,8 +108,19 @@ const COMPARISON_RESULT: ComparisonResult = {
   cardStatsSource: { computedAt: '2026-06-01T00:00:00.000Z', windowDays: 14, listsAnalyzed: 30 },
 };
 
-vi.mock('../../store/dashboardStore', () => ({
-  useDashboardStore: () => ({
+interface DeckComparisonStoreMock {
+  deckArchSlug: string;
+  comparisonResult: ComparisonResult | null;
+  isComparing: boolean;
+  compareProgress: string;
+  compareError: string | null;
+  runDeckComparison: () => void;
+  setActiveTab: () => void;
+  setDeckSection: () => void;
+}
+
+function baseStoreState(): DeckComparisonStoreMock {
+  return {
     deckArchSlug: 'dragapult-ex',
     comparisonResult: COMPARISON_RESULT,
     isComparing: false,
@@ -116,10 +128,21 @@ vi.mock('../../store/dashboardStore', () => ({
     compareError: null,
     runDeckComparison: vi.fn(),
     setActiveTab: vi.fn(),
-  }),
+    setDeckSection: vi.fn(),
+  };
+}
+
+let storeState: DeckComparisonStoreMock = baseStoreState();
+
+vi.mock('../../store/dashboardStore', () => ({
+  useDashboardStore: () => storeState,
 }));
 
 describe('DeckComparisonPanel — performance delta signal (plan §3.7)', () => {
+  beforeAll(() => {
+    storeState = baseStoreState();
+  });
+
   it('renders both the existing copy frequency AND the delta side by side for a card with a delta', () => {
     render(<DeckComparisonPanel />);
     const row = screen.getByTestId('card-row-Ultra Ball');
@@ -165,5 +188,38 @@ describe('DeckComparisonPanel — performance delta signal (plan §3.7)', () => 
       const row = screen.getByTestId(`card-row-${name}`);
       expect(within(row).getByText(correlationNote)).toBeInTheDocument();
     }
+  });
+});
+
+/**
+ * Plan .claude/plans/ui-ux-hub-rework.md §3.7 / §4 Slice F (Fund 3, §0.6) —
+ * once the comparison lives under "My Deck", the setup-link's OLD target
+ * (`setActiveTab('deck')`) is a self-link without effect: the user is
+ * already on that tab and still doesn't see the archetype-slug field (it
+ * lives in `DeckSettingsWidget`, section "Deck List"). The fix must jump to
+ * that section via `setDeckSection('deck')` instead — `setActiveTab` must
+ * NOT be called at all.
+ */
+describe('DeckComparisonPanel — setup link target (plan §3.7, Slice F)', () => {
+  it('calls setDeckSection("deck") — not setActiveTab — when the setup link is clicked with no deckArchSlug configured', async () => {
+    storeState = {
+      ...baseStoreState(),
+      deckArchSlug: '',
+      comparisonResult: null,
+    };
+    const user = userEvent.setup();
+
+    render(<DeckComparisonPanel />);
+
+    // The "not set up" branch renders exactly one interactive element (the
+    // setup link) — scoping by role, not by link text, keeps this
+    // assertion independent of the exact copy/Trans-tag name the
+    // implementer chooses.
+    const setupLink = screen.getByRole('button');
+    await user.click(setupLink);
+
+    expect(storeState.setDeckSection).toHaveBeenCalledTimes(1);
+    expect(storeState.setDeckSection).toHaveBeenCalledWith('deck');
+    expect(storeState.setActiveTab).not.toHaveBeenCalled();
   });
 });

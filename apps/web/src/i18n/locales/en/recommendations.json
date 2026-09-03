@@ -49,7 +49,7 @@
     "refresh": "Refresh",
     "comparing": "Comparing…",
     "notSetUp": "Deck comparison not set up",
-    "setupHint": "Go to <myDeck>My Deck</myDeck> and set your archetype slug (e.g. <slug>n-zoroark</slug>) to compare your list against tournament results.",
+    "setupHint": "Open the <deckSettings>Deck List</deckSettings> section and set your archetype slug there (e.g. <slug>n-zoroark</slug>) to compare your list against tournament results.",
     "compareHint": "Click \"Compare\" to analyze your list against tournament-winning <slug>{{slug}}</slug> lists from Limitless TCG.",
     "considerAdding": "Consider Adding ({{count}})",
     "considerRemoving": "Consider Removing ({{count}})",
