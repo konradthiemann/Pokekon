@@ -964,6 +964,56 @@ describe('replicatorStep — meanFitnessPct is EXACTLY 50 for any share distribu
   );
 });
 
+describe('replicatorStep — non-constant-sum input is reported as status "failed", not silently computed (plan §3.0e, same defensive contract as solveSymmetricZeroSumNash)', () => {
+  it('a non-constant-sum input (p[0][1] = p[1][0] = 0.6, summing to 1.2 instead of 1) is reported as status "failed"', () => {
+    // buildPayoffMatrix can never construct this by design, but replicatorStep
+    // takes a bare PayoffMatrix and must defend against a future second
+    // producer (or a caller invoking it directly, bypassing
+    // solveSymmetricZeroSumNash's own check) that gets the invariant wrong.
+    const matrix = fixtureMatrix(
+      ['A', 'B'],
+      [
+        [0.5, 0.6],
+        [0.6, 0.5],
+      ],
+    );
+    const step = replicatorStep(matrix, [50, 50]);
+    expect(step.status).toBe('failed');
+  });
+
+  it('a genuinely constant-sum input keeps status "optimal"', () => {
+    const matrix = fixtureMatrix(
+      ['A', 'B', 'C'],
+      [
+        [0.5, 1, 0],
+        [0, 0.5, 1],
+        [1, 0, 0.5],
+      ],
+    );
+    const step = replicatorStep(matrix, [50, 30, 20]);
+    expect(step.status).toBe('optimal');
+  });
+
+  it('an all-zero sharePct (no data yet) is NOT reported as "failed" even on a valid matrix -- there is no population to evaluate, so the self-check is skipped rather than false-flagging', () => {
+    const matrix = fixtureMatrix(
+      ['A', 'B', 'C'],
+      [
+        [0.5, 1, 0],
+        [0, 0.5, 1],
+        [1, 0, 0.5],
+      ],
+    );
+    const step = replicatorStep(matrix, [0, 0, 0]);
+    expect(step.status).toBe('optimal');
+  });
+
+  it('n === 0 keeps status "optimal", matching solveSymmetricZeroSumNash', () => {
+    const matrix = fixtureMatrix([], []);
+    const step = replicatorStep(matrix, []);
+    expect(step.status).toBe('optimal');
+  });
+});
+
 describe('replicatorStep — the equilibrium is a fixed point of the replicator dynamic (plan §3.5, consistency test against Slice A2)', () => {
   it('feeding the popularity-paradox equilibrium weights back into replicatorStep reproduces them: support members have growthPct 0 and projectedSharePct === sharePct', () => {
     const matrix = fixtureMatrix(popularityParadoxIds, popularityParadoxP);
@@ -1150,5 +1200,33 @@ describe("fitnessTrend — naming boundary against replicatorStep (plan §3.5): 
       const trendEntry = trend.find((t) => t.archetypeId === id)!;
       expect(trendEntry.fitnessPct).toBeCloseTo(daily.fitnessPct[i], 9);
     });
+  });
+});
+
+describe('fitnessTrend — non-constant-sum input throws instead of silently computing a wrong trend (plan §3.0e, same defensive contract as solveSymmetricZeroSumNash/replicatorStep)', () => {
+  // fitnessTrend returns FitnessTrend[], not a single result object, so
+  // there is no natural place for a `status` field the way replicatorStep
+  // and solveSymmetricZeroSumNash have one -- throwing is the established
+  // convention in this package for "the input violates a structural
+  // invariant" (simplex.ts's solveStandardFormLp does the same for its own
+  // malformed-input cases).
+  const matrix = fixtureMatrix(
+    ['A', 'B'],
+    [
+      [0.5, 0.6],
+      [0.6, 0.5],
+    ],
+  );
+
+  it('throws when previous-period data is present', () => {
+    expect(() => fitnessTrend(matrix, [50, 50], [50, 50])).toThrow();
+  });
+
+  it('throws on the cold-start path too (no previous data) -- the current-share self-check alone already detects the violation', () => {
+    expect(() => fitnessTrend(matrix, [50, 50], [null, null])).toThrow();
+  });
+
+  it('an all-zero currentSharePct (no data yet) does NOT throw even though the matrix is bad -- there is no population to evaluate, so the self-check is skipped rather than false-flagging', () => {
+    expect(() => fitnessTrend(matrix, [0, 0], [null, null])).not.toThrow();
   });
 });
