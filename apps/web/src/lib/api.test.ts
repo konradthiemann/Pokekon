@@ -382,7 +382,7 @@ describe('getMetaEquilibrium (plan .claude/plans/meta-game-theory-layer.md §3.8
     previousWeekFitnessPct: 49.8,
     fitnessDeltaPp: 0.4,
     observedShareDeltaPp: 0.6,
-    direction: 'rising',
+    direction: 'rising' as const,
   };
 
   const WIRE_RESPONSE: MetaEquilibriumResponse = {
