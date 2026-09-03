@@ -4,9 +4,6 @@
   "localMetaBadge": "📍 lokales Meta",
   "snapshotFallback": "Snapshot #{{id}}",
   "page": {
-    "title": "Empfehlungen",
-    "subtitleForDeck": "Für: <deck>{{deckName}}</deck> — basierend auf deinen Matches und dem aktuellen Meta",
-    "subtitleGeneric": "Datenbasierte Vorschläge zur Deck-Anpassung auf Grundlage deiner Match-Historie und Turnierdaten",
     "basedOn_one": "Basierend auf <bold>{{count}} geloggten Match</bold> und aktuellen Meta-Daten.",
     "basedOn_other": "Basierend auf <bold>{{count}} geloggten Matches</bold> und aktuellen Meta-Daten.",
     "logMoreHint": "Logge 10+ Matches für verlässlichere Vorschläge.",
