@@ -7,12 +7,13 @@ import {
   getAiSettings,
   getDeckAnalytics,
   getMeta,
+  getMetaEquilibrium,
   listDeckSnapshots,
   listAllLogs,
   syncMeta,
   updateAiSettings,
 } from './api';
-import type { ArchetypeCardStatsResponse } from './api';
+import type { ArchetypeCardStatsResponse, MetaEquilibriumResponse } from './api';
 import type { DeckCard } from '../types';
 
 /**
@@ -355,6 +356,96 @@ describe('fetchArchetypeCardStats (plan .claude/plans/recommendation-to-prognosi
 
     expect(result.computedAt).toBeNull();
     expect(result.cards).toEqual([]);
+  });
+});
+
+describe('getMetaEquilibrium (plan .claude/plans/meta-game-theory-layer.md §3.8)', () => {
+  const ARCHETYPE_ROW = {
+    archetypeId: 'grimmsnarl-ex',
+    archetypeName: 'Grimmsnarl ex',
+    sharePct: 12.4,
+    weightPct: 34.3,
+    equilibriumPayoffPct: 50.0,
+    paradoxGapPp: -21.9,
+    inSupport: true,
+    excludedCertain: false,
+    rowCoveragePct: 88.0,
+    exclusionRatePct: 3.5,
+    certainExclusionRatePct: 0.0,
+    meanWeightPct: 33.8,
+    weightP05Pct: 20.1,
+    weightP95Pct: 45.2,
+    fitnessPct: 50.0,
+    replicatorGrowthPct: 0.0,
+    projectedSharePct: 12.4,
+    weekFitnessPct: 50.2,
+    previousWeekFitnessPct: 49.8,
+    fitnessDeltaPp: 0.4,
+    observedShareDeltaPp: 0.6,
+    direction: 'rising',
+  };
+
+  const WIRE_RESPONSE: MetaEquilibriumResponse = {
+    windowDays: 14,
+    online: true,
+    bo1: true,
+    computedAt: '2026-06-01T00:00:00.000Z',
+    run: {
+      archetypeCount: 8,
+      valuePct: 50.0,
+      supportSize: 7,
+      equalizerCount: 7,
+      imputedCellSharePct: 4.2,
+      resamples: 2000,
+      seed: 42,
+      failedResamples: 0,
+      exactSupportRatePct: 2.1,
+      currentPeriod: '2026-W23',
+      previousPeriod: '2026-W22',
+    },
+    archetypes: [ARCHETYPE_ROW],
+  };
+
+  it('requests the equilibrium endpoint for the given window and returns the wire shape unchanged', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(WIRE_RESPONSE));
+
+    const result = await getMetaEquilibrium(14);
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/meta/equilibrium?days=14', expect.anything());
+    expect(result).toEqual(WIRE_RESPONSE);
+  });
+
+  it('omits the days query when no window is provided (mirrors fetchArchetypeCardStats)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(WIRE_RESPONSE));
+
+    await getMetaEquilibrium();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/meta/equilibrium', expect.anything());
+  });
+
+  it('surfaces a 400 (invalid days) as an ApiError', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Invalid days', issues: [] }, 400));
+
+    await expect(getMetaEquilibrium(999)).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('tolerates the cold-start response (computedAt: null, run: null, archetypes: [])', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        windowDays: 28,
+        online: true,
+        bo1: true,
+        computedAt: null,
+        run: null,
+        archetypes: [],
+      }),
+    );
+
+    const result = await getMetaEquilibrium(28);
+
+    expect(result.computedAt).toBeNull();
+    expect(result.run).toBeNull();
+    expect(result.archetypes).toEqual([]);
   });
 });
 
