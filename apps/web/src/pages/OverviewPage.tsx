@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { tournamentWinRatePct } from '@pokekon/shared';
 import { useDashboardStore } from '../store/dashboardStore';
 import { StatCard } from '../components/layout/StatCard';
-import { MetaTable } from '../components/meta/MetaTable';
+import { MyMatchupsTable } from '../components/meta/MyMatchupsTable';
 import { PokemonIcon } from '../components/shared/PokemonIcon';
 
 export function OverviewPage() {
@@ -112,7 +112,7 @@ export function OverviewPage() {
         </div>
       )}
 
-      <MetaTable stats={archetypeStats} />
+      <MyMatchupsTable stats={archetypeStats} />
     </div>
   );
 }

@@ -102,7 +102,7 @@ function TH({
 
 const PAGE_SIZE = 10;
 
-function MetaTable({
+function TournamentMetaTable({
   archetypes,
   onSelect,
 }: {
@@ -684,7 +684,7 @@ export function MetaPage() {
               {t('metaTable.loading')}
             </div>
           ) : (
-            <MetaTable archetypes={archetypes} onSelect={setSelected} />
+            <TournamentMetaTable archetypes={archetypes} onSelect={setSelected} />
           )}
         </CollapsibleSection>
 
