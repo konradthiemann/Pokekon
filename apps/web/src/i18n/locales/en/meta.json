@@ -211,5 +211,42 @@
     "tooltipUnknown_one": "· {{count}} excluded (unknown format)",
     "tooltipUnknown_other": "· {{count}} excluded (unknown format)",
     "legend": "Green = favorable (60%+)   Orange = even (40–60%)   Red = unfavorable (<40%)"
+  },
+  "equilibrium": {
+    "title": "Game-theoretic view (experimental)",
+    "intro": "This view shows which decks game theory says belong in the optimal mix – not how popular they currently are. It adds a second, robustness-checked perspective alongside the field score and does not replace it.",
+    "experimentalBadge": "experimental",
+    "notAReplacement": "Complements the field score, does not replace it.",
+    "robust": {
+      "veryRobust": "{{name}} is a poor choice in almost every scenario",
+      "robust": "{{name}} is a poor choice in most scenarios",
+      "unclear": "The data for {{name}} is inconclusive",
+      "likelyIn": "{{name}} belongs in the mix in most scenarios",
+      "value": "excluded in {{rate}} % of runs ({{se}} pp)",
+      "certain": "excluded from every optimal mix (provably)"
+    },
+    "composition": {
+      "title": "Exact composition",
+      "fragile": "This exact composition is unstable: small changes in the matchup data would lead to a noticeably different mix. Rely on the robust statements above rather than the precise percentages here.",
+      "weight": "{{weight}} % ({{low}}-{{high}} %)"
+    },
+    "paradox": {
+      "label": "Popularity paradox",
+      "text": "{{share}} % meta share, but {{weight}} % at equilibrium"
+    },
+    "coverage": {
+      "thin": "relies mostly on missing matchup data"
+    },
+    "trend": {
+      "rising": "Fitness rising",
+      "falling": "Fitness falling",
+      "stable": "Fitness stable",
+      "unknown": "no previous week to compare",
+      "observed": "observed share change: {{delta}} pp"
+    },
+    "source": "As of {{computedAt}}, {{days}}-day window, {{runs}} runs, seed {{seed}}",
+    "sourceImputed": "{{pct}} % of matchup cells have no data",
+    "empty": "Not computed yet.",
+    "methodNote": "The calculation assumes a zero-sum game (win rate + opponent win rate = 100 %) and symmetrizes conflicting matchup numbers between two decks. It does not account for correlations between matchups and is only as good as the underlying tournament data."
   }
 }

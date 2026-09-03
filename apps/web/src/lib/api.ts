@@ -4,6 +4,7 @@ import type {
   BattleAnalysis,
   DeckAnalytics,
   FieldScore,
+  FitnessDirection,
   MatchupRow,
   MetaSyncResult,
   StandingMatchResult,
@@ -675,4 +676,67 @@ export async function fetchArchetypeCardStats(
   return request<ArchetypeCardStatsResponse>(
     `/api/meta/archetypes/${encodeURIComponent(archetypeId)}/card-stats${query}`,
   );
+}
+
+// ─── Game-theoretic meta equilibrium (plan
+// .claude/plans/meta-game-theory-layer.md §3.8) ────────────────────────────
+
+/** One archetype's row in a precomputed equilibrium run. The wire and client
+ *  shapes are identical — no boundary adapter (mirrors
+ *  `ArchetypeCardStatsResponse.cards`). */
+export interface EquilibriumArchetypeRow {
+  archetypeId: string;
+  archetypeName: string;
+  sharePct: number;
+  weightPct: number;
+  equilibriumPayoffPct: number;
+  paradoxGapPp: number;
+  inSupport: boolean;
+  excludedCertain: boolean;
+  rowCoveragePct: number;
+  exclusionRatePct: number;
+  certainExclusionRatePct: number;
+  meanWeightPct: number;
+  weightP05Pct: number;
+  weightP95Pct: number;
+  fitnessPct: number;
+  replicatorGrowthPct: number;
+  projectedSharePct: number;
+  weekFitnessPct: number | null;
+  previousWeekFitnessPct: number | null;
+  fitnessDeltaPp: number | null;
+  observedShareDeltaPp: number | null;
+  direction: FitnessDirection;
+}
+
+export interface EquilibriumRun {
+  archetypeCount: number;
+  valuePct: number;
+  supportSize: number;
+  equalizerCount: number;
+  imputedCellSharePct: number;
+  resamples: number;
+  seed: number;
+  failedResamples: number;
+  exactSupportRatePct: number;
+  currentPeriod: string | null;
+  previousPeriod: string | null;
+}
+
+export interface MetaEquilibriumResponse {
+  windowDays: number;
+  online: boolean;
+  bo1: boolean;
+  /** null on a cold start (job hasn't run yet for this window). */
+  computedAt: string | null;
+  run: EquilibriumRun | null;
+  archetypes: EquilibriumArchetypeRow[];
+}
+
+/** GET /api/meta/equilibrium — mirrors `fetchArchetypeCardStats`'s
+ *  optional-query pattern: `days` is omitted from the URL entirely when not
+ *  provided, letting the server apply its own default window. */
+export async function getMetaEquilibrium(days?: number): Promise<MetaEquilibriumResponse> {
+  const query = days === undefined ? '' : `?days=${days}`;
+  return request<MetaEquilibriumResponse>(`/api/meta/equilibrium${query}`);
 }
