@@ -269,3 +269,19 @@ export const deckSynthesisQuerySchema = z.object({
     .default(META_WINDOW_DEFAULT_DAYS),
   language: z.enum(SYNTHESIS_LANGUAGE_VALUES).default('de'),
 });
+
+/**
+ * Body for POST /api/analysis/deck/:deckId — generate (or serve a cached)
+ * synthesis. `days` defaults to META_WINDOW_DEFAULT_DAYS (route: then snapped
+ * via snapCardStatsWindow, plan §3.8 step 3) rather than here, so the route
+ * can distinguish "omitted" from "explicitly the default". Same ephemeral-BYOK
+ * fields/contract as analyzeLogSchema.
+ */
+export const deckSynthesisPostSchema = z.object({
+  days: z.number().int().min(META_WINDOW_MIN_DAYS).max(META_WINDOW_MAX_DAYS).optional(),
+  language: z.enum(SYNTHESIS_LANGUAGE_VALUES).default('de'),
+  force: z.boolean().optional(),
+  apiKey: z.string().max(400).optional(),
+  provider: z.enum(aiProviderValues).optional(),
+  model: z.string().max(100).nullish(),
+});

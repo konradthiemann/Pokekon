@@ -4319,3 +4319,460 @@ describe('GET /api/analysis/deck/:deckId (plan §3.8, Scheibe H)', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+// Scheibe I (plan §3.8, §4 step 17): POST /api/analysis/deck/:deckId is not
+// mounted yet — only the GET handler exists so far (Scheibe H). Every request
+// below is expected to fail with a 404 ("route not found", Hono's default for
+// an unmatched method on an otherwise-known path) instead of the status codes
+// asserted here, until the implementer adds the route.
+describe('POST /api/analysis/deck/:deckId (plan §3.8, Scheibe I)', () => {
+  const POST_WINDOW_DAYS = 28;
+  const POST_LANGUAGE = 'de';
+
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  let postSynthUserSeq = 0;
+  /** A dedicated, never-reused user id per test. The route's rate limiter
+   *  (plan §3.8: `rateLimit({ windowMs: 60*60_000, max: 20 })`, only on POST)
+   *  keeps its hit counter in-memory for the lifetime of `app` (created once
+   *  in beforeAll) — reusing USER_A/USER_B or a shared id across it()s here
+   *  would let one test's POST volume bleed into another's rate-limit budget,
+   *  most importantly the dedicated 429 test at the bottom of this block. */
+  async function freshUser(): Promise<string> {
+    postSynthUserSeq += 1;
+    const id = `user-post-synth-${postSynthUserSeq}`;
+    await createUser(id);
+    return id;
+  }
+
+  /** Wraps a GitHub Models chat-completion response the way the real API does
+   *  (pattern: ai/githubModels.test.ts `modelResponse`). */
+  function modelResponse(content: string): Response {
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  /** Seeds just enough online-Bo1 tournament data for the archetype to appear
+   *  in loadFieldScores, so buildSynthesisFactSet produces at least the
+   *  'field.winRate' fact (pattern: GET describe block's
+   *  'availableFactCount is > 0' fixture, duplicated here rather than shared
+   *  since that fixture is a function scoped inside a sibling describe()). */
+  async function seedFieldScoreData(
+    archetypeId: string,
+    archetypeName: string,
+    opponentId: string,
+    tournamentId: string,
+  ): Promise<void> {
+    await db.insert(schema.tournaments).values({
+      id: tournamentId,
+      name: `${tournamentId} Event`,
+      date: new Date(),
+      players: 4,
+      isOnline: true,
+      swissMode: 'BO1',
+    });
+    await db.insert(schema.tournamentStandings).values([
+      { tournamentId, archetypeId, archetypeName, wins: 3, losses: 2, ties: 0 },
+      { tournamentId, archetypeId, archetypeName, wins: 3, losses: 2, ties: 0 },
+      {
+        tournamentId,
+        archetypeId: opponentId,
+        archetypeName: 'Opponent Deck',
+        wins: 3,
+        losses: 2,
+        ties: 0,
+      },
+      {
+        tournamentId,
+        archetypeId: opponentId,
+        archetypeName: 'Opponent Deck',
+        wins: 3,
+        losses: 2,
+        ties: 0,
+      },
+    ]);
+    await db.insert(schema.tournamentMatchups).values({
+      tournamentId,
+      deckA: archetypeId,
+      deckB: opponentId,
+      aWins: 12,
+      bWins: 0,
+      ties: 0,
+    });
+    await db.insert(schema.matchupMatrix).values({
+      deck1: `${tournamentId}-irrelevant-a`,
+      deck2: `${tournamentId}-irrelevant-b`,
+      wins: 0,
+      losses: 0,
+      ties: 0,
+      total: 50,
+      winRate: 50,
+      importedAt: new Date('2026-06-01T00:00:00.000Z'),
+    });
+  }
+
+  /** The actual, currently computable field.winRate fact for a deck — used to
+   *  build a claim whose `direction` is guaranteed to match what the route
+   *  will compute server-side, without hand-deriving the Wilson interval
+   *  here (pattern: GET describe block's `currentHashFor`). */
+  async function currentWinRateFact(
+    deckId: number,
+    archetypeId: string,
+    archetypeName: string,
+    variant: string,
+  ): Promise<SynthesisFact> {
+    const factSet = await buildSynthesisFactSet(db, {
+      deck: { id: deckId, archetype: archetypeId, archetypeName, variant },
+      deckCards: [],
+      windowDays: POST_WINDOW_DAYS,
+      language: POST_LANGUAGE,
+    });
+    const fact = factSet.facts.find((f) => f.id === 'field.winRate');
+    if (!fact) throw new Error('test fixture did not produce a field.winRate fact');
+    return fact;
+  }
+
+  interface PostSynthesisResponseBody {
+    synthesis: DeckSynthesis;
+    stale: boolean;
+    cached: boolean;
+  }
+
+  it('returns 400 with the same "no API key" message as POST /api/analysis/log when neither an ephemeral apiKey nor a stored key is available', async () => {
+    const user = await freshUser();
+    const archetypeId = 'post-synth-nokey';
+    const archetypeName = 'No Key Deck';
+    await seedFieldScoreData(
+      archetypeId,
+      archetypeName,
+      'post-synth-nokey-opp',
+      'post-synth-nokey-t1',
+    );
+    const deckId = await createDeck(user, {
+      archetype: archetypeId,
+      archetypeName,
+      variant: 'Standard',
+    });
+
+    const res = await request(`/api/analysis/deck/${deckId}`, {
+      user,
+      method: 'POST',
+      body: { days: POST_WINDOW_DAYS, language: POST_LANGUAGE },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: 'No API key configured. Add one in AI analysis settings.',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 with "Not enough meta data to synthesise yet." and never calls fetch when the archetype has no computable facts', async () => {
+    const user = await freshUser();
+    const deckId = await createDeck(user, {
+      archetype: 'post-synth-empty',
+      archetypeName: 'Empty Facts Deck',
+      variant: 'Standard',
+    });
+
+    const res = await request(`/api/analysis/deck/${deckId}`, {
+      user,
+      method: 'POST',
+      body: { days: POST_WINDOW_DAYS, language: POST_LANGUAGE, apiKey: 'ghp_post_synth_empty' },
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'Not enough meta data to synthesise yet.' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('generates a synthesis on a successful run: 200, a persisted deck_synthesis row, and an ungrounded claim dropped and counted', async () => {
+    const user = await freshUser();
+    const archetypeId = 'post-synth-success';
+    const archetypeName = 'Success Deck';
+    const variant = 'Standard';
+    await seedFieldScoreData(
+      archetypeId,
+      archetypeName,
+      'post-synth-success-opp',
+      'post-synth-success-t1',
+    );
+    const deckId = await createDeck(user, { archetype: archetypeId, archetypeName, variant });
+
+    const winRateFact = await currentWinRateFact(deckId, archetypeId, archetypeName, variant);
+
+    const content = JSON.stringify({
+      claims: [
+        {
+          factId: winRateFact.id,
+          kind: 'observation',
+          direction: winRateFact.direction,
+          text: 'Dein Deck steht mit {value} % gegen das aktuelle Feld da.',
+        },
+        {
+          // Wrong case on purpose: not a real factId -> validateSynthesis
+          // rejects it with 'unknownFact' (pattern: ai/githubModels.test.ts).
+          factId: 'field.winrate',
+          kind: 'observation',
+          direction: 'positive',
+          text: 'Eine nicht belegbare Aussage über {value} %.',
+        },
+      ],
+    });
+    fetchMock.mockResolvedValue(modelResponse(content));
+
+    const res = await request(`/api/analysis/deck/${deckId}`, {
+      user,
+      method: 'POST',
+      body: {
+        days: POST_WINDOW_DAYS,
+        language: POST_LANGUAGE,
+        apiKey: 'ghp_post_synth_success',
+      },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as PostSynthesisResponseBody;
+    expect(body.stale).toBe(false);
+    expect(body.cached).toBe(false);
+    expect(body.synthesis.deckId).toBe(deckId);
+    expect(body.synthesis.source).toBe('llm');
+    expect(body.synthesis.droppedCount).toBe(1);
+    expect(body.synthesis.claims).toHaveLength(1);
+    expect(body.synthesis.claims[0]?.factId).toBe(winRateFact.id);
+
+    const [row] = await db
+      .select()
+      .from(schema.deckSynthesis)
+      .where(
+        and(
+          eq(schema.deckSynthesis.deckId, deckId),
+          eq(schema.deckSynthesis.windowDays, POST_WINDOW_DAYS),
+          eq(schema.deckSynthesis.language, POST_LANGUAGE),
+        ),
+      );
+    expect(row).toBeDefined();
+    expect(row?.source).toBe('llm');
+    expect(row?.droppedCount).toBe(1);
+    expect(row?.claims).toHaveLength(1);
+  });
+
+  it('the second call without force returns cached: true and does not call fetch again', async () => {
+    const user = await freshUser();
+    const archetypeId = 'post-synth-cache';
+    const archetypeName = 'Cache Deck';
+    const variant = 'Standard';
+    await seedFieldScoreData(
+      archetypeId,
+      archetypeName,
+      'post-synth-cache-opp',
+      'post-synth-cache-t1',
+    );
+    const deckId = await createDeck(user, { archetype: archetypeId, archetypeName, variant });
+
+    const winRateFact = await currentWinRateFact(deckId, archetypeId, archetypeName, variant);
+    const content = JSON.stringify({
+      claims: [
+        {
+          factId: winRateFact.id,
+          kind: 'observation',
+          direction: winRateFact.direction,
+          text: 'Dein Deck steht mit {value} % gegen das aktuelle Feld da.',
+        },
+      ],
+    });
+    fetchMock.mockResolvedValue(modelResponse(content));
+
+    const first = await request(`/api/analysis/deck/${deckId}`, {
+      user,
+      method: 'POST',
+      body: { days: POST_WINDOW_DAYS, language: POST_LANGUAGE, apiKey: 'ghp_post_synth_cache' },
+    });
+    expect(first.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const second = await request(`/api/analysis/deck/${deckId}`, {
+      user,
+      method: 'POST',
+      body: { days: POST_WINDOW_DAYS, language: POST_LANGUAGE, apiKey: 'ghp_post_synth_cache' },
+    });
+    expect(second.status).toBe(200);
+    const body = (await second.json()) as PostSynthesisResponseBody;
+    expect(body.cached).toBe(true);
+    expect(body.stale).toBe(false);
+    // Still exactly one call — the second request must not have reached the LLM.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('force: true re-runs the LLM even though a cached row with a matching hash already exists', async () => {
+    const user = await freshUser();
+    const archetypeId = 'post-synth-force';
+    const archetypeName = 'Force Deck';
+    const variant = 'Standard';
+    await seedFieldScoreData(
+      archetypeId,
+      archetypeName,
+      'post-synth-force-opp',
+      'post-synth-force-t1',
+    );
+    const deckId = await createDeck(user, { archetype: archetypeId, archetypeName, variant });
+
+    const winRateFact = await currentWinRateFact(deckId, archetypeId, archetypeName, variant);
+    const content = JSON.stringify({
+      claims: [
+        {
+          factId: winRateFact.id,
+          kind: 'observation',
+          direction: winRateFact.direction,
+          text: 'Dein Deck steht mit {value} % gegen das aktuelle Feld da.',
+        },
+      ],
+    });
+    // mockImplementation (not mockResolvedValue): this test makes TWO real
+    // fetch() calls, and a Response body can only be read once — reusing the
+    // same instance across calls throws "Body has already been read"
+    // regardless of the route's own logic. A fresh Response per call mirrors
+    // what a real HTTP client actually returns.
+    fetchMock.mockImplementation(() => modelResponse(content));
+
+    const first = await request(`/api/analysis/deck/${deckId}`, {
+      user,
+      method: 'POST',
+      body: { days: POST_WINDOW_DAYS, language: POST_LANGUAGE, apiKey: 'ghp_post_synth_force' },
+    });
+    expect(first.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const second = await request(`/api/analysis/deck/${deckId}`, {
+      user,
+      method: 'POST',
+      body: {
+        days: POST_WINDOW_DAYS,
+        language: POST_LANGUAGE,
+        apiKey: 'ghp_post_synth_force',
+        force: true,
+      },
+    });
+    expect(second.status).toBe(200);
+    const body = (await second.json()) as PostSynthesisResponseBody;
+    expect(body.cached).toBe(false);
+    // A second, real call to the LLM.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('an ephemeral body.apiKey is used for the request but never written to user_ai_settings', async () => {
+    const user = await freshUser();
+    const archetypeId = 'post-synth-ephemeral';
+    const archetypeName = 'Ephemeral Key Deck';
+    const variant = 'Standard';
+    await seedFieldScoreData(
+      archetypeId,
+      archetypeName,
+      'post-synth-ephemeral-opp',
+      'post-synth-ephemeral-t1',
+    );
+    const deckId = await createDeck(user, { archetype: archetypeId, archetypeName, variant });
+
+    const winRateFact = await currentWinRateFact(deckId, archetypeId, archetypeName, variant);
+    const content = JSON.stringify({
+      claims: [
+        {
+          factId: winRateFact.id,
+          kind: 'observation',
+          direction: winRateFact.direction,
+          text: 'Dein Deck steht mit {value} % gegen das aktuelle Feld da.',
+        },
+      ],
+    });
+    fetchMock.mockResolvedValue(modelResponse(content));
+
+    // Deliberately no PUT to /api/analysis/settings beforehand.
+    const before = await db
+      .select()
+      .from(schema.userAiSettings)
+      .where(eq(schema.userAiSettings.userId, user));
+    expect(before).toHaveLength(0);
+
+    const res = await request(`/api/analysis/deck/${deckId}`, {
+      user,
+      method: 'POST',
+      body: {
+        days: POST_WINDOW_DAYS,
+        language: POST_LANGUAGE,
+        apiKey: 'ghp_post_synth_ephemeral',
+      },
+    });
+    expect(res.status).toBe(200);
+
+    const after = await db
+      .select()
+      .from(schema.userAiSettings)
+      .where(eq(schema.userAiSettings.userId, user));
+    expect(after).toHaveLength(0);
+  });
+
+  it('returns 404 for a deck owned by a different user, without calling fetch', async () => {
+    const owner = await freshUser();
+    const requester = await freshUser();
+    const deckId = await createDeck(owner, {
+      archetype: 'post-synth-foreign',
+      archetypeName: 'Foreign Deck',
+      variant: 'Standard',
+    });
+
+    const res = await request(`/api/analysis/deck/${deckId}`, {
+      user: requester,
+      method: 'POST',
+      body: { days: POST_WINDOW_DAYS, language: POST_LANGUAGE, apiKey: 'ghp_post_synth_foreign' },
+    });
+    expect(res.status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rate-limits POST to 20 per rolling hour per user, the 21st request gets 429', async () => {
+    const user = await freshUser();
+    const archetypeId = 'post-synth-ratelimit';
+    const archetypeName = 'Rate Limit Deck';
+    await seedFieldScoreData(
+      archetypeId,
+      archetypeName,
+      'post-synth-ratelimit-opp',
+      'post-synth-ratelimit-t1',
+    );
+    const deckId = await createDeck(user, {
+      archetype: archetypeId,
+      archetypeName,
+      variant: 'Standard',
+    });
+
+    // Every call forces a fresh (cheap, empty) LLM round-trip so the loop
+    // exercises the rate limiter itself rather than the cache. mockImplementation
+    // (not mockResolvedValue): up to 20 real fetch() calls happen here, and a
+    // Response body can only be read once — the same instance across calls
+    // would throw "Body has already been read" regardless of route logic.
+    fetchMock.mockImplementation(() => modelResponse(JSON.stringify({ claims: [] })));
+
+    let got429 = false;
+    for (let i = 0; i < 25 && !got429; i++) {
+      const res = await request(`/api/analysis/deck/${deckId}`, {
+        user,
+        method: 'POST',
+        body: {
+          days: POST_WINDOW_DAYS,
+          language: POST_LANGUAGE,
+          apiKey: 'ghp_post_synth_ratelimit',
+          force: true,
+        },
+      });
+      if (res.status === 429) got429 = true;
+      else expect(res.status).toBe(200);
+    }
+    expect(got429).toBe(true);
+  });
+});
