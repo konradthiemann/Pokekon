@@ -1,9 +1,20 @@
-import type { BattleAnalysis } from '@pokekon/shared';
+import type {
+  BattleAnalysis,
+  SynthesisContext,
+  SynthesisFact,
+  ValidatedSynthesis,
+} from '@pokekon/shared';
 
 /** Input to a battle-log analysis: the raw log and which player is "me". */
 export interface AnalysisInput {
   log: string;
   playerName: string;
+}
+
+/** Input to a structured-facts synthesis: the closed fact list plus deck context. */
+export interface SynthesisInput {
+  facts: SynthesisFact[];
+  context: SynthesisContext;
 }
 
 /**
@@ -13,6 +24,10 @@ export interface AnalysisInput {
  */
 export interface AnalysisProvider {
   analyze(input: AnalysisInput): Promise<BattleAnalysis>;
+  /** Structured-input counterpart. Returns the ALREADY VALIDATED result — the
+   *  grounding gate runs inside the adapter, exactly like analyze() calls
+   *  validateAnalysis, so no provider can skip it. */
+  synthesize(input: SynthesisInput): Promise<ValidatedSynthesis>;
 }
 
 /** Error carrying an HTTP status so the route can surface a sensible code. */
