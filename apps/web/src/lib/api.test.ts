@@ -4,8 +4,10 @@ import {
   analyzeBattleLogViaApi,
   createDeckSnapshot,
   fetchArchetypeCardStats,
+  generateDeckSynthesis,
   getAiSettings,
   getDeckAnalytics,
+  getDeckSynthesis,
   getMeta,
   getMetaEquilibrium,
   listDeckSnapshots,
@@ -235,6 +237,145 @@ describe('AI analysis client', () => {
   it('surfaces a 400 (no key configured) as an ApiError', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'No API key configured.' }, 400));
     await expect(analyzeBattleLogViaApi('log', 'Konrad')).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+describe('deck synthesis client (plan .claude/plans/ai-recommendation-synthesis.md §3.10)', () => {
+  const READ_RESPONSE = {
+    deckId: 5,
+    archetypeId: 'dragapult-ex',
+    windowDays: 14,
+    language: 'de',
+    synthesis: null,
+    stale: false,
+    currentInputHash: 'a'.repeat(64),
+    availableFactCount: 4,
+    hasApiKey: true,
+  };
+
+  it('getDeckSynthesis GETs the deck synthesis endpoint and returns the parsed response', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(READ_RESPONSE));
+
+    const result = await getDeckSynthesis(5);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/analysis/deck/5');
+    expect(init.method === undefined || init.method === 'GET').toBe(true);
+    expect(result).toEqual(READ_RESPONSE);
+  });
+
+  it('getDeckSynthesis appends days/language as query params when provided', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(READ_RESPONSE));
+
+    await getDeckSynthesis(5, { days: 14, language: 'de' });
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [path, query] = url.split('?');
+    expect(path).toBe('/api/analysis/deck/5');
+    const params = new URLSearchParams(query);
+    expect(params.get('days')).toBe('14');
+    expect(params.get('language')).toBe('de');
+  });
+
+  it('getDeckSynthesis omits query params entirely when opts is not provided', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(READ_RESPONSE));
+
+    await getDeckSynthesis(5);
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/analysis/deck/5', expect.anything());
+  });
+
+  it('surfaces a 404 (foreign/unknown deck) as an ApiError', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Not found' }, 404));
+
+    await expect(getDeckSynthesis(999)).rejects.toBeInstanceOf(ApiError);
+  });
+
+  const WRITE_RESPONSE = {
+    synthesis: {
+      deckId: 5,
+      archetypeId: 'dragapult-ex',
+      archetypeName: 'Dragapult ex',
+      windowDays: 14,
+      language: 'de',
+      promptVersion: 1,
+      sections: [{ section: 'headline', sentences: ['Dein Deck steht solide da.'] }],
+      claims: [],
+      facts: [],
+      context: {
+        deckId: 5,
+        archetypeId: 'dragapult-ex',
+        archetypeName: 'Dragapult ex',
+        variant: 'Standard',
+        windowDays: 14,
+        language: 'de',
+        cardStatsComputedAt: null,
+        equilibriumComputedAt: null,
+        matchupImportedAt: null,
+      },
+      droppedCount: 0,
+      source: 'llm',
+      provider: 'github-models',
+      model: null,
+      inputHash: 'b'.repeat(64),
+      generatedAt: '2026-06-01T00:00:00.000Z',
+    },
+    stale: false,
+    cached: false,
+  };
+
+  it('generateDeckSynthesis POSTs to the deck synthesis endpoint and returns the parsed response', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(WRITE_RESPONSE));
+
+    const result = await generateDeckSynthesis(5);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/analysis/deck/5');
+    expect(init.method).toBe('POST');
+    expect(result).toEqual(WRITE_RESPONSE);
+  });
+
+  it('generateDeckSynthesis sends an empty body when no opts are given', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(WRITE_RESPONSE));
+
+    await generateDeckSynthesis(5);
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({});
+  });
+
+  it('generateDeckSynthesis includes only the explicitly provided fields in the body', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(WRITE_RESPONSE));
+
+    await generateDeckSynthesis(5, { days: 21, language: 'en', force: true });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ days: 21, language: 'en', force: true });
+  });
+
+  it('generateDeckSynthesis carries an ephemeral apiKey (demo-mode path, mirrors analyzeBattleLogViaApi)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(WRITE_RESPONSE));
+
+    await generateDeckSynthesis(5, {
+      apiKey: 'ghp_demo_token',
+      provider: 'github-models',
+      model: null,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      apiKey: 'ghp_demo_token',
+      provider: 'github-models',
+      model: null,
+    });
+  });
+
+  it('surfaces a 409 (not enough meta data) as an ApiError', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: 'Not enough meta data to synthesise yet.' }, 409),
+    );
+
+    await expect(generateDeckSynthesis(5)).rejects.toBeInstanceOf(ApiError);
   });
 });
 

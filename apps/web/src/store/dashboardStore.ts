@@ -24,7 +24,13 @@ import {
   copyDeckCards,
 } from '../db/queries';
 import { fetchRecentTournaments } from '../lib/metaFetch';
-import { ApiError, fetchArchetypeCardStats } from '../lib/api';
+import {
+  ApiError,
+  fetchArchetypeCardStats,
+  generateDeckSynthesis,
+  getDeckSynthesis,
+} from '../lib/api';
+import type { DeckSynthesisReadResponse } from '../lib/api';
 import type { ArchetypeCardStat, MetaSyncResult } from '@pokekon/shared';
 import { attachCardDeltas, fetchArchetypeComparison } from '../lib/deckComparison';
 import type { ComparisonResult } from '../lib/deckComparison';
@@ -45,6 +51,14 @@ import {
 // lets each call recognise when a newer call has superseded it, so the most
 // recently ISSUED call always wins, never the most recently RESOLVED one.
 let cardStatsRequestSeq = 0;
+
+// Shared by `loadDeckSynthesis` and `runDeckSynthesis` — both write into the
+// same `deckSynthesis` slice, so a deck switch (new `loadDeckSynthesis` call)
+// while a generation is still in flight (or vice versa) must discard the
+// older call's result the same way `cardStatsRequestSeq` does above (plan
+// ai-recommendation-synthesis.md §3.10: "demselben Request-Sequenz-Guard wie
+// loadCardStats").
+let deckSynthesisRequestSeq = 0;
 
 /** The three top-level axes of the IA (plan ui-ux-hub-rework.md §3.1, §3.9). */
 export type DashboardTab = 'overview' | 'meta' | 'deck';
@@ -83,6 +97,14 @@ interface DashboardState {
   cardStats: ArchetypeCardStat[];
   cardStatsSource: ComparisonResult['cardStatsSource'];
   isLoadingCardStats: boolean;
+
+  // AI-synthesised deck tips (plan ai-recommendation-synthesis.md §3.10,
+  // Slice K): a rendered text over the same facts as `cardStats`/analytics,
+  // generated only on explicit user action (spec decision 1).
+  deckSynthesis: DeckSynthesisReadResponse | null;
+  isLoadingSynthesis: boolean;
+  isSynthesizing: boolean;
+  synthesisError: string | null;
 
   // UI state
   isLoading: boolean;
@@ -124,6 +146,12 @@ interface DashboardState {
    *  (notably `comparisonResult`/`compareError`) untouched, so a broken
    *  delta endpoint can never fail the whole comparison. */
   loadCardStats: (archetypeSlug: string) => Promise<void>;
+  /** Read-only, no token cost — safe to call on mount / deck switch. */
+  loadDeckSynthesis: (deckId: number) => Promise<void>;
+  /** User-triggered generation (spec decision 1). Requires a prior
+   *  `loadDeckSynthesis` call for this deck — the UI only offers the
+   *  generate button once `hasApiKey`/`availableFactCount` are known. */
+  runDeckSynthesis: (opts?: { force?: boolean; apiKey?: string }) => Promise<void>;
   // Deck management
   setActiveDeck: (id: number) => Promise<void>;
   createNewDeck: (archetype: string, archetypeName: string, variant: string) => Promise<number>;
@@ -157,6 +185,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   cardStats: [],
   cardStatsSource: null,
   isLoadingCardStats: false,
+  deckSynthesis: null,
+  isLoadingSynthesis: false,
+  isSynthesizing: false,
+  synthesisError: null,
   isLoading: false,
   lastRefreshed: null,
   activeTab: 'overview',
@@ -428,6 +460,60 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       if (requestId !== cardStatsRequestSeq) return;
       console.warn('[DashboardStore] loadCardStats failed:', err);
       set({ cardStats: [], cardStatsSource: null, isLoadingCardStats: false });
+    }
+  },
+
+  loadDeckSynthesis: async (deckId) => {
+    const requestId = ++deckSynthesisRequestSeq;
+    set({ isLoadingSynthesis: true });
+    try {
+      const response = await getDeckSynthesis(deckId);
+      // A newer call (deck switch, or a generation kicked off in the
+      // meantime) already won — discard this now-stale response.
+      if (requestId !== deckSynthesisRequestSeq) return;
+      set({ deckSynthesis: response, isLoadingSynthesis: false });
+    } catch (err) {
+      if (requestId !== deckSynthesisRequestSeq) return;
+      console.warn('[DashboardStore] loadDeckSynthesis failed:', err);
+      set({ isLoadingSynthesis: false });
+    }
+  },
+
+  runDeckSynthesis: async (opts) => {
+    // Precondition: `loadDeckSynthesis` has already populated
+    // `deckSynthesis` for this deck — the UI only shows the generate button
+    // once `hasApiKey`/`availableFactCount` are known. Calling this with no
+    // prior load is a caller bug, not a case this action needs to recover
+    // from (plan ai-recommendation-synthesis.md §3.10).
+    const current = get().deckSynthesis;
+    if (!current) return;
+
+    const requestId = ++deckSynthesisRequestSeq;
+    set({ isSynthesizing: true, synthesisError: null });
+    try {
+      const response = await generateDeckSynthesis(current.deckId, opts);
+      if (requestId !== deckSynthesisRequestSeq) return;
+      // The write response has no `currentInputHash`/`availableFactCount`/
+      // `hasApiKey` of its own — flat-merge into the previously loaded,
+      // read-shaped state, overwriting only what the write actually
+      // reports. `currentInputHash` becomes the freshly generated
+      // synthesis's own `inputHash`: after a successful generation that IS
+      // the hash the text was written against.
+      set({
+        deckSynthesis: {
+          ...current,
+          synthesis: response.synthesis,
+          stale: response.stale,
+          currentInputHash: response.synthesis.inputHash,
+        },
+        isSynthesizing: false,
+      });
+    } catch (err) {
+      if (requestId !== deckSynthesisRequestSeq) return;
+      set({
+        isSynthesizing: false,
+        synthesisError: err instanceof Error ? err.message : String(err),
+      });
     }
   },
 }));
