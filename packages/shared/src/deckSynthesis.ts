@@ -353,3 +353,168 @@ export function validateSynthesis(claims: unknown, facts: SynthesisFact[]): Vali
 
   return { accepted, rejected };
 }
+
+// ---------------------------------------------------------------------------
+// 3.4 -- rendering and assembly (deterministic, no second LLM round)
+// ---------------------------------------------------------------------------
+
+export const SYNTHESIS_SECTIONS = [
+  'headline',
+  'strengths',
+  'risks',
+  'listLevers',
+  'context',
+] as const;
+export type SynthesisSection = (typeof SYNTHESIS_SECTIONS)[number];
+
+/** Max rendered sentences kept per section; excess (model order) are dropped
+ *  from `sections` without affecting `droppedCount` (that only counts
+ *  `validated.rejected`). */
+const MAX_SECTION_SENTENCES = 3;
+
+/**
+ * Section for a claim -- derived, never chosen by the model. First match
+ * wins, in this exact order:
+ *  1. claim.kind === 'recommendation' -> 'listLevers'
+ *  2. fact.kind === 'fieldScore'      -> 'headline'
+ *  3. fact.direction === 'positive'   -> 'strengths'
+ *  4. fact.direction === 'negative'   -> 'risks'
+ *  5. else                            -> 'context'
+ */
+export function sectionForClaim(claim: SynthesisClaim, fact: SynthesisFact): SynthesisSection {
+  if (claim.kind === 'recommendation') {
+    return 'listLevers';
+  }
+  if (fact.kind === 'fieldScore') {
+    return 'headline';
+  }
+  if (fact.direction === 'positive') {
+    return 'strengths';
+  }
+  if (fact.direction === 'negative') {
+    return 'risks';
+  }
+  return 'context';
+}
+
+const CLAIM_PLACEHOLDER_PATTERN = /\{(value|low|high|label)\}/g;
+
+/** One decimal, dot separator -- consistent with the existing
+ *  formatWithInterval (apps/web/src/components/meta/confidence.ts:27-37). */
+function formatSynthesisNumber(value: number): string {
+  return value.toFixed(1);
+}
+
+/**
+ * Substitute the four placeholders from the fact. Numbers use one decimal
+ * and a dot separator, without a unit (the model writes the unit itself);
+ * {label} renders fact.label.
+ */
+export function renderClaimText(claim: SynthesisClaim, fact: SynthesisFact): string {
+  return claim.text.replace(CLAIM_PLACEHOLDER_PATTERN, (match, name: string) => {
+    switch (name) {
+      case 'value':
+        return formatSynthesisNumber(fact.value);
+      case 'low':
+        return fact.lowPct === null ? match : formatSynthesisNumber(fact.lowPct);
+      case 'high':
+        return fact.highPct === null ? match : formatSynthesisNumber(fact.highPct);
+      case 'label':
+        return fact.label;
+      default:
+        return match;
+    }
+  });
+}
+
+export interface SynthesisSectionBlock {
+  section: SynthesisSection;
+  sentences: string[];
+}
+
+export const DECK_SYNTHESIS_SOURCE_VALUES = ['llm', 'demo-seed'] as const;
+export type DeckSynthesisSource = (typeof DECK_SYNTHESIS_SOURCE_VALUES)[number];
+
+export interface DeckSynthesis {
+  deckId: number;
+  archetypeId: string;
+  archetypeName: string;
+  windowDays: number;
+  language: SynthesisLanguage;
+  promptVersion: number;
+  /** Rendered, ready to display. Empty sections omitted; section order is
+   *  SYNTHESIS_SECTIONS order; max 3 sentences per section (model order). */
+  sections: SynthesisSectionBlock[];
+  /** The surviving claims, for the "worauf beruht das?" disclosure. */
+  claims: SynthesisClaim[];
+  /** Snapshot the text was generated from -- the UI renders THESE numbers. */
+  facts: SynthesisFact[];
+  context: SynthesisContext;
+  /** How many model claims the gate dropped. Surfaced, never hidden. */
+  droppedCount: number;
+  source: DeckSynthesisSource;
+  provider: string | null;
+  model: string | null;
+  inputHash: string;
+  generatedAt: string; // ISO
+}
+
+/** Pure assembly: validated claims + facts + context -> DeckSynthesis. No
+ *  I/O, no Date.now()/Math.random() -- idempotent for identical inputs. */
+export function assembleSynthesis(
+  validated: ValidatedSynthesis,
+  facts: SynthesisFact[],
+  context: SynthesisContext,
+  meta: {
+    inputHash: string;
+    source: DeckSynthesisSource;
+    provider: string | null;
+    model: string | null;
+    generatedAt: string;
+  },
+): DeckSynthesis {
+  const factsById = new Map(facts.map((fact) => [fact.id, fact]));
+
+  const sentencesBySection = new Map<SynthesisSection, string[]>();
+  for (const claim of validated.accepted) {
+    const fact = factsById.get(claim.factId);
+    if (!fact) {
+      continue;
+    }
+    const section = sectionForClaim(claim, fact);
+    const sentence = renderClaimText(claim, fact);
+    const existing = sentencesBySection.get(section);
+    if (existing) {
+      existing.push(sentence);
+    } else {
+      sentencesBySection.set(section, [sentence]);
+    }
+  }
+
+  const sections: SynthesisSectionBlock[] = [];
+  for (const section of SYNTHESIS_SECTIONS) {
+    const sentences = sentencesBySection.get(section);
+    if (sentences && sentences.length > 0) {
+      sections.push({ section, sentences: sentences.slice(0, MAX_SECTION_SENTENCES) });
+    }
+  }
+
+  return {
+    deckId: context.deckId,
+    archetypeId: context.archetypeId,
+    archetypeName: context.archetypeName,
+    windowDays: context.windowDays,
+    language: context.language,
+    promptVersion: SYNTHESIS_PROMPT_VERSION,
+    sections,
+    claims: validated.accepted,
+    facts,
+    context,
+    droppedCount: validated.rejected.length,
+    source: meta.source,
+    provider: meta.provider,
+    model: meta.model,
+    inputHash: meta.inputHash,
+    generatedAt: meta.generatedAt,
+  };
+}

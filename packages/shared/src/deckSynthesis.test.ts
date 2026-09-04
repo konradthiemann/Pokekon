@@ -8,15 +8,26 @@
 // './deckSynthesis.js'"), not a stub returning wrong values. @implementer
 // creates the module next; these tests define "done" for that work.
 import { describe, it, expect } from 'vitest';
-import type { FactDirection, SynthesisFact } from './deckSynthesis.js';
+import type {
+  FactDirection,
+  SynthesisFact,
+  SynthesisClaim,
+  RejectedClaim,
+  ValidatedSynthesis,
+  SynthesisContext,
+} from './deckSynthesis.js';
 import {
   NEUTRAL_EPSILON,
   MAX_SYNTHESIS_CLAIMS,
   CLAIM_REJECTION_REASONS,
+  SYNTHESIS_SECTIONS,
   deriveFactDirection,
   sanitizeFactLabel,
   factIdForCard,
   validateSynthesis,
+  sectionForClaim,
+  renderClaimText,
+  assembleSynthesis,
 } from './deckSynthesis.js';
 
 // ---------------------------------------------------------------------------
@@ -594,5 +605,361 @@ describe('validateSynthesis — binding check order (plan §3.3)', () => {
     expect(result.accepted).toEqual([]);
     expect(result.rejected).toHaveLength(1);
     expect(result.rejected[0]?.reason).toBe('insufficientEvidence');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sectionForClaim / renderClaimText / assembleSynthesis (plan §3.4, Slice C)
+// ---------------------------------------------------------------------------
+//
+// None of `sectionForClaim`, `renderClaimText`, `assembleSynthesis` or
+// `SYNTHESIS_SECTIONS` exist on the module yet -- Slices A/B only added the
+// fact/claim primitives and `validateSynthesis`. Under Vitest's esbuild-based
+// transform, importing a non-existent named export does not fail at
+// module-load time (unlike strict Node ESM) -- the binding resolves to
+// `undefined`, so each test fails at the call site with "TypeError:
+// sectionForClaim/renderClaimText/assembleSynthesis is not a function" --
+// red for the right reason. `npx tsc --noEmit` additionally reports
+// TS2305 "has no exported member" for all four names, confirming the same
+// gap at the type level. @implementer adds them to deckSynthesis.ts next.
+
+/** Minimal-but-complete SynthesisFact fixture builder for this slice's
+ *  tests -- only `id`/`kind`/`direction` matter per case, everything else is
+ *  a neutral default that gets overridden where the test cares. */
+function buildFact(
+  overrides: Partial<SynthesisFact> & Pick<SynthesisFact, 'id' | 'kind' | 'direction'>,
+): SynthesisFact {
+  return {
+    label: 'Fixture',
+    value: 60,
+    unit: 'pct',
+    neutralValue: 50,
+    lowPct: null,
+    highPct: null,
+    significant: false,
+    usableForRecommendation: true,
+    entityNames: [],
+    ...overrides,
+  };
+}
+
+/** SynthesisClaim fixture builder: 'observation'/'positive'/generic text
+ *  unless overridden -- mirrors the `makeClaim` helper above but typed
+ *  against the real exported `SynthesisClaim`. */
+function buildClaim(
+  overrides: Partial<SynthesisClaim> & Pick<SynthesisClaim, 'factId'>,
+): SynthesisClaim {
+  return {
+    kind: 'observation',
+    direction: 'positive',
+    text: 'Fixture text.',
+    ...overrides,
+  };
+}
+
+describe('sectionForClaim — rule table (plan §3.4, exact, first match wins)', () => {
+  it('(a) kind "recommendation" -> listLevers, regardless of fact.kind or direction', () => {
+    const fact = buildFact({ id: 'matchup.x', kind: 'matchup', direction: 'positive' });
+    const claim = buildClaim({ factId: fact.id, kind: 'recommendation', direction: 'positive' });
+    expect(sectionForClaim(claim, fact)).toBe('listLevers');
+  });
+
+  it('(a) beats (b): a recommendation on a fieldScore fact still lands in listLevers, not headline', () => {
+    const fact = buildFact({ id: 'field.winRate', kind: 'fieldScore', direction: 'positive' });
+    const claim = buildClaim({ factId: fact.id, kind: 'recommendation', direction: 'positive' });
+    expect(sectionForClaim(claim, fact)).toBe('listLevers');
+  });
+
+  it('(b) observation on a fieldScore fact -> headline', () => {
+    const fact = buildFact({ id: 'field.winRate', kind: 'fieldScore', direction: 'positive' });
+    const claim = buildClaim({ factId: fact.id, kind: 'observation', direction: 'positive' });
+    expect(sectionForClaim(claim, fact)).toBe('headline');
+  });
+
+  it('(c) observation, fact.direction "positive", non-fieldScore -> strengths', () => {
+    const fact = buildFact({ id: 'matchup.a', kind: 'matchup', direction: 'positive' });
+    const claim = buildClaim({ factId: fact.id, kind: 'observation', direction: 'positive' });
+    expect(sectionForClaim(claim, fact)).toBe('strengths');
+  });
+
+  it('(d) observation, fact.direction "negative" -> risks', () => {
+    const fact = buildFact({ id: 'matchup.b', kind: 'matchup', direction: 'negative' });
+    const claim = buildClaim({ factId: fact.id, kind: 'observation', direction: 'negative' });
+    expect(sectionForClaim(claim, fact)).toBe('risks');
+  });
+
+  it('(e) observation, fact.direction "neutral", non-fieldScore -> context', () => {
+    const fact = buildFact({ id: 'meta.share.self', kind: 'metaShare', direction: 'neutral' });
+    const claim = buildClaim({ factId: fact.id, kind: 'observation', direction: 'neutral' });
+    expect(sectionForClaim(claim, fact)).toBe('context');
+  });
+});
+
+describe('renderClaimText — placeholder substitution (plan §3.4)', () => {
+  it('substitutes all four placeholders in one sentence: bare numbers, one decimal, dot separator (formatWithInterval-consistent)', () => {
+    const fact = buildFact({
+      id: 'field.winRate',
+      kind: 'fieldScore',
+      direction: 'positive',
+      label: 'Mein Deck',
+      value: 55.24,
+      neutralValue: 50,
+      lowPct: 51.14,
+      highPct: 59.26,
+    });
+    const claim = buildClaim({
+      factId: fact.id,
+      text: '{label}: {value} % ({low}–{high} %)',
+    });
+    expect(renderClaimText(claim, fact)).toBe('Mein Deck: 55.2 % (51.1–59.3 %)');
+  });
+
+  it('keeps a trailing ".0" -- one decimal is always shown, never a bare integer', () => {
+    const fact = buildFact({
+      id: 'matchup.dragapult-ex',
+      kind: 'matchup',
+      direction: 'negative',
+      label: 'Dragapult ex',
+      value: 41.0,
+      lowPct: 33.0,
+      highPct: 49.4,
+    });
+    const claim = buildClaim({
+      factId: fact.id,
+      direction: 'negative',
+      text: '{label} liegt bei {value} %.',
+    });
+    expect(renderClaimText(claim, fact)).toBe('Dragapult ex liegt bei 41.0 %.');
+  });
+
+  it('uses a dot as decimal separator, never a comma -- consistent in both languages', () => {
+    const fact = buildFact({
+      id: 'field.winRate',
+      kind: 'fieldScore',
+      direction: 'positive',
+      value: 62.5,
+    });
+    const claim = buildClaim({ factId: fact.id, text: '{value} %' });
+    const result = renderClaimText(claim, fact);
+    expect(result).toBe('62.5 %');
+    expect(result).not.toContain(',');
+  });
+
+  it('bandless fact: a text without {low}/{high} renders normally -- the omission is not this function’s concern (that is validateSynthesis’s missingBandPlaceholder job)', () => {
+    const fact = buildFact({
+      id: 'meta.share.self',
+      kind: 'metaShare',
+      direction: 'positive',
+      label: 'Eigener Meta-Anteil',
+      value: 8.4,
+      neutralValue: 0,
+      lowPct: null,
+      highPct: null,
+    });
+    const claim = buildClaim({
+      factId: fact.id,
+      text: '{label} liegt bei {value} %.',
+    });
+    expect(renderClaimText(claim, fact)).toBe('Eigener Meta-Anteil liegt bei 8.4 %.');
+  });
+});
+
+describe('assembleSynthesis — binding properties (plan §3.4)', () => {
+  const context: SynthesisContext = {
+    deckId: 1,
+    archetypeId: 'mega-kangaskhan-ex',
+    archetypeName: 'Mega Kangaskhan ex',
+    variant: 'Standard',
+    windowDays: 28,
+    language: 'de',
+    cardStatsComputedAt: null,
+    equilibriumComputedAt: null,
+    matchupImportedAt: null,
+  };
+
+  const meta = {
+    inputHash: 'a'.repeat(64),
+    source: 'llm' as const,
+    provider: 'github-models',
+    model: 'openai/gpt-4.1',
+    generatedAt: '2026-09-03T12:00:00.000Z',
+  };
+
+  /** One fact/claim per SYNTHESIS_SECTIONS entry, PLUS four 'strengths'
+   *  facts/claims to pin the "max 3 sentences per section, model order"
+   *  rule from the TSDoc on `DeckSynthesis.sections`. The accepted array is
+   *  deliberately NOT grouped by section, to prove assembleSynthesis groups
+   *  by section itself rather than relying on input order. */
+  const headlineFact = buildFact({
+    id: 'field.winRate',
+    kind: 'fieldScore',
+    direction: 'positive',
+    label: 'Mein Deck',
+    value: 55.2,
+    lowPct: 51.1,
+    highPct: 59.3,
+  });
+  const strengthFacts = ['A', 'B', 'C', 'D'].map((letter, i) =>
+    buildFact({
+      id: `matchup.${letter.toLowerCase()}`,
+      kind: 'matchup',
+      direction: 'positive',
+      label: `Matchup ${letter}`,
+      value: 60 + i,
+      lowPct: 55 + i,
+      highPct: 65 + i,
+      significant: true,
+      usableForRecommendation: true,
+    }),
+  );
+  const riskFact = buildFact({
+    id: 'matchup.risk',
+    kind: 'matchup',
+    direction: 'negative',
+    label: 'Matchup Risk',
+    value: 35,
+    lowPct: 25,
+    highPct: 46,
+    significant: true,
+    usableForRecommendation: true,
+  });
+  const leverFact = buildFact({
+    id: 'card.ultra-ball',
+    kind: 'cardDelta',
+    direction: 'positive',
+    label: 'Ultra Ball',
+    value: 5,
+    neutralValue: 0,
+    lowPct: 2,
+    highPct: 8,
+    significant: true,
+    usableForRecommendation: true,
+  });
+  const contextFact = buildFact({
+    id: 'meta.share.self',
+    kind: 'metaShare',
+    direction: 'neutral',
+    label: 'Eigener Meta-Anteil',
+    value: 8.4,
+    neutralValue: 0,
+    lowPct: null,
+    highPct: null,
+  });
+  const facts: SynthesisFact[] = [headlineFact, ...strengthFacts, riskFact, leverFact, contextFact];
+
+  const claimHeadline = buildClaim({
+    factId: headlineFact.id,
+    text: '{label} steht mit {value} % solide da.',
+  });
+  const claimA = buildClaim({ factId: 'matchup.a', text: '{label} läuft gut.' });
+  const claimRisk = buildClaim({
+    factId: riskFact.id,
+    direction: 'negative',
+    text: 'Gegen {label} ist Vorsicht geboten.',
+  });
+  const claimB = buildClaim({ factId: 'matchup.b', text: '{label} läuft gut.' });
+  const claimLever = buildClaim({
+    factId: leverFact.id,
+    kind: 'recommendation',
+    text: 'Erwäge mehr Kopien von {label}.',
+  });
+  const claimC = buildClaim({ factId: 'matchup.c', text: '{label} läuft gut.' });
+  const claimContext = buildClaim({
+    factId: contextFact.id,
+    direction: 'neutral',
+    text: '{label} liegt bei {value} %.',
+  });
+  const claimD = buildClaim({ factId: 'matchup.d', text: '{label} läuft gut.' });
+
+  // Deliberately unsorted by section, to prove assembleSynthesis groups
+  // itself. Within 'strengths' the model order is A, B, C, D -- D is the
+  // fourth strengths claim and must be dropped from `sections` by the cap.
+  const accepted: SynthesisClaim[] = [
+    claimHeadline,
+    claimA,
+    claimRisk,
+    claimB,
+    claimLever,
+    claimC,
+    claimContext,
+    claimD,
+  ];
+
+  const rejected: RejectedClaim[] = [
+    { claim: buildClaim({ factId: 'unknown.fact.1', text: 'x' }), reason: 'unknownFact' },
+    { claim: buildClaim({ factId: 'unknown.fact.2', text: 'y' }), reason: 'unknownFact' },
+  ];
+
+  const validated: ValidatedSynthesis = { accepted, rejected };
+
+  it('sections contains no block with an empty sentences array', () => {
+    const result = assembleSynthesis(validated, facts, context, meta);
+    for (const block of result.sections) {
+      expect(block.sentences.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('claims.length equals validated.accepted.length; droppedCount equals validated.rejected.length', () => {
+    const result = assembleSynthesis(validated, facts, context, meta);
+    expect(result.claims).toHaveLength(accepted.length);
+    expect(result.droppedCount).toBe(rejected.length);
+  });
+
+  it('all claims rejected -> sections/claims are [] and droppedCount > 0 -- a VALID result, not an error', () => {
+    const allRejected: ValidatedSynthesis = {
+      accepted: [],
+      rejected: [
+        { claim: buildClaim({ factId: headlineFact.id, text: 'x' }), reason: 'directionMismatch' },
+      ],
+    };
+    expect(() => assembleSynthesis(allRejected, facts, context, meta)).not.toThrow();
+    const result = assembleSynthesis(allRejected, facts, context, meta);
+    expect(result.sections).toEqual([]);
+    expect(result.claims).toEqual([]);
+    expect(result.droppedCount).toBeGreaterThan(0);
+  });
+
+  it('no rendered sentence contains a curly brace -- placeholders are always substituted', () => {
+    const result = assembleSynthesis(validated, facts, context, meta);
+    for (const block of result.sections) {
+      for (const sentence of block.sentences) {
+        expect(sentence).not.toContain('{');
+        expect(sentence).not.toContain('}');
+      }
+    }
+  });
+
+  it('is idempotent: calling twice with identical inputs yields a deeply equal result', () => {
+    const first = assembleSynthesis(validated, facts, context, meta);
+    const second = assembleSynthesis(validated, facts, context, meta);
+    expect(second).toEqual(first);
+  });
+
+  it('section order follows SYNTHESIS_SECTIONS and caps at 3 sentences per section, in model order', () => {
+    const result = assembleSynthesis(validated, facts, context, meta);
+    expect(SYNTHESIS_SECTIONS).toEqual(['headline', 'strengths', 'risks', 'listLevers', 'context']);
+    expect(result.sections.map((block) => block.section)).toEqual([
+      'headline',
+      'strengths',
+      'risks',
+      'listLevers',
+      'context',
+    ]);
+
+    const strengths = result.sections.find((block) => block.section === 'strengths');
+    expect(strengths?.sentences).toHaveLength(3);
+    expect(strengths?.sentences[0]).toContain('Matchup A');
+    expect(strengths?.sentences[1]).toContain('Matchup B');
+    expect(strengths?.sentences[2]).toContain('Matchup C');
+    expect(strengths?.sentences.some((sentence) => sentence.includes('Matchup D'))).toBe(false);
+
+    expect(result.sections.find((block) => block.section === 'headline')?.sentences).toHaveLength(
+      1,
+    );
+    expect(result.sections.find((block) => block.section === 'risks')?.sentences).toHaveLength(1);
+    expect(result.sections.find((block) => block.section === 'listLevers')?.sentences).toHaveLength(
+      1,
+    );
+    expect(result.sections.find((block) => block.section === 'context')?.sentences).toHaveLength(1);
   });
 });
