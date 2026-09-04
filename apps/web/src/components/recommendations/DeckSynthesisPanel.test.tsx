@@ -305,6 +305,25 @@ describe('DeckSynthesisPanel — synthesis present (plan §3.10 state table)', (
     expect(() => render(<DeckSynthesisPanel />)).not.toThrow();
     expect(screen.getByTestId('deck-synthesis-empty')).toBeInTheDocument();
   });
+
+  it('does NOT show the "not enough data" notice when a synthesis already exists, even if the live availableFactCount has since dropped to 0', () => {
+    // Regression: a demo-seed (or previously cached) synthesis renders its
+    // sections from its own stored fact snapshot -- it is independent of
+    // the live availableFactCount, which reflects only the CURRENT facts
+    // computed for staleness checking. Showing "not enough data" above a
+    // fully rendered analysis is misleading, and the plan's §3.10 state
+    // table only pairs `noFacts` with `synthesis === null`.
+    storeState.deckSynthesis = makeReadResponse({
+      synthesis: makeSynthesis(),
+      hasApiKey: true,
+      availableFactCount: 0,
+    });
+
+    render(<DeckSynthesisPanel />);
+
+    expect(screen.queryByTestId('deck-synthesis-no-facts')).not.toBeInTheDocument();
+    expect(screen.getByText(HEADLINE_SENTENCE)).toBeInTheDocument();
+  });
 });
 
 describe('DeckSynthesisPanel — loading and error (plan §3.10 state table)', () => {
