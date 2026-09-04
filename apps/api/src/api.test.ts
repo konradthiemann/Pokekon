@@ -103,7 +103,16 @@ beforeAll(async () => {
     db,
     getSessionUser: async (headers) => {
       const id = headers.get('x-test-user');
-      return id === null ? null : { id, isAnonymous: false };
+      if (id === null) return null;
+      // Read the real `isAnonymous` column instead of hardcoding false, so
+      // tests can exercise anonymous-only routes (POST /api/demo/seed) by
+      // inserting a user row with isAnonymous: true (see createUser below).
+      const [row] = await db
+        .select({ isAnonymous: schema.user.isAnonymous })
+        .from(schema.user)
+        .where(eq(schema.user.id, id))
+        .limit(1);
+      return { id, isAnonymous: row?.isAnonymous ?? false };
     },
   });
 });
@@ -124,9 +133,13 @@ async function request(
 
 /** Inserts a throwaway user row — needed whenever a test wants an account
  *  isolated from USER_A/USER_B (e.g. per-user one-time-use flags, where
- *  reusing a shared constant across tests would cross-contaminate state). */
-async function createUser(id: string): Promise<void> {
-  await db.insert(schema.user).values({ id, name: id, email: `${id}@example.com` });
+ *  reusing a shared constant across tests would cross-contaminate state).
+ *  `isAnonymous` defaults to false; pass true to simulate a guest/demo
+ *  account (POST /api/demo/seed is restricted to those, routes/demo.ts:19). */
+async function createUser(id: string, opts: { isAnonymous?: boolean } = {}): Promise<void> {
+  await db
+    .insert(schema.user)
+    .values({ id, name: id, email: `${id}@example.com`, isAnonymous: opts.isAnonymous ?? false });
 }
 
 async function createDeck(user: string, overrides: Record<string, unknown> = {}): Promise<number> {
@@ -4774,5 +4787,66 @@ describe('POST /api/analysis/deck/:deckId (plan §3.8, Scheibe I)', () => {
       else expect(res.status).toBe(200);
     }
     expect(got429).toBe(true);
+  });
+});
+
+// Scheibe J (plan §3.11, §4 step 19): seedDemoData is expected to write a
+// pre-baked deck_synthesis row (source: 'demo-seed', both languages) for Deck
+// A only — Deck B intentionally stays at the cold-start `synthesis: null`
+// state, so the demo also shows the "generate" button without spending a
+// token. POST /api/demo/seed itself is restricted to isAnonymous accounts
+// (routes/demo.ts:19); freshAnonymousUser below inserts a user row with
+// isAnonymous: true so the guard passes.
+describe('POST /api/demo/seed -> GET /api/analysis/deck/:deckId (plan §3.11, Scheibe J)', () => {
+  let demoUserSeq = 0;
+  async function freshAnonymousUser(): Promise<string> {
+    demoUserSeq += 1;
+    const id = `user-demo-synth-${demoUserSeq}`;
+    await createUser(id, { isAnonymous: true });
+    return id;
+  }
+
+  async function seedAndGetDeckIds(user: string): Promise<{ deckAId: number; deckBId: number }> {
+    const seedRes = await request('/api/demo/seed', { user, method: 'POST' });
+    expect(seedRes.status).toBe(200);
+
+    const rows = await db
+      .select({ id: schema.decks.id, archetype: schema.decks.archetype })
+      .from(schema.decks)
+      .where(eq(schema.decks.userId, user));
+    const deckA = rows.find((r) => r.archetype === 'mega-kangaskhan-ex');
+    const deckB = rows.find((r) => r.archetype === 'n-zoroark');
+    expect(deckA).toBeDefined();
+    expect(deckB).toBeDefined();
+    return { deckAId: deckA!.id, deckBId: deckB!.id };
+  }
+
+  it.each(['de', 'en'] as const)(
+    'Deck A carries a pre-baked demo-seed synthesis in %s (source: demo-seed, stale: false)',
+    async (language) => {
+      const user = await freshAnonymousUser();
+      const { deckAId } = await seedAndGetDeckIds(user);
+
+      const res = await request(`/api/analysis/deck/${deckAId}?language=${language}`, { user });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        synthesis: { source: string; language: string } | null;
+        stale: boolean;
+      };
+      expect(body.synthesis).not.toBeNull();
+      expect(body.synthesis?.source).toBe('demo-seed');
+      expect(body.synthesis?.language).toBe(language);
+      expect(body.stale).toBe(false);
+    },
+  );
+
+  it('Deck B intentionally has no pre-baked synthesis (visible cold-start/button state)', async () => {
+    const user = await freshAnonymousUser();
+    const { deckBId } = await seedAndGetDeckIds(user);
+
+    const res = await request(`/api/analysis/deck/${deckBId}`, { user });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { synthesis: unknown };
+    expect(body.synthesis).toBeNull();
   });
 });

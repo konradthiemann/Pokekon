@@ -17,11 +17,26 @@
 // under localStorage 'tcg-player-name' on demo entry so the parser pins "me".
 
 import { eq } from 'drizzle-orm';
-import type { BattleAnalysis } from '@pokekon/shared';
+import {
+  assembleSynthesis,
+  deriveFactDirection,
+  factIdForCard,
+  sanitizeFactLabel,
+  SYNTHESIS_LANGUAGE_VALUES,
+  SYNTHESIS_PROMPT_VERSION,
+  validateSynthesis,
+  type BattleAnalysis,
+  type SynthesisClaim,
+  type SynthesisContext,
+  type SynthesisFact,
+  type SynthesisLanguage,
+} from '@pokekon/shared';
 import type { Db } from '../db/index.js';
 import { decks, deckCards, deckSnapshots, opponentLogs } from '../db/schema.js';
 import type { SnapshotCard } from '../db/schema.js';
+import { saveDeckSynthesis } from './deckSynthesisStore.js';
 import { syncParsedLog } from './matchLogPipeline.js';
+import { synthesisInputHash } from './synthesisFacts.js';
 
 export const DEMO_PLAYER = 'Gtmap';
 
@@ -775,6 +790,217 @@ const DECK_B_MATCHES: SeedMatch[] = [
   },
 ];
 
+// ─── Pre-baked deck synthesis (Deck A only, plan §3.11, Scheibe J) ──────────────
+// Fixed fact snapshot + hand-written claims per language, so the "Tipps"-section
+// shows real, evidence-grounded prose in the demo without spending an LLM token.
+// Deck B intentionally stays without a synthesis (cold-start/button state).
+
+const DEMO_ARCHETYPE_NAME = 'Mega Kangaskhan ex';
+const DEMO_ARCHETYPE_VARIANT = 'Ogerpon Toolbox';
+/** Snaps to CARD_STATS_WINDOWS's 28-day bucket — the window the GET route
+ *  falls back to by default (META_WINDOW_DEFAULT_DAYS=30, snapped). */
+const DEMO_SYNTHESIS_WINDOW_DAYS = 28;
+
+/** field.winRate — the archetype has a clear positive field score. */
+const demoFieldWinRateFact: SynthesisFact = (() => {
+  const value = 56.4;
+  const neutralValue = 50;
+  const lowPct = 52.1;
+  const highPct = 60.8;
+  const direction = deriveFactDirection({ value, neutralValue, lowPct, highPct });
+  return {
+    id: 'field.winRate',
+    kind: 'fieldScore',
+    label: sanitizeFactLabel(DEMO_ARCHETYPE_NAME),
+    value,
+    unit: 'pct',
+    neutralValue,
+    lowPct,
+    highPct,
+    direction,
+    significant: true,
+    usableForRecommendation: direction !== 'neutral',
+    entityNames: [],
+  };
+})();
+
+/** matchup.dragapult-ex — clear weak matchup (mirrors the logged Dragapult ex
+ *  losses on the old build). */
+const demoDragapultMatchupFact: SynthesisFact = (() => {
+  const value = 33.3;
+  const neutralValue = 50;
+  const lowPct = 21.0;
+  const highPct = 45.0;
+  const direction = deriveFactDirection({ value, neutralValue, lowPct, highPct });
+  return {
+    id: 'matchup.dragapult-ex',
+    kind: 'matchup',
+    label: sanitizeFactLabel('Dragapult ex'),
+    value,
+    unit: 'pct',
+    neutralValue,
+    lowPct,
+    highPct,
+    direction,
+    significant: true,
+    usableForRecommendation: true,
+    entityNames: [],
+  };
+})();
+
+/** matchup.raging-bolt-ogerpon — clear favourable matchup (mirrors the logged
+ *  Raging Bolt Ogerpon sweep). */
+const demoRagingBoltMatchupFact: SynthesisFact = (() => {
+  const value = 71.0;
+  const neutralValue = 50;
+  const lowPct = 58.0;
+  const highPct = 84.0;
+  const direction = deriveFactDirection({ value, neutralValue, lowPct, highPct });
+  return {
+    id: 'matchup.raging-bolt-ogerpon',
+    kind: 'matchup',
+    label: sanitizeFactLabel('Raging Bolt Ogerpon'),
+    value,
+    unit: 'pct',
+    neutralValue,
+    lowPct,
+    highPct,
+    direction,
+    significant: true,
+    usableForRecommendation: true,
+    entityNames: [],
+  };
+})();
+
+/** card.eri — Eri is not in the deck; a positive delta makes it an actionable
+ *  add (mirrors the real tech-suggestion recommendation for this matchup). */
+const demoEriCardFact: SynthesisFact = (() => {
+  const value = 8.5;
+  const neutralValue = 0;
+  const lowPct = 2.0;
+  const highPct = 15.0;
+  const direction = deriveFactDirection({ value, neutralValue, lowPct, highPct });
+  return {
+    id: `card.${factIdForCard('Eri')}`,
+    kind: 'cardDelta',
+    label: sanitizeFactLabel('Eri'),
+    value,
+    unit: 'pp',
+    neutralValue,
+    lowPct,
+    highPct,
+    direction,
+    significant: true,
+    usableForRecommendation: true,
+    entityNames: [],
+    inUserDeck: false,
+  };
+})();
+
+/** equilibrium.trend — a mild, bandless positive form trend. */
+const demoEquilibriumTrendFact: SynthesisFact = (() => {
+  const value = 4.2;
+  const neutralValue = 0;
+  const direction = deriveFactDirection({ value, neutralValue, lowPct: null, highPct: null });
+  return {
+    id: 'equilibrium.trend',
+    kind: 'equilibriumTrend',
+    label: sanitizeFactLabel(DEMO_ARCHETYPE_NAME),
+    value,
+    unit: 'pp',
+    neutralValue,
+    lowPct: null,
+    highPct: null,
+    direction,
+    significant: false,
+    usableForRecommendation: direction !== 'neutral',
+    entityNames: [],
+  };
+})();
+
+/** Fact snapshot the pre-baked demo synthesis was written against. Fixed
+ *  numbers, so the demo text is internally consistent regardless of the live
+ *  meta — exactly like the pre-baked battle-log analyses describe the seeded
+ *  logs, not the live meta. */
+export const DEMO_SYNTHESIS_FACTS: SynthesisFact[] = [
+  demoFieldWinRateFact,
+  demoDragapultMatchupFact,
+  demoRagingBoltMatchupFact,
+  demoEriCardFact,
+  demoEquilibriumTrendFact,
+];
+
+/** One claim list per language. Every claim MUST survive validateSynthesis
+ *  against DEMO_SYNTHESIS_FACTS — guarded by demoSeed.test.ts. Written for a
+ *  reader who does not know this deck: no internal jargon (factIds,
+ *  confidence-interval names, Bo1/Bo3, ...). */
+export const DEMO_SYNTHESIS_CLAIMS: Record<SynthesisLanguage, SynthesisClaim[]> = {
+  de: [
+    {
+      factId: 'field.winRate',
+      kind: 'observation',
+      direction: 'positive',
+      text: 'Aktuell gewinnt {label} rund {value}% der gewichteten Partien gegen das aktuelle Feld, mit einer Bandbreite von {low} bis {high}%.',
+    },
+    {
+      factId: 'matchup.dragapult-ex',
+      kind: 'observation',
+      direction: 'negative',
+      text: 'Gegen {label} liegt die Gewinnrate nur bei {value}%, mit einer Bandbreite von {low} bis {high}% – ein klarer Schwachpunkt.',
+    },
+    {
+      factId: 'matchup.raging-bolt-ogerpon',
+      kind: 'observation',
+      direction: 'positive',
+      text: 'Das Matchup gegen {label} ist sehr stark: {value}% Gewinnrate, mit einer Bandbreite von {low} bis {high}%.',
+    },
+    {
+      factId: `card.${factIdForCard('Eri')}`,
+      kind: 'recommendation',
+      direction: 'positive',
+      text: '{label} ist im Deck nicht enthalten, obwohl die Daten ein deutliches Plus von {value} Prozentpunkten nahelegen (Bandbreite {low} bis {high}) – ein Testinclude lohnt sich.',
+    },
+    {
+      factId: 'equilibrium.trend',
+      kind: 'observation',
+      direction: 'positive',
+      text: 'Der Formtrend von {label} zeigt zuletzt nach oben: {value} Prozentpunkte gegenüber der Vorperiode.',
+    },
+  ],
+  en: [
+    {
+      factId: 'field.winRate',
+      kind: 'observation',
+      direction: 'positive',
+      text: 'Right now {label} wins about {value}% of weighted games against the current field, in a range of {low} to {high}%.',
+    },
+    {
+      factId: 'matchup.dragapult-ex',
+      kind: 'observation',
+      direction: 'negative',
+      text: 'Against {label} the win rate sits at only {value}%, ranging from {low} to {high}% – a clear weak spot.',
+    },
+    {
+      factId: 'matchup.raging-bolt-ogerpon',
+      kind: 'observation',
+      direction: 'positive',
+      text: 'The matchup against {label} is very strong: a {value}% win rate, ranging from {low} to {high}%.',
+    },
+    {
+      factId: `card.${factIdForCard('Eri')}`,
+      kind: 'recommendation',
+      direction: 'positive',
+      text: '{label} is missing from the deck, even though the data suggests a solid gain of {value} percentage points (range {low} to {high}) – worth testing a copy.',
+    },
+    {
+      factId: 'equilibrium.trend',
+      kind: 'observation',
+      direction: 'positive',
+      text: 'The recent form trend for {label} points upward: {value} percentage points versus the previous period.',
+    },
+  ],
+};
+
 // ─── Seed entry point ─────────────────────────────────────────────────────────
 
 /**
@@ -910,6 +1136,41 @@ export async function seedDemoData(db: Db, userId: string): Promise<{ seeded: bo
         playerName: DEMO_PLAYER,
       });
     }
+  }
+
+  // ── Pre-baked deck synthesis — Deck A only (plan §3.11, Scheibe J). Deck B
+  // deliberately stays without a row, so the demo also shows the cold-start
+  // "generate" button state without spending a token. ────────────────────────
+  for (const language of SYNTHESIS_LANGUAGE_VALUES) {
+    const context: SynthesisContext = {
+      deckId: deckAId,
+      archetypeId: 'mega-kangaskhan-ex',
+      archetypeName: sanitizeFactLabel(DEMO_ARCHETYPE_NAME),
+      variant: sanitizeFactLabel(DEMO_ARCHETYPE_VARIANT),
+      windowDays: DEMO_SYNTHESIS_WINDOW_DAYS,
+      language,
+      cardStatsComputedAt: null,
+      equilibriumComputedAt: null,
+      matchupImportedAt: null,
+    };
+
+    const validated = validateSynthesis(DEMO_SYNTHESIS_CLAIMS[language], DEMO_SYNTHESIS_FACTS);
+    const inputHash = synthesisInputHash(DEMO_SYNTHESIS_FACTS, {
+      archetypeId: context.archetypeId,
+      windowDays: DEMO_SYNTHESIS_WINDOW_DAYS,
+      language,
+      promptVersion: SYNTHESIS_PROMPT_VERSION,
+    });
+
+    const synthesis = assembleSynthesis(validated, DEMO_SYNTHESIS_FACTS, context, {
+      inputHash,
+      source: 'demo-seed',
+      provider: null,
+      model: null,
+      generatedAt: daysAgoDate(1).toISOString(),
+    });
+
+    await saveDeckSynthesis(db, userId, synthesis);
   }
 
   return { seeded: true };
