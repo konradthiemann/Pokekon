@@ -21,6 +21,9 @@ import {
   solveSymmetricZeroSumNash,
   type ListPerformanceEntry,
   type MatchupCell,
+  type SynthesisClaim,
+  type SynthesisContext,
+  type SynthesisFact,
   type TournamentDecklist,
 } from '@pokekon/shared';
 import { createApp } from './app.js';
@@ -1044,6 +1047,156 @@ Konrad hat gewonnen!`;
       body: { apiKey: '' },
     });
     expect(await cleared.json()).toMatchObject({ hasApiKey: false });
+  });
+});
+
+// Scheibe E (plan §3.7, §4 step 9): the deck_synthesis cache table does not
+// exist yet — schema.deckSynthesis is undefined until the implementer adds it
+// to db/schema.ts and generates drizzle/0015_*.sql. Expected to fail with a
+// runtime TypeError ("Cannot read properties of undefined") when db.insert()
+// is called, and with TS2339 ("Property 'deckSynthesis' does not exist on
+// type ...") under `npm run typecheck`.
+describe('deck_synthesis cache table (plan §3.7, Scheibe E)', () => {
+  function sampleFact(overrides: Partial<SynthesisFact> = {}): SynthesisFact {
+    return {
+      id: 'field.winRate',
+      kind: 'fieldScore',
+      label: "N's Zoroark",
+      value: 55.2,
+      unit: 'pct',
+      neutralValue: 50,
+      lowPct: 51.1,
+      highPct: 59.3,
+      direction: 'positive',
+      significant: true,
+      usableForRecommendation: true,
+      entityNames: [],
+      ...overrides,
+    };
+  }
+
+  function sampleContext(
+    deckId: number,
+    overrides: Partial<SynthesisContext> = {},
+  ): SynthesisContext {
+    return {
+      deckId,
+      archetypeId: 'n-zoroark',
+      archetypeName: "N's Zoroark",
+      variant: 'Standard',
+      windowDays: 28,
+      language: 'de',
+      cardStatsComputedAt: null,
+      equilibriumComputedAt: null,
+      matchupImportedAt: null,
+      ...overrides,
+    };
+  }
+
+  function sampleClaim(overrides: Partial<SynthesisClaim> = {}): SynthesisClaim {
+    return {
+      factId: 'field.winRate',
+      kind: 'observation',
+      direction: 'positive',
+      text: 'Dein Deck steht mit {value} % solide gegen das aktuelle Feld da.',
+      ...overrides,
+    };
+  }
+
+  function sampleValues(deckId: number, overrides: Record<string, unknown> = {}) {
+    return {
+      deckId,
+      userId: USER_A,
+      windowDays: 28,
+      language: 'de' as const,
+      promptVersion: 1,
+      inputHash: 'a'.repeat(64),
+      facts: [sampleFact()],
+      context: sampleContext(deckId),
+      claims: [sampleClaim()],
+      droppedCount: 1,
+      source: 'llm' as const,
+      provider: 'github-models',
+      model: 'openai/gpt-4.1',
+      generatedAt: new Date('2026-06-17T00:00:00.000Z'),
+      ...overrides,
+    };
+  }
+
+  it('inserts a row with all required fields and reads it back unchanged', async () => {
+    const deckId = await createDeck(USER_A);
+    const values = sampleValues(deckId);
+
+    await db.insert(schema.deckSynthesis).values(values);
+
+    const [row] = await db
+      .select()
+      .from(schema.deckSynthesis)
+      .where(eq(schema.deckSynthesis.deckId, deckId));
+
+    expect(row).toMatchObject({
+      deckId,
+      userId: USER_A,
+      windowDays: 28,
+      language: 'de',
+      promptVersion: 1,
+      inputHash: 'a'.repeat(64),
+      droppedCount: 1,
+      source: 'llm',
+      provider: 'github-models',
+      model: 'openai/gpt-4.1',
+    });
+    expect(row?.facts).toEqual([sampleFact()]);
+    expect(row?.context).toEqual(sampleContext(deckId));
+    expect(row?.claims).toEqual([sampleClaim()]);
+    expect(row?.generatedAt).toBeInstanceOf(Date);
+  });
+
+  it('enforces the (deckId, windowDays, language) unique index', async () => {
+    const deckId = await createDeck(USER_A);
+    await db.insert(schema.deckSynthesis).values(sampleValues(deckId));
+
+    // Same (deckId, windowDays, language) tuple — must violate deck_synthesis_uq.
+    await expect(
+      db.insert(schema.deckSynthesis).values(sampleValues(deckId, { inputHash: 'b'.repeat(64) })),
+    ).rejects.toThrow();
+
+    // A different language on the same deck/window is NOT a conflict.
+    await db.insert(schema.deckSynthesis).values(sampleValues(deckId, { language: 'en' as const }));
+    const rows = await db
+      .select()
+      .from(schema.deckSynthesis)
+      .where(eq(schema.deckSynthesis.deckId, deckId));
+    expect(rows).toHaveLength(2);
+  });
+
+  it('rejects an invalid `source` value via a DB-level CHECK constraint', async () => {
+    const deckId = await createDeck(USER_A);
+
+    await expect(
+      db
+        .insert(schema.deckSynthesis)
+        .values(sampleValues(deckId, { source: 'invalid' as unknown as 'llm' | 'demo-seed' })),
+    ).rejects.toThrow();
+  });
+
+  it('cascades delete: removing the referenced deck removes its deck_synthesis row', async () => {
+    const deckId = await createDeck(USER_A);
+    await db.insert(schema.deckSynthesis).values(sampleValues(deckId));
+
+    const before = await db
+      .select()
+      .from(schema.deckSynthesis)
+      .where(eq(schema.deckSynthesis.deckId, deckId));
+    expect(before).toHaveLength(1);
+
+    await db.delete(schema.decks).where(eq(schema.decks.id, deckId));
+
+    const after = await db
+      .select()
+      .from(schema.deckSynthesis)
+      .where(eq(schema.deckSynthesis.deckId, deckId));
+    expect(after).toHaveLength(0);
   });
 });
 
