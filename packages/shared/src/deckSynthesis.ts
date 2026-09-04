@@ -164,3 +164,192 @@ export function sanitizeFactLabel(raw: string): string {
 export function factIdForCard(cardName: string): string {
   return normalizeCardName(cardName).replace(/ /g, '-');
 }
+
+// ---------------------------------------------------------------------------
+// 3.3 -- claims and validation
+// ---------------------------------------------------------------------------
+
+export const SYNTHESIS_CLAIM_KINDS = ['observation', 'recommendation'] as const;
+export type SynthesisClaimKind = (typeof SYNTHESIS_CLAIM_KINDS)[number];
+
+export interface SynthesisClaim {
+  /** Must match a SynthesisFact.id exactly (case-sensitive). */
+  factId: string;
+  kind: SynthesisClaimKind;
+  /** The model's own reading of the number. Must equal fact.direction. */
+  direction: FactDirection;
+  /** Prose WITHOUT numbers. Placeholders: {value} {low} {high} {label}. */
+  text: string;
+}
+
+export const CLAIM_REJECTION_REASONS = [
+  'malformed', // wrong shape / unknown kind or direction value
+  'emptyText', // empty, whitespace, or longer than MAX_CLAIM_TEXT_CHARS
+  'unknownFact', // factId not in the supplied facts
+  'duplicate', // second claim on the same factId
+  'unknownPlaceholder', // a placeholder that is not one of the four allowed
+  'missingBandPlaceholder', // {low}/{high} used on a bandless fact
+  'directionMismatch', // claim.direction !== fact.direction
+  'insufficientEvidence', // recommendation on a fact below the Spec 3/5 bar
+  'foreignNumber', // digit in text that no referenced label contains
+] as const;
+export type ClaimRejectionReason = (typeof CLAIM_REJECTION_REASONS)[number];
+
+export interface RejectedClaim {
+  claim: SynthesisClaim;
+  reason: ClaimRejectionReason;
+}
+
+export interface ValidatedSynthesis {
+  accepted: SynthesisClaim[];
+  rejected: RejectedClaim[];
+}
+
+const FACT_DIRECTION_VALUES: readonly FactDirection[] = ['positive', 'negative', 'neutral'];
+
+const ALLOWED_PLACEHOLDERS = ['value', 'low', 'high', 'label'] as const;
+const BAND_PLACEHOLDERS = ['low', 'high'] as const;
+
+const PLACEHOLDER_PATTERN = /\{([a-zA-Z]*)\}/g;
+const NUMBER_PATTERN = /\d+(?:[.,]\d+)?/g;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Structural check only (reason 'malformed'): correct shape, known kind and
+ *  direction values. Does not know about facts yet. */
+function coerceClaim(candidate: unknown): SynthesisClaim | null {
+  if (!isRecord(candidate)) {
+    return null;
+  }
+  const { factId, kind, direction, text } = candidate;
+  if (typeof factId !== 'string' || factId.length === 0) {
+    return null;
+  }
+  if (typeof kind !== 'string' || !SYNTHESIS_CLAIM_KINDS.includes(kind as SynthesisClaimKind)) {
+    return null;
+  }
+  if (
+    typeof direction !== 'string' ||
+    !FACT_DIRECTION_VALUES.includes(direction as FactDirection)
+  ) {
+    return null;
+  }
+  if (typeof text !== 'string') {
+    return null;
+  }
+  return {
+    factId,
+    kind: kind as SynthesisClaimKind,
+    direction: direction as FactDirection,
+    text,
+  };
+}
+
+/** Placeholders present in the text, in order of appearance (including
+ *  unknown ones, so the caller can decide malformed vs. unknownPlaceholder). */
+function extractPlaceholders(text: string): string[] {
+  const placeholders: string[] = [];
+  for (const match of text.matchAll(PLACEHOLDER_PATTERN)) {
+    placeholders.push(match[1] ?? '');
+  }
+  return placeholders;
+}
+
+/** Digits left over after stripping placeholders that are allowed only when
+ *  they occur as a substring of fact.label or one of fact.entityNames. */
+function hasForeignNumber(text: string, fact: SynthesisFact): boolean {
+  const withoutPlaceholders = text.replace(PLACEHOLDER_PATTERN, '');
+  const numbers = withoutPlaceholders.match(NUMBER_PATTERN) ?? [];
+  return numbers.some((token) => {
+    const inLabel = fact.label.includes(token);
+    const inEntityNames = fact.entityNames.some((name) => name.includes(token));
+    return !inLabel && !inEntityNames;
+  });
+}
+
+/**
+ * The provider-independent grounding gate for structured input -- the
+ * counterpart to validateAnalysis() for battle logs. Never throws: unusable
+ * input yields { accepted: [], rejected: [] }. `accepted` keeps the model's
+ * order; the first claim per factId wins.
+ */
+export function validateSynthesis(claims: unknown, facts: SynthesisFact[]): ValidatedSynthesis {
+  const accepted: SynthesisClaim[] = [];
+  const rejected: RejectedClaim[] = [];
+
+  if (!Array.isArray(claims)) {
+    return { accepted, rejected };
+  }
+
+  const factsById = new Map(facts.map((fact) => [fact.id, fact]));
+  const seenFactIds = new Set<string>();
+  const limitedClaims = claims.slice(0, MAX_SYNTHESIS_CLAIMS);
+
+  for (const candidate of limitedClaims) {
+    const claim = coerceClaim(candidate);
+    if (!claim) {
+      // Malformed candidates have no valid SynthesisClaim shape to attach to
+      // RejectedClaim.claim; the plan's malformed-input tests only assert on
+      // `reason`, never on `claim`, for this case.
+      rejected.push({ claim: candidate as SynthesisClaim, reason: 'malformed' });
+      continue;
+    }
+
+    const trimmedText = claim.text.trim();
+    if (trimmedText.length === 0 || claim.text.length > MAX_CLAIM_TEXT_CHARS) {
+      rejected.push({ claim, reason: 'emptyText' });
+      continue;
+    }
+
+    const fact = factsById.get(claim.factId);
+    if (!fact) {
+      rejected.push({ claim, reason: 'unknownFact' });
+      continue;
+    }
+
+    if (seenFactIds.has(claim.factId)) {
+      rejected.push({ claim, reason: 'duplicate' });
+      continue;
+    }
+
+    const placeholders = extractPlaceholders(claim.text);
+    const hasUnknownPlaceholder = placeholders.some(
+      (name) => !ALLOWED_PLACEHOLDERS.includes(name as (typeof ALLOWED_PLACEHOLDERS)[number]),
+    );
+    if (hasUnknownPlaceholder) {
+      rejected.push({ claim, reason: 'unknownPlaceholder' });
+      continue;
+    }
+
+    const hasBand = fact.lowPct !== null && fact.highPct !== null;
+    const usesBandPlaceholder = placeholders.some((name) =>
+      BAND_PLACEHOLDERS.includes(name as (typeof BAND_PLACEHOLDERS)[number]),
+    );
+    if (usesBandPlaceholder && !hasBand) {
+      rejected.push({ claim, reason: 'missingBandPlaceholder' });
+      continue;
+    }
+
+    if (claim.direction !== fact.direction) {
+      rejected.push({ claim, reason: 'directionMismatch' });
+      continue;
+    }
+
+    if (claim.kind === 'recommendation' && !fact.usableForRecommendation) {
+      rejected.push({ claim, reason: 'insufficientEvidence' });
+      continue;
+    }
+
+    if (hasForeignNumber(claim.text, fact)) {
+      rejected.push({ claim, reason: 'foreignNumber' });
+      continue;
+    }
+
+    seenFactIds.add(claim.factId);
+    accepted.push(claim);
+  }
+
+  return { accepted, rejected };
+}
