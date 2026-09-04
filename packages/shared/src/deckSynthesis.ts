@@ -250,6 +250,20 @@ function coerceClaim(candidate: unknown): SynthesisClaim | null {
   };
 }
 
+/** Best-effort SynthesisClaim for a candidate that failed coerceClaim() --
+ *  never casts the arbitrary `unknown` input, only copies fields that are
+ *  actually string-shaped. Used solely to populate RejectedClaim.claim for
+ *  the 'malformed' reason, which no test or caller reads the contents of. */
+function placeholderClaim(candidate: unknown): SynthesisClaim {
+  const record = isRecord(candidate) ? candidate : {};
+  return {
+    factId: typeof record.factId === 'string' ? record.factId : '',
+    kind: 'observation',
+    direction: 'neutral',
+    text: typeof record.text === 'string' ? record.text : '',
+  };
+}
+
 /** Placeholders present in the text, in order of appearance (including
  *  unknown ones, so the caller can decide malformed vs. unknownPlaceholder). */
 function extractPlaceholders(text: string): string[] {
@@ -295,8 +309,9 @@ export function validateSynthesis(claims: unknown, facts: SynthesisFact[]): Vali
     if (!claim) {
       // Malformed candidates have no valid SynthesisClaim shape to attach to
       // RejectedClaim.claim; the plan's malformed-input tests only assert on
-      // `reason`, never on `claim`, for this case.
-      rejected.push({ claim: candidate as SynthesisClaim, reason: 'malformed' });
+      // `reason`, never on `claim`, for this case. Build a safe placeholder
+      // instead of casting the arbitrary `unknown` input.
+      rejected.push({ claim: placeholderClaim(candidate), reason: 'malformed' });
       continue;
     }
 
