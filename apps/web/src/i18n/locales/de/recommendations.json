@@ -38,6 +38,29 @@
       "version": "Version"
     }
   },
+  "synthesis": {
+    "title": "KI-Zusammenfassung",
+    "intro": "Verwandelt die Auswertung unten in eine kurze, lesbare Zusammenfassung des aktuellen Deck-Stands.",
+    "generate": "Text erzeugen",
+    "regenerate": "Neu erzeugen",
+    "generating": "Erzeuge…",
+    "stale": "Zahlen haben sich geändert",
+    "noFacts": "Noch zu wenig Meta-Daten — logge mehr Matches oder synchronisiere das Meta, um das freizuschalten.",
+    "noKey": "Noch kein KI-Schlüssel hinterlegt. Trage einen in den KI-Einstellungen ein, um eine Zusammenfassung zu erzeugen.",
+    "noKeyDemo": "Demo-Modus: Gib unten einen GitHub-Models-Token ein, um das auszuprobieren, ohne dass serverseitig etwas gespeichert wird.",
+    "empty": "Diesmal hat keine Aussage unsere Faktenprüfung überstanden — bitte erneut versuchen.",
+    "error": "Erzeugung fehlgeschlagen",
+    "generatedAt": "Erzeugt am {{date}}",
+    "sections": {
+      "headline": "Überblick",
+      "strengths": "Stärken",
+      "risks": "Risiken",
+      "listLevers": "Mögliche Listen-Änderungen",
+      "context": "Kontext"
+    },
+    "disclosure": "Worauf beruht das?",
+    "disclosureDropped": "{{count}} weitere Aussagen wurden von der Faktenprüfung verworfen und werden nicht angezeigt."
+  },
   "comparison": {
     "sectionTitle": "Listen-Vergleich mit Turnierergebnissen",
     "title": "Listen-Vergleich",

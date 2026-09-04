@@ -6,6 +6,19 @@ import { DeckPage } from './DeckPage';
 import type { Deck, OpponentLog } from '../types';
 import type { DeckSection } from '../store/dashboardStore';
 
+// DeckSynthesisPanel (mounted inside DeckTipsSection, plan
+// ai-recommendation-synthesis.md §3.10) reads the session to tell demo
+// guests apart from regular users — mock it the same way
+// DeckSynthesisPanel.test.tsx does so this suite never hits the network.
+vi.mock('../lib/authClient', () => ({
+  authClient: {
+    useSession: vi.fn(() => ({ data: null, isPending: false, error: null, refetch: vi.fn() })),
+    signIn: { email: vi.fn(), social: vi.fn() },
+    signUp: { email: vi.fn() },
+    signOut: vi.fn(),
+  },
+}));
+
 beforeAll(async () => {
   await i18n.changeLanguage('en');
 });
@@ -50,6 +63,15 @@ interface DeckPageStoreMock {
   isComparing: boolean;
   compareProgress: unknown;
   compareError: unknown;
+  // Deck-synthesis slice (plan ai-recommendation-synthesis.md §3.10) —
+  // required so DeckSynthesisPanel, mounted inside DeckTipsSection, doesn't
+  // read `undefined`.
+  deckSynthesis: unknown;
+  isLoadingSynthesis: boolean;
+  isSynthesizing: boolean;
+  synthesisError: string | null;
+  loadDeckSynthesis: () => void;
+  runDeckSynthesis: () => void;
   runDeckComparison: () => void;
   setActiveTab: () => void;
   setDeckSection: (section: DeckSection) => void;
@@ -89,6 +111,12 @@ const useTestStore = create<DeckPageStoreMock>((set) => ({
   isComparing: false,
   compareProgress: null,
   compareError: null,
+  deckSynthesis: null,
+  isLoadingSynthesis: false,
+  isSynthesizing: false,
+  synthesisError: null,
+  loadDeckSynthesis: vi.fn(),
+  runDeckSynthesis: vi.fn(),
   runDeckComparison: vi.fn(),
   setActiveTab: vi.fn(),
   setDeckSection: (section) => set({ deckSection: section }),
