@@ -77,6 +77,58 @@ form fields a manual entry would set; the only wire change is the now-actually-s
 
 ---
 
+## Deck Synthesis (Spec 8 — Structured LLM Analysis)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as DeckTipsSection
+    participant Store as dashboardStore
+    participant API as POST /api/analysis/deck/:deckId
+    participant AI as ai/synthesize
+    participant DB as PostgreSQL
+    participant Validate as validateSynthesis
+
+    User->>UI: Click "Synthesize" button
+    UI->>Store: runDeckSynthesis(deckId, language)
+    Store->>Store: buildSynthesisFactSet(fieldScore, cardStats, equilibrium)
+    Store->>Store: computeInputHash(facts, language, promptVersion)
+    Store->>DB: Check deck_synthesis cache by (deckId, windowDays, language)
+    
+    alt Cache hit
+        DB-->>Store: Return cached DeckSynthesis
+        Store-->>UI: Render cached text + "snapshot from X"
+    else Cache miss
+        Store->>API: POST {deckId, language, facts}
+        API->>AI: synthesize(facts, context)
+        AI->>AI: buildSynthesisPrompts(facts, context)
+        AI->>AI: LLM call (temperature: 0, JSON mode)
+        AI->>AI: Parse response → SynthesisClaim[]
+        AI->>Validate: validateSynthesis(claims, facts)
+        Validate-->>AI: accepted[], rejected[]
+        AI->>AI: assembleSynthesis(validated, facts, ...) → DeckSynthesis
+        AI-->>API: DeckSynthesis (rendered, persisted)
+        API->>DB: Upsert into deck_synthesis (cache key = inputHash)
+        DB-->>API: Row inserted/updated
+        API-->>Store: Return DeckSynthesis
+        Store-->>UI: Render sections + claims + dropped count
+    end
+    UI-->>User: Display synthesized text with sources
+```
+
+**Key differences from battle-log analysis:**
+1. **No raw input:** The LLM receives a closed, structured facts list (Field-Score, matchups, card deltas, equilibrium) — not a raw battle log.
+2. **Direction from band:** Each fact's direction (positive/negative/neutral) is derived from its confidence interval, not guessed by the model.
+3. **No numbers from model:** Claims use placeholders (`{value}`, `{label}`) filled server-side after validation.
+4. **Cache by input hash:** Text is reused until the underlying facts change; input hash is computed from the canonical facts list + language + prompt version.
+5. **Snapshot semantics:** Old text persists as "snapshot from {timestamp}" with a "Re-synthesize" button, but the UI always renders the **current** numbers, never stale data.
+
+---
+
+## Server-side Battle-Log Pipeline (match_log_parsed)
+
+---
+
 ## Meta Sync (Limitless API)
 
 > **Legacy browser path.** This sync currently runs in the browser (with the `corsproxy.io` fallback shown below). It is slated to move to a server-side cron job — no CORS proxy needed — writing the shared server-side `meta_snapshots` table (see [architecture.md](./architecture.md) → *External API Integration* and [backend-evolution-plan.md](./backend-evolution-plan.md) §6.2).

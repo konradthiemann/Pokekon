@@ -78,6 +78,17 @@ Die oberste Schicht. Kernpunkte (vollständig in [`../CLAUDE.md`](../CLAUDE.md))
 
 Bei Konflikt zwischen einem Agent-File und der Verfassung **gewinnt die Verfassung**, und der Widerspruch wird gemeldet.
 
+### Anti-Halluzinations-Architektur: zwei Analyse-Typen
+
+Das Projekt hat zwei LLM-Analyse-Modi (siehe [`features.md` §8 & §19](./features.md)), die sich in der Art des Groundings unterscheiden:
+
+| Typ | Input | Grounding | Validierung | Use Case |
+|-----|-------|-----------|-------------|----------|
+| **Battle-Log-Analyse** (§8) | Rohtext aus TCG Live (deutsches Protokoll) | **Wörtliches Zitat:** jede Aussage muss einen verbatim Quote aus dem Rohlog nennen (`evidenceExistsInLog`). | After-parse: Aussagen ohne Beleg werden verworfen (`validateAnalysis`). | Spielzug-Kritik, Fehler identifizieren. |
+| **Deck-Synthese** (§19) | Geschlossene Fakten-Liste (Field-Score, Matchups, Card Deltas, Equilibrium) | **Struktur + Richtung:** Aussage muss auf einen Fakt in der Liste zeigen (`factId`), und die Richtung der Aussage muss zum **aus dem Konfidenzband abgeleiteten** Vorzeichen des Fakts passen. | Parallel zu & nach Parsing: Richtung abgeleitet (`deriveFactDirection`), Zahlen sind Platzhalter (Server rendert). | Gesamtdeck-Empfehlungen gegen das Feld. |
+
+Beide nutzen `temperature: 0`, JSON-Struktur und die **geteilte Engine** `@pokekon/shared`; ein **provider-agnostischer Adapter** (`apps/api/src/ai/`) erlaubt Provider-Wechsel ohne Logik-Änderung. Das ist ein Designziel aus CLAUDE.md Golden Rule 6: Anti-Halluzination bleibt, wird nicht aufgeweicht.
+
 ---
 
 ## 4. Agent-Roster (Schicht ②)

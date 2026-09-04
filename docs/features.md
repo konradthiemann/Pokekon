@@ -14,6 +14,7 @@
 | Battle log analysis (server-side LLM, BYOK) | Deck → Match detail | User triggers + API key |
 | Deck comparison vs. tournament lists | Deck → Tips | User triggers |
 | Data-driven recommendations | Deck → Tips | Auto on data change |
+| Deck synthesis (KI-text über aggregierte Daten) | Deck → Tips | User triggers |
 | Local meta priority | Deck / Meta | User configures |
 | Recent tournaments view | Meta | User triggers |
 | Matchup matrix | Meta | Auto from meta data |
@@ -491,6 +492,39 @@ This is honest communication: acknowledge the noise, show the uncertainty, let t
 ### Data pipeline
 
 `GET /api/meta/archetypes/:archetypeId/card-stats?days=7..180` returns precomputed deltas from the `archetype_card_stats` table. The job `computeCardStats` runs once per sync window (separate from `syncMeta`, typically after it) and rewrites the table for each (archetype, window) pair in a single transaction. Cold start (empty table) yields `computedAt: null` and `cards: []`; the UI tolerates this gracefully.
+
+---
+
+## 19. Deck Synthesis (KI-Text über Kennzahlen)
+
+**Page:** `DeckPage` — "Tips" section (primary panel, below recommendations)
+
+A second, structured analysis type (distinct from the Battle-Log Analysis §8): the LLM receives pre-computed, aggregated facts — Field-Score with confidence bands, weighted matchups, card performance deltas, equilibrium signals — rather than a raw battle log, and synthesizes a personalized text summary without inventing numbers or claiming evidence that isn't there.
+
+### What it does
+
+Combines three data sources into a closed set of structured **facts** (each with an id, value, neutral threshold, and confidence band), feeds them to the LLM with strict rules, and renders the surviving claims into a final text with sections (headline, strengths, risks, recommendations, context). Unlike battle-log analysis which grounds claims in wörtliche quotes, this synthesis grounds in **structure + direction**: each claim must reference a fact by id (exists in the input list) and must declare direction (positive/negative/neutral) that matches the fact's derived direction (from its confidence band, not guessed by the model).
+
+### The grounding principle (how it avoids hallucination)
+
+1. **Closed facts list**: The prompt contains only and exactly the facts the model may discuss, each with a stable `id` — no invention, no speculation on data outside this list.
+2. **Direction from the band, not the point**: A fact's direction (positive/negative/neutral) is derived from its confidence interval: does the band exclude the neutral value and lie above/below it? This inherits the Spec 3 principle (confidence-aware, never overconfident at low sample sizes). A matchup with 8–2 record from 10 games has a wide band including 50 %, so it's `neutral`, and a claim "you're strong here" is rejected.
+3. **No numbers from the model**: Claims contain placeholders (`{value}`, `{low}`, `{high}`, `{label}`), which the server fills deterministically from the fact. Impossible to hallucinate a number when it's never left the server.
+4. **Evidence threshold**: A claim of type `recommendation` may only reference facts meeting the Spec 3/5 confidence bar (`significant` in matchups, `tier !== 'insufficient'` in card deltas). The KI-layer doesn't lower the standard.
+
+### Trigger and caching
+
+- **Trigger:** User clicks "Synthesize" button in Deck Tips section — not automatic on every page load (saves tokens, consistent with battle-log analysis pattern).
+- **Cache:** The text is cached by an input hash (canonical hash over the facts list + language + prompt version). Text is reused until the underlying numbers change. If data shifts, the old text remains as "snapshot from {timestamp}" with a "Re-synthesize" button, but the rendered numbers are always fresh.
+
+### Data sources
+
+| Source | Fields | Used for |
+|--------|--------|----------|
+| Field Score (Spec 3) | `fieldWinRatePct`, confidence band, coverage % | `field.winRate`, `field.coverage` facts |
+| Weighted matchups | Per-opponent `winRatePct`, band, meta share | `matchup.*` facts |
+| Card performance deltas (Spec 5) | `deltaPp`, tier, band, in-deck status | `card.*` facts |
+| Equilibrium signals (Spec 6, optional) | Weight, gap, trend, fitness delta | `equilibrium.*` facts |
 
 ---
 

@@ -49,6 +49,8 @@ drift fails the build instead of silently shipping an empty analysis.
 
 ## AI analysis without spending tokens
 
+### Battle-Log Analysis
+
 1. **Pre-baked analyses** — every logged demo match ships with a stored
    `analysis` JSON (evidence-grounded), so the Match Detail → Analyse tab shows a
    real analysis with **zero** API calls.
@@ -57,6 +59,10 @@ drift fails the build instead of silently shipping an empty analysis.
    sent per request; `POST /api/analysis/log` accepts an ephemeral `apiKey` in the
    body that is used once and **never stored server-side**. Regular users keep the
    existing server-side encrypted-key flow.
+
+### Deck Synthesis
+
+The demo seed includes pre-computed deck syntheses in the `deck_synthesis` table for both demo decks, seeded with `source: 'demo-seed'`. The Mega Kangaskhan ex deck (primary, with field data) has syntheses in both DE and EN; the Zoroark deck is intentionally left without (shows the cold-start state: "No synthesis available — click Synthesize"). This demonstrates the feature without spending tokens on demo-mode visits.
 
 ## Try it locally
 
