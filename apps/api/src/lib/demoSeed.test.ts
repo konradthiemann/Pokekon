@@ -1,6 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { parseBattleLog, validateAnalysis } from '@pokekon/shared';
-import { DEMO_PLAYER, DEMO_LOGGED_MATCHES, DECK_A_MATCHES, DECK_A_CARDS_V2 } from './demoSeed.js';
+import {
+  assembleSynthesis,
+  parseBattleLog,
+  SYNTHESIS_LANGUAGE_VALUES,
+  validateAnalysis,
+  validateSynthesis,
+  type SynthesisContext,
+} from '@pokekon/shared';
+import {
+  DEMO_PLAYER,
+  DEMO_LOGGED_MATCHES,
+  DECK_A_MATCHES,
+  DECK_A_CARDS_V2,
+  // Scheibe J (plan §3.11, §4 step 19): the pre-baked demo synthesis fact
+  // snapshot + per-language claim lists — do not exist yet, expected to fail
+  // module resolution until the implementer adds them to demoSeed.ts.
+  DEMO_SYNTHESIS_FACTS,
+  DEMO_SYNTHESIS_CLAIMS,
+} from './demoSeed.js';
 
 type Match = (typeof DECK_A_MATCHES)[number];
 
@@ -82,4 +99,112 @@ describe('demo seed recommendation triggers', () => {
     expect(names).not.toContain('eri');
     expect(names).not.toContain('briar');
   });
+});
+
+// Guards the pre-baked deck-synthesis demo content (plan §3.11, §4 step 19). The
+// same idea as the battle-log guard above: every hand-written claim must survive
+// the REAL grounding gate against its own fact snapshot, and the assembled text
+// must be free of both template placeholders and internal jargon — the reader
+// of a demo synthesis knows nothing about factIds, confidence bands or Wilson
+// intervals (fifth AC, spec §"Verständlichkeit").
+describe('demo seed deck synthesis content (plan §3.11)', () => {
+  // Case-sensitive. Matched with a word boundary for alphanumeric/underscore
+  // terms (so e.g. 'pp' does not falsely fire inside 'Support') and as a plain
+  // substring for symbols that \b cannot bracket (θ has no \w neighbour).
+  const FORBIDDEN_ABBREVIATIONS = ['Bo1', 'Bo3', 'pp', 'Wilson', 'Nash', 'θ', 'MIN_MATCHUP_GAMES'];
+
+  function findForbiddenAbbreviation(text: string): string | null {
+    for (const term of FORBIDDEN_ABBREVIATIONS) {
+      const isWordLike = /^\w+$/.test(term);
+      const hit = isWordLike ? new RegExp(`\\b${term}\\b`).test(text) : text.includes(term);
+      if (hit) return term;
+    }
+    return null;
+  }
+
+  function demoContext(language: (typeof SYNTHESIS_LANGUAGE_VALUES)[number]): SynthesisContext {
+    return {
+      deckId: 1,
+      archetypeId: 'mega-kangaskhan-ex',
+      archetypeName: 'Mega Kangaskhan ex',
+      variant: 'Ogerpon Toolbox',
+      windowDays: 28,
+      language,
+      cardStatsComputedAt: null,
+      equilibriumComputedAt: null,
+      matchupImportedAt: null,
+    };
+  }
+
+  it.each(SYNTHESIS_LANGUAGE_VALUES)(
+    'every %s claim survives validateSynthesis against DEMO_SYNTHESIS_FACTS',
+    (language) => {
+      const claims = DEMO_SYNTHESIS_CLAIMS[language];
+      const validated = validateSynthesis(claims, DEMO_SYNTHESIS_FACTS);
+      expect(validated.rejected).toEqual([]);
+      expect(validated.accepted).toHaveLength(claims.length);
+    },
+  );
+
+  it.each(SYNTHESIS_LANGUAGE_VALUES)(
+    'assembleSynthesis produces at least the headline and listLevers sections (%s)',
+    (language) => {
+      const claims = DEMO_SYNTHESIS_CLAIMS[language];
+      const validated = validateSynthesis(claims, DEMO_SYNTHESIS_FACTS);
+      const synthesis = assembleSynthesis(validated, DEMO_SYNTHESIS_FACTS, demoContext(language), {
+        inputHash: 'a'.repeat(64),
+        source: 'demo-seed',
+        provider: null,
+        model: null,
+        generatedAt: '2026-08-01T00:00:00.000Z',
+      });
+
+      const sectionNames = synthesis.sections.map((s) => s.section);
+      expect(sectionNames).toContain('headline');
+      expect(sectionNames).toContain('listLevers');
+    },
+  );
+
+  it.each(SYNTHESIS_LANGUAGE_VALUES)(
+    'no rendered sentence contains an unfilled placeholder brace (%s)',
+    (language) => {
+      const claims = DEMO_SYNTHESIS_CLAIMS[language];
+      const validated = validateSynthesis(claims, DEMO_SYNTHESIS_FACTS);
+      const synthesis = assembleSynthesis(validated, DEMO_SYNTHESIS_FACTS, demoContext(language), {
+        inputHash: 'a'.repeat(64),
+        source: 'demo-seed',
+        provider: null,
+        model: null,
+        generatedAt: '2026-08-01T00:00:00.000Z',
+      });
+
+      for (const block of synthesis.sections) {
+        for (const sentence of block.sentences) {
+          expect(sentence).not.toContain('{');
+          expect(sentence).not.toContain('}');
+        }
+      }
+    },
+  );
+
+  it.each(SYNTHESIS_LANGUAGE_VALUES)(
+    'no rendered sentence contains an internal abbreviation from the forbidden list (%s)',
+    (language) => {
+      const claims = DEMO_SYNTHESIS_CLAIMS[language];
+      const validated = validateSynthesis(claims, DEMO_SYNTHESIS_FACTS);
+      const synthesis = assembleSynthesis(validated, DEMO_SYNTHESIS_FACTS, demoContext(language), {
+        inputHash: 'a'.repeat(64),
+        source: 'demo-seed',
+        provider: null,
+        model: null,
+        generatedAt: '2026-08-01T00:00:00.000Z',
+      });
+
+      for (const block of synthesis.sections) {
+        for (const sentence of block.sentences) {
+          expect(findForbiddenAbbreviation(sentence)).toBeNull();
+        }
+      }
+    },
+  );
 });

@@ -38,6 +38,29 @@
       "version": "Version"
     }
   },
+  "synthesis": {
+    "title": "AI Summary",
+    "intro": "Turn the analytics below into a short, readable summary of your deck's current standing.",
+    "generate": "Generate text",
+    "regenerate": "Regenerate",
+    "generating": "Generating…",
+    "stale": "Numbers have changed since this was written",
+    "noFacts": "Not enough meta data yet — log more matches or sync the meta to unlock this.",
+    "noKey": "No AI key configured yet. Add one in your AI settings to generate a summary.",
+    "noKeyDemo": "Demo mode: enter a GitHub Models token below to try this without saving anything server-side.",
+    "empty": "No claim survived our fact-check this time — please try generating again.",
+    "error": "Generation failed",
+    "generatedAt": "Generated {{date}}",
+    "sections": {
+      "headline": "Overview",
+      "strengths": "Strengths",
+      "risks": "Risks",
+      "listLevers": "List Changes to Consider",
+      "context": "Context"
+    },
+    "disclosure": "What is this based on?",
+    "disclosureDropped": "{{count}} additional claims were dropped by our fact-check and are not shown."
+  },
   "comparison": {
     "sectionTitle": "List Comparison vs. Tournament Results",
     "title": "List Comparison",

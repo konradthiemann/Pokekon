@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ARCHETYPE_SLUG_PATTERN, BEST_OF_VALUES } from '@pokekon/shared';
+import { ARCHETYPE_SLUG_PATTERN, BEST_OF_VALUES, SYNTHESIS_LANGUAGE_VALUES } from '@pokekon/shared';
 import {
   aiProviderValues,
   cardTypeValues,
@@ -250,6 +250,37 @@ export const aiSettingsPutSchema = z
 export const analyzeLogSchema = z.object({
   battleLog: z.string().min(1).max(MAX_BATTLE_LOG_CHARS),
   playerName: z.string().min(1).max(100),
+  apiKey: z.string().max(400).optional(),
+  provider: z.enum(aiProviderValues).optional(),
+  model: z.string().max(100).nullish(),
+});
+
+// ─── Deck synthesis (Spec 8, plan §3.8) ────────────────────────────────────────
+
+/** Query for GET /api/analysis/deck/:deckId — `days` is snapped to
+ *  CARD_STATS_WINDOWS (snapCardStatsWindow) after parsing, same as the other
+ *  meta reads. */
+export const deckSynthesisQuerySchema = z.object({
+  days: z.coerce
+    .number()
+    .int()
+    .min(META_WINDOW_MIN_DAYS)
+    .max(META_WINDOW_MAX_DAYS)
+    .default(META_WINDOW_DEFAULT_DAYS),
+  language: z.enum(SYNTHESIS_LANGUAGE_VALUES).default('de'),
+});
+
+/**
+ * Body for POST /api/analysis/deck/:deckId — generate (or serve a cached)
+ * synthesis. `days` defaults to META_WINDOW_DEFAULT_DAYS (route: then snapped
+ * via snapCardStatsWindow, plan §3.8 step 3) rather than here, so the route
+ * can distinguish "omitted" from "explicitly the default". Same ephemeral-BYOK
+ * fields/contract as analyzeLogSchema.
+ */
+export const deckSynthesisPostSchema = z.object({
+  days: z.number().int().min(META_WINDOW_MIN_DAYS).max(META_WINDOW_MAX_DAYS).optional(),
+  language: z.enum(SYNTHESIS_LANGUAGE_VALUES).default('de'),
+  force: z.boolean().optional(),
   apiKey: z.string().max(400).optional(),
   provider: z.enum(aiProviderValues).optional(),
   model: z.string().max(100).nullish(),

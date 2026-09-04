@@ -256,7 +256,7 @@ export async function loadMatchupData(db: Db, window: MetaWindow): Promise<Match
 
 /** Field scores for every archetype in the window ('other' participates as an
  *  opponent but is never ranked as a subject — it is not a playable deck). */
-async function loadFieldScores(
+export async function loadFieldScores(
   db: Db,
   window: MetaWindow,
 ): Promise<{ window: WindowAggregates; scores: FieldScore[]; matchup: MatchupData }> {

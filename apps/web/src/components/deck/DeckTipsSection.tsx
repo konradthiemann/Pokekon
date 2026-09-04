@@ -3,6 +3,7 @@ import { Trans, useTranslation } from 'react-i18next';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { RecommendationsPanel } from '../recommendations/RecommendationsPanel';
 import { DeckComparisonPanel } from '../recommendations/DeckComparisonPanel';
+import { DeckSynthesisPanel } from '../recommendations/DeckSynthesisPanel';
 import { useRecommendations } from '../../hooks/useRecommendations';
 import { computeDeckPerformanceStats } from '../../lib/deckPerformanceStats';
 import { Info, MapPin } from 'lucide-react';
@@ -125,6 +126,11 @@ export function DeckTipsSection() {
           </span>
         </div>
       )}
+
+      {/* AI-synthesised summary of the analytics below it (plan
+          ai-recommendation-synthesis.md §3.10) — the fließtext comes first,
+          the detail it summarizes follows. */}
+      <DeckSynthesisPanel />
 
       {/* Matchup + version recommendations */}
       <RecommendationsPanel recommendations={recommendations} />

@@ -3,11 +3,13 @@ import type {
   ArchetypeCardStat,
   BattleAnalysis,
   DeckAnalytics,
+  DeckSynthesis,
   FieldScore,
   FitnessDirection,
   MatchupRow,
   MetaSyncResult,
   StandingMatchResult,
+  SynthesisLanguage,
   TournamentDecklist,
 } from '@pokekon/shared';
 import type {
@@ -739,4 +741,75 @@ export interface MetaEquilibriumResponse {
 export async function getMetaEquilibrium(days?: number): Promise<MetaEquilibriumResponse> {
   const query = days === undefined ? '' : `?days=${days}`;
   return request<MetaEquilibriumResponse>(`/api/meta/equilibrium${query}`);
+}
+
+// ─── Deck synthesis (plan .claude/plans/ai-recommendation-synthesis.md
+// §3.8/§3.10) ──────────────────────────────────────────────────────────────
+
+/** GET /api/analysis/deck/{deckId} — current facts + the cached synthesis
+ *  (if any), never triggers an LLM call. `synthesis: null` is a cold start,
+ *  not a 404. */
+export interface DeckSynthesisReadResponse {
+  deckId: number;
+  archetypeId: string;
+  windowDays: number;
+  language: SynthesisLanguage;
+  synthesis: DeckSynthesis | null;
+  /** true when the stored text was generated from different numbers. */
+  stale: boolean;
+  /** Hash of the CURRENT numbers, regardless of whether a synthesis exists. */
+  currentInputHash: string;
+  /** How many facts would be available right now; 0 disables the generate button. */
+  availableFactCount: number;
+  /** Mirrors GET /api/analysis/settings so the panel needs only one call. */
+  hasApiKey: boolean;
+}
+
+/** POST /api/analysis/deck/{deckId} — generate (or serve a cached) synthesis. */
+export interface DeckSynthesisWriteResponse {
+  synthesis: DeckSynthesis;
+  stale: false;
+  /** true when a cache hit served the response and no LLM call was made. */
+  cached: boolean;
+}
+
+/** Read-only: current facts + the cached synthesis, no token cost. Safe to
+ *  call on mount / deck switch. */
+export async function getDeckSynthesis(
+  deckId: number,
+  opts?: { days?: number; language?: SynthesisLanguage },
+): Promise<DeckSynthesisReadResponse> {
+  const params = new URLSearchParams();
+  if (opts?.days !== undefined) params.set('days', String(opts.days));
+  if (opts?.language !== undefined) params.set('language', opts.language);
+  const query = params.toString();
+  return request<DeckSynthesisReadResponse>(
+    `/api/analysis/deck/${deckId}${query ? `?${query}` : ''}`,
+  );
+}
+
+/** Trigger a generation. `apiKey` is the demo-mode ephemeral token path —
+ *  identical to `analyzeBattleLogViaApi` (`:413-435`). */
+export async function generateDeckSynthesis(
+  deckId: number,
+  opts?: {
+    days?: number;
+    language?: SynthesisLanguage;
+    force?: boolean;
+    apiKey?: string;
+    provider?: string;
+    model?: string | null;
+  },
+): Promise<DeckSynthesisWriteResponse> {
+  return request<DeckSynthesisWriteResponse>(`/api/analysis/deck/${deckId}`, {
+    method: 'POST',
+    body: JSON.stringify({
+      ...(opts?.days !== undefined ? { days: opts.days } : {}),
+      ...(opts?.language !== undefined ? { language: opts.language } : {}),
+      ...(opts?.force !== undefined ? { force: opts.force } : {}),
+      ...(opts?.apiKey ? { apiKey: opts.apiKey } : {}),
+      ...(opts?.provider ? { provider: opts.provider } : {}),
+      ...(opts?.model !== undefined ? { model: opts.model } : {}),
+    }),
+  });
 }

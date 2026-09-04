@@ -19,12 +19,17 @@ import {
   CARD_KIND_VALUES,
   CARD_SIGNAL_TIER_VALUES,
   FITNESS_DIRECTION_VALUES,
+  SYNTHESIS_LANGUAGE_VALUES,
+  DECK_SYNTHESIS_SOURCE_VALUES,
 } from '@pokekon/shared';
 import type {
   ParsedTurn,
   PrizePoint,
   StandingMatchResult,
   TournamentDecklist,
+  SynthesisFact,
+  SynthesisContext,
+  SynthesisClaim,
 } from '@pokekon/shared';
 
 export const user = pgTable('user', {
@@ -665,3 +670,47 @@ export const legacyImportState = pgTable('legacy_import_state', {
     .references(() => user.id, { onDelete: 'cascade' }),
   importedAt: timestamp('imported_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ─── Deck synthesis cache (plan §3.7, Spec 8) ────────────────────────────────
+// One row per (deck, windowDays, language). The `inputHash` is THE cache key —
+// see synthesisInputHash()/canonicalizeFacts() in lib/synthesisFacts.ts (plan
+// §3.7): a content hash over the rounded facts, not a timestamp, so a job
+// re-run producing identical numbers never invalidates a cached text.
+
+export const deckSynthesis = pgTable(
+  'deck_synthesis',
+  {
+    id: serial('id').primaryKey(),
+    deckId: integer('deck_id')
+      .notNull()
+      .references(() => decks.id, { onDelete: 'cascade' }),
+    /** Redundant to decks.userId, but every user-scoped table carries it
+     *  (deck_cards, deck_snapshots) — keeps the ownership filter one join
+     *  shorter and matches the house style. */
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    windowDays: integer('window_days').notNull(),
+    language: text('language', { enum: SYNTHESIS_LANGUAGE_VALUES }).notNull(),
+    promptVersion: integer('prompt_version').notNull(),
+    /** sha256 over canonicalizeFacts(...) — THE cache key (above). */
+    inputHash: text('input_hash').notNull(),
+    /** The fact snapshot the text was generated from. The UI renders these
+     *  numbers, never live ones — text and numbers never drift apart. */
+    facts: jsonb('facts').$type<SynthesisFact[]>().notNull(),
+    context: jsonb('context').$type<SynthesisContext>().notNull(),
+    claims: jsonb('claims').$type<SynthesisClaim[]>().notNull(),
+    droppedCount: integer('dropped_count').notNull().default(0),
+    source: text('source', { enum: DECK_SYNTHESIS_SOURCE_VALUES }).notNull(),
+    provider: text('provider'),
+    model: text('model'),
+    generatedAt: timestamp('generated_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('deck_synthesis_uq').on(table.deckId, table.windowDays, table.language),
+    index('deck_synthesis_userId_idx').on(table.userId),
+    // Defence in depth, same pattern as archetype_card_stats_tier_chk
+    // (schema.ts:478): a CHECK on `source` limited to 'llm' / 'demo-seed'.
+    check('deck_synthesis_source_chk', sql`${table.source} in ('llm', 'demo-seed')`),
+  ],
+);

@@ -456,6 +456,35 @@ is only decrypted server-side for the analysis call — never returned to client
 | `encrypted_api_key` | text (nullable) | `v1:iv:tag:ciphertext`; null → no key configured |
 | `created_at` / `updated_at` | timestamptz | |
 
+### Table: `deck_synthesis` (migration `0015`, Spec 8 KI-Synthese)
+
+Pre-computed deck synthesis — cached LLM-generated text over aggregated facts (Field-Score, matchups, card deltas, equilibrium signals). Cache key is a hash of the canonical facts list plus language and prompt version; when data changes, old text persists as historical snapshot.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | serial PK | |
+| `deck_id` | int FK → `decks.id` | `onDelete: cascade`, indexed |
+| `user_id` | text FK → `user.id` | Ownership check, indexed (redundant to decks.userId, but matches house style like deck_cards) |
+| `archetype_id` | text | Limitless archetype slug, indexed (for stats queries) |
+| `window_days` | int | Analysis window: 7, 14, 21, or 28 |
+| `language` | text | `'de'` or `'en'` — rendered language |
+| `prompt_version` | int | Version of `buildSynthesisPrompts` and validation logic; cache invalidates on bump |
+| `input_hash` | text | Canonical hash of facts list (deterministic, reused across users same meta) |
+| `sections_json` | jsonb | `SynthesisSectionBlock[]` — rendered, ready to display (headline, strengths, risks, listLevers, context) |
+| `claims_json` | jsonb | `SynthesisClaim[]` — surviving claims, for "based on" disclosure |
+| `facts_snapshot_json` | jsonb | `SynthesisFact[]` — the facts this text was derived from; UI renders THESE numbers, never live |
+| `context_json` | jsonb | `SynthesisContext` — deck/archetype/variant/window metadata |
+| `dropped_count` | int | How many model claims the validation gate rejected |
+| `source` | text | `'llm'` or `'demo-seed'` — whether from a live call or demo pre-baked data |
+| `provider` | text (nullable) | LLM provider (`'github-models'`); null for demo-seed |
+| `model` | text (nullable) | LLM model slug (`'openai/gpt-4.1'`); null for demo-seed |
+| `generated_at` | timestamptz | ISO timestamp of generation |
+| `created_at` | timestamptz | Row insertion time (queries sort by this desc for latest) |
+
+**Unique index:** `(deck_id, window_days, language)` — one cached synthesis per deck-window-language combo; upsert on re-run.
+
+**Check constraint:** `source IN ('llm','demo-seed')`; `language IN ('de','en')`; `window_days IN (7,14,21,28)`.
+
 ### Tables: `meta_equilibrium_runs` and `meta_equilibrium_archetypes` (migration `0014`, Spec 6 Nash equilibrium)
 
 Precomputed Nash equilibrium analysis per analysis window, filled by the `computeEquilibrium` job. Two tables (not one) to avoid denormalizing run-level metadata across ~25 archetype rows. Foreign key with `onDelete: cascade` ensures full-replace-per-window atomicity.

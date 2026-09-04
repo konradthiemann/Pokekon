@@ -4,6 +4,19 @@ import i18n from '../../i18n';
 import { DeckTipsSection } from './DeckTipsSection';
 import type { OpponentLog } from '../../types';
 
+// DeckSynthesisPanel (mounted here as of plan ai-recommendation-synthesis.md
+// §3.10) reads the session to tell demo guests apart from regular users —
+// mock it the same way DeckSynthesisPanel.test.tsx does (pattern:
+// Sidebar.test.tsx, UserMenu.test.tsx) so this suite never hits the network.
+vi.mock('../../lib/authClient', () => ({
+  authClient: {
+    useSession: vi.fn(() => ({ data: null, isPending: false, error: null, refetch: vi.fn() })),
+    signIn: { email: vi.fn(), social: vi.fn() },
+    signUp: { email: vi.fn() },
+    signOut: vi.fn(),
+  },
+}));
+
 beforeAll(async () => {
   await i18n.changeLanguage('en');
 });
@@ -46,6 +59,15 @@ vi.mock('../../store/dashboardStore', () => ({
     runDeckComparison: vi.fn(),
     setActiveTab: vi.fn(),
     setDeckSection: vi.fn(),
+    // Deck-synthesis slice (plan ai-recommendation-synthesis.md §3.10,
+    // dashboardStore.ts:104-107,150-154) — required so DeckSynthesisPanel,
+    // mounted directly above RecommendationsPanel, doesn't read `undefined`.
+    deckSynthesis: null,
+    isLoadingSynthesis: false,
+    isSynthesizing: false,
+    synthesisError: null,
+    loadDeckSynthesis: vi.fn(),
+    runDeckSynthesis: vi.fn(),
   }),
 }));
 
@@ -76,5 +98,23 @@ describe('DeckTipsSection — deck comparison lives here (plan ui-ux-hub-rework 
 
     // recommendations:comparison.sectionTitle — "List Comparison vs. Tournament Results"
     expect(screen.getByText(/list comparison vs\. tournament results/i)).toBeInTheDocument();
+  });
+});
+
+describe('DeckTipsSection — deck synthesis panel is mounted above the recommendations list (plan ai-recommendation-synthesis.md §3.10: "direkt über <RecommendationsPanel />")', () => {
+  it("renders the DeckSynthesisPanel before RecommendationsPanel's content in DOM order", () => {
+    opponentLogs = [];
+    render(<DeckTipsSection />);
+
+    // archetypeStats is always [] in this mock, so useRecommendations short-
+    // circuits to [] and RecommendationsPanel renders its `panel.empty` text
+    // (RecommendationsPanel.tsx) — a stable anchor regardless of log state.
+    const synthesisPanel = screen.getByTestId('deck-synthesis-panel');
+    const recommendationsEmptyText = screen.getByText(/no recommendations yet/i);
+
+    expect(
+      synthesisPanel.compareDocumentPosition(recommendationsEmptyText) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

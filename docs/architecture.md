@@ -214,6 +214,7 @@ graph TD
 
     DeckTipsSection --> RecommendationsPanel
     DeckTipsSection --> DeckComparisonPanel
+    DeckTipsSection --> DeckSynthesisPanel
 
     OpponentLog --> AddLogModal
     OpponentLog --> MatchDetailModal

@@ -26,7 +26,12 @@ vi.mock('../lib/deckComparison', async (importOriginal) => {
 
 vi.mock('../lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/api')>();
-  return { ...actual, fetchArchetypeCardStats: vi.fn() };
+  return {
+    ...actual,
+    fetchArchetypeCardStats: vi.fn(),
+    getDeckSynthesis: vi.fn(),
+    generateDeckSynthesis: vi.fn(),
+  };
 });
 
 // Automocked for the `refresh()`/auto-load-on-archetype-change tests below —
@@ -37,7 +42,7 @@ vi.mock('../db/queries');
 import { useDashboardStore } from './dashboardStore';
 import { fetchArchetypeComparison } from '../lib/deckComparison';
 import type { ComparisonResult } from '../lib/deckComparison';
-import { fetchArchetypeCardStats } from '../lib/api';
+import { fetchArchetypeCardStats, generateDeckSynthesis, getDeckSynthesis } from '../lib/api';
 import {
   getDecks,
   getDeckCards,
@@ -50,6 +55,8 @@ import type { Deck } from '../types';
 
 const mockedFetchComparison = vi.mocked(fetchArchetypeComparison);
 const mockedFetchCardStats = vi.mocked(fetchArchetypeCardStats);
+const mockedGetDeckSynthesis = vi.mocked(getDeckSynthesis);
+const mockedGenerateDeckSynthesis = vi.mocked(generateDeckSynthesis);
 const mockedGetDecks = vi.mocked(getDecks);
 const mockedGetDeckCards = vi.mocked(getDeckCards);
 const mockedGetDeckSnapshots = vi.mocked(getDeckSnapshots);
@@ -111,6 +118,8 @@ const DECK_B: Deck = {
 beforeEach(() => {
   mockedFetchComparison.mockReset();
   mockedFetchCardStats.mockReset();
+  mockedGetDeckSynthesis.mockReset();
+  mockedGenerateDeckSynthesis.mockReset();
   mockedGetDecks.mockReset();
   mockedGetDeckCards.mockReset().mockResolvedValue([]);
   mockedGetDeckSnapshots.mockReset().mockResolvedValue([]);
@@ -506,5 +515,155 @@ describe('dashboardStore.loadCardStats discards a stale, out-of-order response',
       '2026-06-02T00:00:00.000Z',
     );
     expect(useDashboardStore.getState().cardStats).toEqual([]);
+  });
+});
+
+/**
+ * Plan .claude/plans/ai-recommendation-synthesis.md §3.10, Slice K — the
+ * `deckSynthesis`/`isLoadingSynthesis`/`isSynthesizing`/`synthesisError`
+ * store slice plus `loadDeckSynthesis`/`runDeckSynthesis`. None of these
+ * exist on the store yet — expected to fail with "is not a function" /
+ * `undefined` until the implementer adds them.
+ */
+describe('dashboardStore deck synthesis (plan ai-recommendation-synthesis.md §3.10, Slice K)', () => {
+  const READ_RESPONSE = {
+    deckId: 5,
+    archetypeId: 'dragapult-ex',
+    windowDays: 14,
+    language: 'de' as const,
+    synthesis: null,
+    stale: false,
+    currentInputHash: 'a'.repeat(64),
+    availableFactCount: 4,
+    hasApiKey: true,
+  };
+
+  const DECK_SYNTHESIS = {
+    deckId: 5,
+    archetypeId: 'dragapult-ex',
+    archetypeName: 'Dragapult ex',
+    windowDays: 14,
+    language: 'de' as const,
+    promptVersion: 1,
+    sections: [{ section: 'headline' as const, sentences: ['Dein Deck steht solide da.'] }],
+    claims: [],
+    facts: [],
+    context: {
+      deckId: 5,
+      archetypeId: 'dragapult-ex',
+      archetypeName: 'Dragapult ex',
+      variant: 'Standard',
+      windowDays: 14,
+      language: 'de' as const,
+      cardStatsComputedAt: null,
+      equilibriumComputedAt: null,
+      matchupImportedAt: null,
+    },
+    droppedCount: 0,
+    source: 'llm' as const,
+    provider: 'github-models',
+    model: null,
+    inputHash: 'b'.repeat(64),
+    generatedAt: '2026-06-01T00:00:00.000Z',
+  };
+
+  it('defaults the synthesis slice to its cold-start values', () => {
+    const state = useDashboardStore.getState();
+    expect(state.deckSynthesis).toBeNull();
+    expect(state.isLoadingSynthesis).toBe(false);
+    expect(state.isSynthesizing).toBe(false);
+    expect(state.synthesisError).toBeNull();
+  });
+
+  it('loadDeckSynthesis sets isLoadingSynthesis during the call and fills deckSynthesis on success', async () => {
+    let resolve!: (value: typeof READ_RESPONSE) => void;
+    const pending = new Promise<typeof READ_RESPONSE>((res) => {
+      resolve = res;
+    });
+    mockedGetDeckSynthesis.mockReturnValueOnce(pending);
+
+    const call = useDashboardStore.getState().loadDeckSynthesis(5);
+    await Promise.resolve();
+    expect(useDashboardStore.getState().isLoadingSynthesis).toBe(true);
+
+    resolve(READ_RESPONSE);
+    await call;
+
+    const state = useDashboardStore.getState();
+    expect(state.deckSynthesis).toEqual(READ_RESPONSE);
+    expect(state.isLoadingSynthesis).toBe(false);
+  });
+
+  it('runDeckSynthesis sets isSynthesizing during the call and updates deckSynthesis from the write response on success', async () => {
+    let resolve!: (value: {
+      synthesis: typeof DECK_SYNTHESIS;
+      stale: false;
+      cached: boolean;
+    }) => void;
+    const pending = new Promise<{
+      synthesis: typeof DECK_SYNTHESIS;
+      stale: false;
+      cached: boolean;
+    }>((res) => {
+      resolve = res;
+    });
+    mockedGenerateDeckSynthesis.mockReturnValueOnce(pending);
+
+    const call = useDashboardStore.getState().runDeckSynthesis();
+    await Promise.resolve();
+    expect(useDashboardStore.getState().isSynthesizing).toBe(true);
+
+    resolve({ synthesis: DECK_SYNTHESIS, stale: false, cached: false });
+    await call;
+
+    const state = useDashboardStore.getState();
+    expect(state.isSynthesizing).toBe(false);
+    // The write response has no `currentInputHash`/`availableFactCount`/
+    // `hasApiKey` fields of its own — only `synthesis` and `stale` are
+    // contractually pinned by the plan (§3.10) as to what a write maps
+    // into the read-shaped `deckSynthesis` state.
+    expect(state.deckSynthesis).toMatchObject({ synthesis: DECK_SYNTHESIS, stale: false });
+    expect(state.synthesisError).toBeNull();
+  });
+
+  it('runDeckSynthesis sets synthesisError on failure and leaves isSynthesizing false', async () => {
+    mockedGenerateDeckSynthesis.mockRejectedValueOnce(new Error('No API key configured.'));
+
+    await useDashboardStore.getState().runDeckSynthesis();
+
+    const state = useDashboardStore.getState();
+    expect(state.isSynthesizing).toBe(false);
+    expect(state.synthesisError).toBeTruthy();
+  });
+
+  it('loadDeckSynthesis keeps the result of the most recently issued call, even if an earlier call for a different deck resolves later (request-sequence guard, mirrors loadCardStats)', async () => {
+    let resolveFirst!: (value: typeof READ_RESPONSE) => void;
+    let resolveSecond!: (value: typeof READ_RESPONSE) => void;
+    const firstResponse = new Promise<typeof READ_RESPONSE>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondResponse = new Promise<typeof READ_RESPONSE>((resolve) => {
+      resolveSecond = resolve;
+    });
+    mockedGetDeckSynthesis.mockReturnValueOnce(firstResponse);
+    mockedGetDeckSynthesis.mockReturnValueOnce(secondResponse);
+
+    // Call order: deck 5 first, deck 6 second — but let deck 6 (the second,
+    // more recently issued call) resolve FIRST, simulating a deck switch
+    // while the first load is still in flight.
+    const firstCall = useDashboardStore.getState().loadDeckSynthesis(5);
+    const secondCall = useDashboardStore.getState().loadDeckSynthesis(6);
+
+    resolveSecond({ ...READ_RESPONSE, deckId: 6, archetypeId: 'gardevoir-ex' });
+    await secondCall;
+
+    // The first (now-stale) call resolves AFTER the second one already won.
+    resolveFirst({ ...READ_RESPONSE, deckId: 5, archetypeId: 'dragapult-ex' });
+    await firstCall;
+
+    // Deck 6 was issued last and must be what's in the store — never
+    // overwritten back to the stale deck-5 result.
+    expect(useDashboardStore.getState().deckSynthesis?.deckId).toBe(6);
+    expect(useDashboardStore.getState().deckSynthesis?.archetypeId).toBe('gardevoir-ex');
   });
 });

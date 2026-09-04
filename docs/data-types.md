@@ -678,3 +678,115 @@ Per-archetype week-over-week trend. The `observedShareDeltaPp` is **purely descr
 **Key assumption (documented in code and `features.md` §18):** The two complete weeks are derived from `meta_snapshots`, excluding the current ISO week (which is continuously re-synced and thus a partial aggregate). This is the only honest way to compare: finished data against finished data.
 
 Result is `[]` if the input is empty or all lists have invalid percentiles. A list with all cards means `delta === null` (same group for with/without), and the tier becomes `'insufficient'` — this is honest: you can't claim a card helps or hurts if it appears in every list.
+
+---
+
+## Deck Synthesis Types (Spec 8 — `@pokekon/shared/src/deckSynthesis.ts`)
+
+Structured LLM synthesis over aggregated facts (Field-Score, matchups, card deltas, equilibrium signals). Unlike battle-log analysis which grounds in verbatim quotes, synthesis grounds in **structure + direction**: each claim references a fact by id and declares direction matching the fact's derived direction.
+
+### `SynthesisFact`
+```typescript
+interface SynthesisFact {
+  id: string;                  // 'field.winRate' | 'matchup.<archetypeId>' | 'card.<cardKey>' | ...
+  kind: SynthesisFactKind;     // 'fieldScore' | 'coverage' | 'matchup' | 'cardDelta' | ...
+  label: string;               // Display name (archetype, card name, etc.), sanitized
+  value: number;               // The metric
+  unit: 'pct' | 'pp' | 'games' | 'copies';
+  neutralValue: number;        // Threshold (50 for matchups, 0 for deltas, 100 for coverage)
+  lowPct: number | null;       // Confidence band lower; null = no band
+  highPct: number | null;      // Confidence band upper; null = no band
+  direction: FactDirection;    // 'positive' | 'negative' | 'neutral' (derived from band or point)
+  significant: boolean;        // true if band excludes neutralValue
+  usableForRecommendation: boolean;  // false for context-only facts (never recommendation base)
+  entityNames: string[];       // Allowed literal digit fragments (e.g., card names with numbers)
+  inUserDeck?: boolean;        // For cardDelta: is this card in the user's deck?
+  userCount?: number;          // For cardDelta: how many copies in the user's deck?
+}
+```
+
+One fact the LLM may discuss. The `direction` is derived (never guessed by the model) from `value`, `neutralValue`, and the confidence band via `deriveFactDirection()` — if the band exists and excludes neutralValue, that determines direction; otherwise the point estimate determines it (within a `NEUTRAL_EPSILON` tolerance). The `usableForRecommendation` field controls the **Spec 3/5 evidence bar**: only facts meeting the confidence threshold may be claimed as recommendations.
+
+### `SynthesisClaim`
+```typescript
+interface SynthesisClaim {
+  factId: string;              // Must match a SynthesisFact.id exactly
+  kind: 'observation' | 'recommendation';
+  direction: 'positive' | 'negative' | 'neutral';  // Model's reading; must match fact.direction
+  text: string;                // Prose without numbers; placeholders: {value} {low} {high} {label}
+}
+```
+
+One claim from the model. Validation checks:
+- `factId` exists in the facts list (structural grounding)
+- `direction` matches `fact.direction` (directional grounding, core of Spec 8 decision 3)
+- `text` contains only allowed placeholders and no unapproved digits (no hallucinated numbers)
+- `kind === 'recommendation'` may only appear on `usableForRecommendation === true` facts (evidence bar)
+
+### `ValidatedSynthesis`
+```typescript
+interface ValidatedSynthesis {
+  accepted: SynthesisClaim[];        // Surviving claims, model order preserved
+  rejected: RejectedClaim[];         // Claims and their rejection reasons
+}
+
+interface RejectedClaim {
+  claim: SynthesisClaim;
+  reason: ClaimRejectionReason;  // 'malformed' | 'unknownFact' | 'directionMismatch' | ...
+}
+```
+
+Output of `validateSynthesis(claims, facts)`. Never throws — unusable input yields `{ accepted: [], rejected: [] }`. Rejection reasons are prioritised (see `CLAIM_REJECTION_REASONS` in code for order); first violation wins.
+
+### `DeckSynthesis`
+```typescript
+interface DeckSynthesis {
+  deckId: number;
+  archetypeId: string;
+  archetypeName: string;
+  windowDays: number;
+  language: SynthesisLanguage;  // 'de' | 'en'
+  promptVersion: number;
+  sections: SynthesisSectionBlock[];     // Headline, Strengths, Risks, List Levers, Context
+  claims: SynthesisClaim[];              // Surviving claims for "based on" disclosure
+  facts: SynthesisFact[];                // Snapshot; UI renders THESE numbers, never live
+  context: SynthesisContext;             // Deck/archetype/variant/window metadata
+  droppedCount: number;                  // Model claims rejected by validation gate
+  source: 'llm' | 'demo-seed';
+  provider: string | null;               // 'github-models'; null for demo-seed
+  model: string | null;                  // 'openai/gpt-4.1'; null for demo-seed
+  inputHash: string;                     // Hash of facts; cache key
+  generatedAt: string;                   // ISO timestamp
+}
+
+interface SynthesisSectionBlock {
+  section: SynthesisSection;   // 'headline' | 'strengths' | 'risks' | 'listLevers' | 'context'
+  sentences: string[];         // Rendered, placeholder-substituted claims (max 3 per section)
+}
+```
+
+The complete synthesis result, ready to display. Sections contain **rendered claims only** (placeholders filled with numbers). Empty sections are omitted. The `facts` snapshot is persisted so the UI renders those numbers even if the live data changes; the `claims` array is preserved for transparency ("what claims survived validation?").
+
+### `SynthesisContext`
+```typescript
+interface SynthesisContext {
+  deckId: number;
+  archetypeId: string;
+  archetypeName: string;
+  variant: string;
+  windowDays: number;
+  language: SynthesisLanguage;
+  cardStatsComputedAt: string | null;  // When the card delta data was computed
+  equilibriumComputedAt: string | null;  // When equilibrium data was computed
+  matchupImportedAt: string | null;    // When matchup data was last synced
+}
+```
+
+Contextual metadata (deck and data source timestamps). Used for sourcing footnotes ("based on data from {timestamp}").
+
+### `SynthesisLanguage`
+```typescript
+type SynthesisLanguage = 'de' | 'en';
+```
+
+The output language for synthesis. Separate from the API's locale system; a user can request synthesis in either language regardless of their UI language.
