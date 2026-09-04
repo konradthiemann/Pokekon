@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ARCHETYPE_SLUG_PATTERN, BEST_OF_VALUES } from '@pokekon/shared';
+import { ARCHETYPE_SLUG_PATTERN, BEST_OF_VALUES, SYNTHESIS_LANGUAGE_VALUES } from '@pokekon/shared';
 import {
   aiProviderValues,
   cardTypeValues,
@@ -253,4 +253,19 @@ export const analyzeLogSchema = z.object({
   apiKey: z.string().max(400).optional(),
   provider: z.enum(aiProviderValues).optional(),
   model: z.string().max(100).nullish(),
+});
+
+// ─── Deck synthesis (Spec 8, plan §3.8) ────────────────────────────────────────
+
+/** Query for GET /api/analysis/deck/:deckId — `days` is snapped to
+ *  CARD_STATS_WINDOWS (snapCardStatsWindow) after parsing, same as the other
+ *  meta reads. */
+export const deckSynthesisQuerySchema = z.object({
+  days: z.coerce
+    .number()
+    .int()
+    .min(META_WINDOW_MIN_DAYS)
+    .max(META_WINDOW_MAX_DAYS)
+    .default(META_WINDOW_DEFAULT_DAYS),
+  language: z.enum(SYNTHESIS_LANGUAGE_VALUES).default('de'),
 });

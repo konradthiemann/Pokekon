@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { and, eq } from 'drizzle-orm';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildPayoffMatrix,
   canonicalizeFacts,
@@ -23,6 +23,7 @@ import {
   replicatorStep,
   sectionForClaim,
   solveSymmetricZeroSumNash,
+  SYNTHESIS_PROMPT_VERSION,
   type DeckSynthesis,
   type ListPerformanceEntry,
   type MatchupCell,
@@ -3913,5 +3914,408 @@ describe('synthesisInputHash (plan §3.7, Scheibe G)', () => {
     // promptVersion is part of the meta appended by canonicalizeFacts.
     const hashDifferentPromptVersion = synthesisInputHash([fact], { ...meta, promptVersion: 2 });
     expect(hashDifferentPromptVersion).not.toBe(hash1);
+  });
+});
+
+// ─── Scheibe H (plan §3.8, §4 step 15): GET /api/analysis/deck/:deckId ─────────
+// routes/analysis.ts only registers /settings and /log so far — GET /deck/:id
+// is not mounted yet. Expected to 404 (unmatched route) until the implementer
+// adds it. GET never triggers an LLM call (plan §3.8: "GET bleibt
+// ungedrosselt, weil es kein Token kostet"); every test below stubs global
+// fetch and asserts it was never called.
+describe('GET /api/analysis/deck/:deckId (plan §3.8, Scheibe H)', () => {
+  const GET_WINDOW_DAYS = 28;
+  const GET_LANGUAGE = 'de';
+
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  let getSynthUserSeq = 0;
+  /** A dedicated, never-reused user id per test. GET reads user_ai_settings
+   *  for `hasApiKey`, and reusing USER_A/USER_B across it()s here would make
+   *  the hasApiKey assertions depend on execution order relative to the
+   *  'AI analysis (/api/analysis)' describe block above. */
+  async function freshUser(): Promise<string> {
+    getSynthUserSeq += 1;
+    const id = `user-get-synth-${getSynthUserSeq}`;
+    await createUser(id);
+    return id;
+  }
+
+  function getSampleFact(overrides: Partial<SynthesisFact> = {}): SynthesisFact {
+    return {
+      id: 'field.winRate',
+      kind: 'fieldScore',
+      label: 'Sample Deck',
+      value: 55.2,
+      unit: 'pct',
+      neutralValue: 50,
+      lowPct: 51.1,
+      highPct: 59.3,
+      direction: 'positive',
+      significant: true,
+      usableForRecommendation: true,
+      entityNames: [],
+      ...overrides,
+    };
+  }
+
+  function getSampleContext(
+    deckId: number,
+    archetypeId: string,
+    overrides: Partial<SynthesisContext> = {},
+  ): SynthesisContext {
+    return {
+      deckId,
+      archetypeId,
+      archetypeName: 'Sample Deck',
+      variant: 'Standard',
+      windowDays: GET_WINDOW_DAYS,
+      language: GET_LANGUAGE,
+      cardStatsComputedAt: null,
+      equilibriumComputedAt: null,
+      matchupImportedAt: null,
+      ...overrides,
+    };
+  }
+
+  function getSampleClaim(overrides: Partial<SynthesisClaim> = {}): SynthesisClaim {
+    return {
+      factId: 'field.winRate',
+      kind: 'observation',
+      direction: 'positive',
+      text: 'Dein Deck steht mit {value} % solide gegen das aktuelle Feld da.',
+      ...overrides,
+    };
+  }
+
+  /** A full stored DeckSynthesis fixture, built directly (not through
+   *  validateSynthesis/assembleSynthesis — this describe block only
+   *  exercises the READ path; the write path's grounding tests belong to
+   *  Scheibe I). */
+  function getSampleSynthesis(
+    deckId: number,
+    archetypeId: string,
+    overrides: Partial<DeckSynthesis> = {},
+  ): DeckSynthesis {
+    const facts = [getSampleFact()];
+    const context = getSampleContext(deckId, archetypeId);
+    const claims = [getSampleClaim()];
+    return {
+      deckId,
+      archetypeId,
+      archetypeName: 'Sample Deck',
+      windowDays: GET_WINDOW_DAYS,
+      language: GET_LANGUAGE,
+      promptVersion: SYNTHESIS_PROMPT_VERSION,
+      sections: [
+        {
+          section: sectionForClaim(claims[0]!, facts[0]!),
+          sentences: [renderClaimText(claims[0]!, facts[0]!)],
+        },
+      ],
+      claims,
+      facts,
+      context,
+      droppedCount: 0,
+      source: 'llm',
+      provider: 'github-models',
+      model: 'openai/gpt-4.1',
+      inputHash: 'a'.repeat(64),
+      generatedAt: '2026-06-17T00:00:00.000Z',
+      ...overrides,
+    };
+  }
+
+  /** The exact pair the route is contractually specified to use to determine
+   *  `stale` (plan §3.8 steps 4–5: buildSynthesisFactSet + synthesisInputHash).
+   *  Used here only to derive the hash the route is expected to compute for a
+   *  given deck — buildSynthesisFactSet's own behaviour is Scheibe G's test
+   *  surface, not this one's. */
+  async function currentHashFor(
+    deckId: number,
+    archetypeId: string,
+    archetypeName: string,
+    variant: string,
+  ): Promise<string> {
+    const factSet = await buildSynthesisFactSet(db, {
+      deck: { id: deckId, archetype: archetypeId, archetypeName, variant },
+      deckCards: [],
+      windowDays: GET_WINDOW_DAYS,
+      language: GET_LANGUAGE,
+    });
+    return synthesisInputHash(factSet.facts, {
+      archetypeId,
+      windowDays: GET_WINDOW_DAYS,
+      language: GET_LANGUAGE,
+      promptVersion: SYNTHESIS_PROMPT_VERSION,
+    });
+  }
+
+  it('cold start: 200 with synthesis null, stale false and availableFactCount 0 for a deck with no facts and no stored row', async () => {
+    const user = await freshUser();
+    const archetypeId = 'get-synth-cold';
+    const deckId = await createDeck(user, {
+      archetype: archetypeId,
+      archetypeName: 'Cold Deck',
+      variant: 'Standard',
+    });
+
+    const res = await request(
+      `/api/analysis/deck/${deckId}?days=${GET_WINDOW_DAYS}&language=${GET_LANGUAGE}`,
+      { user },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      deckId,
+      archetypeId,
+      windowDays: GET_WINDOW_DAYS,
+      language: GET_LANGUAGE,
+      synthesis: null,
+      stale: false,
+      availableFactCount: 0,
+      hasApiKey: false,
+    });
+    expect(body.currentInputHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for a deck owned by a different user (no existence leak)', async () => {
+    const owner = await freshUser();
+    const requester = await freshUser();
+    const deckId = await createDeck(owner, {
+      archetype: 'get-synth-foreign',
+      archetypeName: 'Foreign Deck',
+      variant: 'Standard',
+    });
+
+    const res = await request(`/api/analysis/deck/${deckId}`, { user: requester });
+    expect(res.status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for an unknown deckId', async () => {
+    const user = await freshUser();
+    const res = await request('/api/analysis/deck/999999999', { user });
+    expect(res.status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('hasApiKey: true when the user has a configured, encrypted key in user_ai_settings', async () => {
+    const user = await freshUser();
+    const put = await request('/api/analysis/settings', {
+      user,
+      method: 'PUT',
+      body: { provider: 'github-models', apiKey: 'ghp_get_synth_key', model: 'openai/gpt-4.1' },
+    });
+    expect(put.status).toBe(200);
+
+    const deckId = await createDeck(user, {
+      archetype: 'get-synth-haskey',
+      archetypeName: 'Has Key Deck',
+      variant: 'Standard',
+    });
+    const res = await request(`/api/analysis/deck/${deckId}`, { user });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.hasApiKey).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('hasApiKey: false when the user has no user_ai_settings row', async () => {
+    const user = await freshUser();
+    const deckId = await createDeck(user, {
+      archetype: 'get-synth-nokey',
+      archetypeName: 'No Key Deck',
+      variant: 'Standard',
+    });
+    const res = await request(`/api/analysis/deck/${deckId}`, { user });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.hasApiKey).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('availableFactCount is > 0 when the archetype has computable field-score facts', async () => {
+    const user = await freshUser();
+    const archetypeId = 'get-synth-facts';
+    const archetypeName = 'Facts Deck';
+    const opponentId = 'get-synth-facts-opp';
+
+    await db.insert(schema.tournaments).values({
+      id: 'get-synth-facts-t1',
+      name: 'GET Synth Facts Event',
+      date: new Date(),
+      players: 4,
+      isOnline: true,
+      swissMode: 'BO1',
+    });
+    await db.insert(schema.tournamentStandings).values([
+      {
+        tournamentId: 'get-synth-facts-t1',
+        archetypeId,
+        archetypeName,
+        wins: 3,
+        losses: 2,
+        ties: 0,
+      },
+      {
+        tournamentId: 'get-synth-facts-t1',
+        archetypeId,
+        archetypeName,
+        wins: 3,
+        losses: 2,
+        ties: 0,
+      },
+      {
+        tournamentId: 'get-synth-facts-t1',
+        archetypeId: opponentId,
+        archetypeName: 'Facts Opponent',
+        wins: 3,
+        losses: 2,
+        ties: 0,
+      },
+      {
+        tournamentId: 'get-synth-facts-t1',
+        archetypeId: opponentId,
+        archetypeName: 'Facts Opponent',
+        wins: 3,
+        losses: 2,
+        ties: 0,
+      },
+    ]);
+    await db.insert(schema.tournamentMatchups).values({
+      tournamentId: 'get-synth-facts-t1',
+      deckA: archetypeId,
+      deckB: opponentId,
+      aWins: 12,
+      bWins: 0,
+      ties: 0,
+    });
+    await db.insert(schema.matchupMatrix).values({
+      deck1: 'get-synth-facts-irrelevant-a',
+      deck2: 'get-synth-facts-irrelevant-b',
+      wins: 0,
+      losses: 0,
+      ties: 0,
+      total: 50,
+      winRate: 50,
+      importedAt: new Date('2026-06-01T00:00:00.000Z'),
+    });
+
+    const deckId = await createDeck(user, {
+      archetype: archetypeId,
+      archetypeName,
+      variant: 'Standard',
+    });
+    const res = await request(
+      `/api/analysis/deck/${deckId}?days=${GET_WINDOW_DAYS}&language=${GET_LANGUAGE}`,
+      { user },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.availableFactCount).toBeGreaterThan(0);
+    expect(body.currentInputHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(body.synthesis).toBeNull();
+    expect(body.stale).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('serves the stored row with stale: false when its inputHash matches the currently computable facts', async () => {
+    const user = await freshUser();
+    const archetypeId = 'get-synth-match';
+    const archetypeName = 'Match Deck';
+    const variant = 'Standard';
+    const deckId = await createDeck(user, { archetype: archetypeId, archetypeName, variant });
+
+    const matchingHash = await currentHashFor(deckId, archetypeId, archetypeName, variant);
+    await saveDeckSynthesis(
+      db,
+      user,
+      getSampleSynthesis(deckId, archetypeId, { inputHash: matchingHash, source: 'llm' }),
+    );
+
+    const res = await request(
+      `/api/analysis/deck/${deckId}?days=${GET_WINDOW_DAYS}&language=${GET_LANGUAGE}`,
+      { user },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      synthesis: DeckSynthesis | null;
+      stale: boolean;
+      currentInputHash: string;
+    };
+    expect(body.stale).toBe(false);
+    expect(body.currentInputHash).toBe(matchingHash);
+    expect(body.synthesis).not.toBeNull();
+    expect(body.synthesis?.inputHash).toBe(matchingHash);
+    expect(body.synthesis?.claims).toEqual([getSampleClaim()]);
+    expect(body.synthesis?.source).toBe('llm');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('stale: true when the stored row inputHash differs from the current facts and source is "llm"', async () => {
+    const user = await freshUser();
+    const archetypeId = 'get-synth-stale-llm';
+    const archetypeName = 'Stale LLM Deck';
+    const variant = 'Standard';
+    const deckId = await createDeck(user, { archetype: archetypeId, archetypeName, variant });
+
+    // Deliberately not the hash the route would currently compute for this
+    // deck — a mismatched sha256 hex string this far off has no realistic
+    // chance of colliding.
+    await saveDeckSynthesis(
+      db,
+      user,
+      getSampleSynthesis(deckId, archetypeId, { inputHash: 'a'.repeat(64), source: 'llm' }),
+    );
+
+    const res = await request(
+      `/api/analysis/deck/${deckId}?days=${GET_WINDOW_DAYS}&language=${GET_LANGUAGE}`,
+      { user },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { synthesis: DeckSynthesis | null; stale: boolean };
+    expect(body.stale).toBe(true);
+    expect(body.synthesis).not.toBeNull();
+    expect(body.synthesis?.inputHash).toBe('a'.repeat(64));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('stale: false even though the inputHash differs when source is "demo-seed" (curated text is never flagged stale)', async () => {
+    const user = await freshUser();
+    const archetypeId = 'get-synth-stale-demo';
+    const archetypeName = 'Stale Demo Deck';
+    const variant = 'Standard';
+    const deckId = await createDeck(user, { archetype: archetypeId, archetypeName, variant });
+
+    await saveDeckSynthesis(
+      db,
+      user,
+      getSampleSynthesis(deckId, archetypeId, {
+        inputHash: 'b'.repeat(64),
+        source: 'demo-seed',
+        provider: null,
+        model: null,
+      }),
+    );
+
+    const res = await request(
+      `/api/analysis/deck/${deckId}?days=${GET_WINDOW_DAYS}&language=${GET_LANGUAGE}`,
+      { user },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { synthesis: DeckSynthesis | null; stale: boolean };
+    expect(body.stale).toBe(false);
+    expect(body.synthesis).not.toBeNull();
+    expect(body.synthesis?.source).toBe('demo-seed');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

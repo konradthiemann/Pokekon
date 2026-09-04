@@ -1,11 +1,19 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { SYNTHESIS_PROMPT_VERSION } from '@pokekon/shared';
 import { AnalysisError, getAnalysisProvider } from '../ai/index.js';
-import { userAiSettings, type AiProvider } from '../db/schema.js';
+import { decks, deckCards, userAiSettings, type AiProvider } from '../db/schema.js';
 import { decryptSecret, encryptSecret } from '../lib/crypto.js';
+import { loadDeckSynthesis } from '../lib/deckSynthesisStore.js';
+import { buildSynthesisFactSet, synthesisInputHash } from '../lib/synthesisFacts.js';
 import type { ApiEnv } from '../middleware/session.js';
-import { aiSettingsPutSchema, analyzeLogSchema } from '../validation.js';
-import { readJson } from './shared.js';
+import {
+  aiSettingsPutSchema,
+  analyzeLogSchema,
+  deckSynthesisQuerySchema,
+  snapCardStatsWindow,
+} from '../validation.js';
+import { parseId, readJson } from './shared.js';
 
 /**
  * /api/analysis — provider-agnostic LLM analysis of battle logs (plan §6.3 Phase A).
@@ -127,6 +135,77 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
       }
       return c.json({ error: 'Analysis failed.' }, 500);
     }
+  });
+
+  // GET /api/analysis/deck/:deckId — read-only: current facts + the cached
+  // synthesis (if any), never an LLM call (plan §3.7/§3.8, Scheibe H).
+  routes.get('/deck/:deckId', async (c) => {
+    const deckId = parseId(c.req.param('deckId'));
+    if (deckId === null) return c.json({ error: 'Not found' }, 404);
+
+    const db = c.get('db');
+    const userId = c.get('user').id;
+
+    // Ownership first, before anything else — a foreign or unknown deck is a
+    // 404, never a 403 (no existence oracle, plan §3.8).
+    const [deck] = await db
+      .select()
+      .from(decks)
+      .where(and(eq(decks.id, deckId), eq(decks.userId, userId)))
+      .limit(1);
+    if (!deck) return c.json({ error: 'Not found' }, 404);
+
+    const parsed = deckSynthesisQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid query', issues: parsed.error.issues }, 400);
+    }
+    const windowDays = snapCardStatsWindow(parsed.data.days);
+    const language = parsed.data.language;
+
+    const deckCardRows = await db
+      .select({ name: deckCards.name, count: deckCards.count })
+      .from(deckCards)
+      .where(eq(deckCards.deckId, deckId));
+
+    const [factSet, row, settings] = await Promise.all([
+      buildSynthesisFactSet(db, {
+        deck: {
+          id: deck.id,
+          archetype: deck.archetype,
+          archetypeName: deck.archetypeName,
+          variant: deck.variant,
+        },
+        deckCards: deckCardRows,
+        windowDays,
+        language,
+      }),
+      loadDeckSynthesis(db, deckId, windowDays, language),
+      db.select().from(userAiSettings).where(eq(userAiSettings.userId, userId)).limit(1),
+    ]);
+
+    const currentInputHash = synthesisInputHash(factSet.facts, {
+      archetypeId: deck.archetype,
+      windowDays,
+      language,
+      promptVersion: SYNTHESIS_PROMPT_VERSION,
+    });
+
+    // Serve rule (plan §3.7): no row -> not stale; matching hash -> not
+    // stale; mismatched hash on an 'llm' row -> stale; mismatched hash on a
+    // 'demo-seed' row -> never stale (a curated example, not a live figure).
+    const stale = row !== null && row.inputHash !== currentInputHash && row.source === 'llm';
+
+    return c.json({
+      deckId: deck.id,
+      archetypeId: deck.archetype,
+      windowDays,
+      language,
+      synthesis: row,
+      stale,
+      currentInputHash,
+      availableFactCount: factSet.facts.length,
+      hasApiKey: settings[0]?.encryptedApiKey != null,
+    });
   });
 
   return routes;
