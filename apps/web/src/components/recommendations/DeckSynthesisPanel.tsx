@@ -101,7 +101,7 @@ export function DeckSynthesisPanel() {
         )}
       </div>
 
-      {!hasFacts && (
+      {!synthesis && !hasFacts && (
         <p data-testid="deck-synthesis-no-facts" className="text-xs text-slate-500">
           {t('synthesis.noFacts')}
         </p>
