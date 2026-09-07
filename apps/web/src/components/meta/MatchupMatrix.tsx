@@ -362,11 +362,10 @@ export function MatchupMatrix({
         )}
         <button
           onClick={loadData}
-          className="ml-auto text-slate-400 hover:text-brand-700 transition-colors"
-          title={t('matchupMatrix.reload')}
-          aria-label={t('matchupMatrix.reload')}
+          className="ml-auto flex items-center gap-1 text-slate-500 hover:text-brand-700 transition-colors"
         >
           <RefreshCw className="w-3 h-3" aria-hidden="true" />
+          <span>{t('matchupMatrix.reload')}</span>
         </button>
       </div>
     </div>
