@@ -148,8 +148,8 @@
     "pastDays": "Past (days)",
     "minPlayers": "Min. players",
     "onlineOnly": "Online only",
-    "load": "Load",
-    "emptyHint": "Click \"Load\" to fetch recent tournaments from Limitless TCG.",
+    "load": "Load tournament list",
+    "emptyHint": "Click \"Load tournament list\" to fetch recent tournaments from Limitless TCG.",
     "openStandings": "Open standings"
   },
   "matchupMatrix": {
@@ -171,7 +171,7 @@
     "sourceBlend": "Real data: {{ownGames}} online-Bo1 matches ({{ownPairs}} pairings) · {{fallback}} pairings via TrainerHill (approx.) · win rate from row deck's perspective",
     "conflictNote_one": "· {{count}} pairing disagrees with TrainerHill by >15pp",
     "conflictNote_other": "· {{count}} pairings disagree with TrainerHill by >15pp",
-    "reload": "Reload data"
+    "reload": "Reload matchup data"
   },
   "metaShareChart": {
     "empty": "No meta data loaded.",

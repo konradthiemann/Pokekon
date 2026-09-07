@@ -288,8 +288,10 @@ on the light **"playmat"** surface (`#eef3fb`, see [design-system.md](./design-s
 using Tailwind utilities throughout.
 
 The desktop `Sidebar` is `hidden md:flex`, so any global action it hosts must also
-be reachable on mobile. **Sync Live Meta** therefore lives both in the sidebar and
-in the **Meta page** header, so a phone user can always load tournament data.
+be reachable on mobile. **Sync Live Meta** is extracted into the shared `SyncControls`
+component: the desktop `Sidebar` renders it at the foot (unchanged), and the mobile
+`MobileAccountSheet` (accessible via the account chip, top right) renders the same
+block, ensuring every user can reload tournament data regardless of viewport.
 
 ## Visual design
 

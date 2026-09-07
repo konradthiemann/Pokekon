@@ -5,7 +5,7 @@
 | Feature | Page | Triggered by |
 |---------|------|-------------|
 | Meta overview with charts | Overview | Auto on load |
-| Live meta sync | Sidebar / Meta | User clicks "Sync" |
+| Live meta sync | Sidebar / Account Sheet | User clicks "Sync" |
 | Deck management (add, import, edit, delete) | Deck | User actions |
 | Deck versioning (snapshots) | Deck | User clicks "Snapshot" |
 | Deck variant management | Deck | User creates/duplicates |
@@ -39,7 +39,7 @@ Data source: Zustand store (`archetypeStats`, `metaSnapshots`). No API calls on 
 
 ## 2. Live Meta Sync
 
-**Triggered from:** the "Sync Live Meta" button — in the desktop **Sidebar** and, since the sidebar is hidden on mobile (`md:flex`), also in the **Meta page** header, so it's reachable on every viewport.
+**Triggered from:** the "Sync Live Meta" button via the shared `SyncControls` component — in the desktop **Sidebar** (bottom) and on mobile via the **Account Sheet** (accessed from the account chip, top right), so it's reachable on every viewport.
 
 Runs **server-side** (`POST /api/meta/sync` → `apps/api/src/jobs/syncMeta.ts`, also runnable as a Railway cron): the server fetches the Limitless TCG API directly (no CORS proxy needed) and aggregates into the global `meta_snapshots` table.
 
@@ -57,7 +57,7 @@ Runs **server-side** (`POST /api/meta/sync` → `apps/api/src/jobs/syncMeta.ts`,
 
 **Downstream consumers of `match_results`:** The archetype-lists endpoint (`GET /api/meta/archetypes/:id/lists`) joins each standing's `match_results` jsonb and returns it as the `matchResults` field of every `ArchetypeListEntry`. The prediction panel's per-list drill-down (`ListFieldPerformance`) reads this field to show real game-by-game W/L vs the local field — no additional server call needed.
 
-**Progress feedback:** The Zustand store exposes `isSyncing` and `syncProgress` strings that the Sidebar and the Meta page header render in real time.
+**Progress feedback:** The Zustand store exposes `isSyncing` and `syncProgress` strings that the `SyncControls` component renders in real time — visible in both desktop Sidebar and mobile Account Sheet.
 
 ---
 
@@ -422,7 +422,7 @@ Every archetype row is clickable and opens an in-tab drilldown. The whole Meta t
 
 The overview Meta Table **is** the day-window field analysis itself (`GET /api/meta/field-analysis?days&online&bo1`): share, win rate, record **and** a sortable **Feld-Score** column per archetype, so the best-positioned deck — not merely the most-played one — is visible at a glance, and the day/online controls genuinely drive the metashare (not just the score).
 
-**Cold start:** before the first server sync there are no persisted standings — the drilldown and the overview table show explicit empty states pointing to "Sync Live Meta".
+**Cold start:** before the first server sync there are no persisted standings — the drilldown and the overview table show explicit empty states pointing to "Sync Live Meta" (in the Sidebar on desktop, or via the Account Sheet on mobile).
 
 ---
 

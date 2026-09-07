@@ -150,8 +150,7 @@
       "notes": "Notes"
     },
     "logAndAnalysis": "Log + analysis available",
-    "logAvailable": "Battle log available",
-    "logMatch": "Log Match"
+    "logAvailable": "Battle log available"
   },
   "analysis": {
     "apiError": "Anthropic API error {{status}}: {{message}}",

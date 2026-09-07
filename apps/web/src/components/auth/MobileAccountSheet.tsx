@@ -5,6 +5,7 @@ import { Brain, LogOut, X } from 'lucide-react';
 import { authClient } from '../../lib/authClient';
 import { LanguageSwitcher } from '../layout/LanguageSwitcher';
 import { LegalLinks } from '../layout/LegalLinks';
+import { SyncControls } from '../layout/SyncControls';
 import { AiSettingsModal } from '../settings/AiSettingsModal';
 
 /**
@@ -112,6 +113,10 @@ export function MobileAccountSheet() {
                 <Brain className="w-3.5 h-3.5 text-brand-700" aria-hidden="true" />
                 {t('aiSettings.title')}
               </button>
+
+              <div className="border-t border-slate-200 pt-4 mb-3 space-y-2">
+                <SyncControls />
+              </div>
 
               <div className="flex items-center justify-between border-t border-slate-200 pt-4">
                 <LanguageSwitcher />

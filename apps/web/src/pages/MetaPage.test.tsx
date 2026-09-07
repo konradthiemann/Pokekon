@@ -47,15 +47,28 @@ beforeAll(async () => {
   await i18n.changeLanguage('en');
 });
 
-beforeEach(() => {
-  localStorage.clear();
-  vi.mocked(getMetaEquilibrium)
-    .mockReset()
-    .mockResolvedValue(equilibriumResponse(META_DEFAULT_DAYS, '2020-06-15T00:00:00.000Z'));
-});
+interface MetaPageStoreMock {
+  syncMeta: () => Promise<unknown>;
+  isSyncing: boolean;
+  syncProgress: string;
+  syncError: string | null;
+  lastSynced: Date | null;
+  recentTournaments: unknown[];
+  isFetchingTournaments: boolean;
+  tournamentsError: string | null;
+  loadRecentTournaments: () => void;
+  localMeta: unknown[];
+  setLocalMeta: () => void;
+  archetypeStats: unknown[];
+}
 
-vi.mock('../store/dashboardStore', () => ({
-  useDashboardStore: () => ({
+/** Mutable per-test store state (pattern: Sidebar.test.tsx:18-35) — needed so
+ *  C2 (plan §3.11-C) can override `lastSynced` for a single test without
+ *  disturbing the fixed defaults every other MetaPage test relies on. */
+let storeState: MetaPageStoreMock;
+
+function baseMetaPageStore(): MetaPageStoreMock {
+  return {
     syncMeta: vi.fn(),
     isSyncing: false,
     syncProgress: '',
@@ -71,7 +84,19 @@ vi.mock('../store/dashboardStore', () => ({
     localMeta: [],
     setLocalMeta: vi.fn(),
     archetypeStats: [],
-  }),
+  };
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  storeState = baseMetaPageStore();
+  vi.mocked(getMetaEquilibrium)
+    .mockReset()
+    .mockResolvedValue(equilibriumResponse(META_DEFAULT_DAYS, '2020-06-15T00:00:00.000Z'));
+});
+
+vi.mock('../store/dashboardStore', () => ({
+  useDashboardStore: () => storeState,
 }));
 
 vi.mock('../lib/api', async (importOriginal) => {
@@ -277,5 +302,45 @@ describe('MetaPage — equilibrium data does not go stale across a window switch
     // Must still show the current (7-day) window's data, never the stale one.
     expect(experimentalSectionBody().textContent).toContain('2021');
     expect(experimentalSectionBody().textContent).not.toContain('2020');
+  });
+});
+
+// Plan .claude/plans/ui-ux-button-consolidation.md §3.7 / §3.11-C: the
+// MetaPage's own "Sync Live Meta" copy (documented as a mobile-reachability
+// workaround, MetaPage.tsx:555-558) is removed without ersatzlos loss — the
+// action stays reachable via the Sidebar (desktop) and the MobileAccountSheet
+// (mobile, plan §3.5) — but the `syncedAt` readout and the tournament-list
+// loader are untouched and must keep working.
+describe('MetaPage — no more sync-button duplicate (plan §3.7, §3.11-C)', () => {
+  it('C1: renders no button named layout:sidebar.syncLiveMeta', async () => {
+    render(<MetaPage />);
+    await flushEffects();
+
+    expect(
+      screen.queryByRole('button', { name: i18n.t('layout:sidebar.syncLiveMeta') as string }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('C2: still shows the syncedAt readout when the store reports a lastSynced timestamp (regression net — green from the start, guards the §3.7 "Bleibt" requirement)', async () => {
+    storeState.lastSynced = new Date('2026-01-01T12:00:00.000Z');
+    render(<MetaPage />);
+    await flushEffects();
+
+    expect(
+      screen.getByText(
+        i18n.t('layout:sidebar.syncedAt', {
+          time: storeState.lastSynced.toLocaleTimeString(),
+        }) as string,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('C3: the tournament-list button (meta:tournaments.load) still exists (regression net — green from the start, key-based so it survives the §3.1 label rename too)', async () => {
+    render(<MetaPage />);
+    await flushEffects();
+
+    expect(
+      screen.getByRole('button', { name: i18n.t('meta:tournaments.load') as string }),
+    ).toBeInTheDocument();
   });
 });
