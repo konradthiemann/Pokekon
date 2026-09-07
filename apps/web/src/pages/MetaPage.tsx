@@ -13,7 +13,6 @@ import {
   ChevronRight,
   Minus,
   Grid3X3,
-  Globe,
   AlertCircle,
   FlaskConical,
   Scale,
@@ -480,7 +479,7 @@ function RecentTournaments() {
 
 export function MetaPage() {
   const { t } = useTranslation('meta');
-  const { syncMeta, isSyncing, syncProgress, syncError, lastSynced } = useDashboardStore();
+  const { isSyncing, syncProgress, syncError, lastSynced } = useDashboardStore();
   const [selected, setSelected] = useState<ArchetypeSelection | null>(null);
 
   // Meta window (days back + online Bo1-Swiss scope). Drives BOTH the overview
@@ -552,18 +551,6 @@ export function MetaPage() {
     loadedEquilibrium?.key === equilibriumRequestKey ? loadedEquilibrium.data : null;
   const equilibriumError = equilibriumFailedKey === equilibriumRequestKey;
 
-  // The "Sync Live Meta" action also lives in the desktop sidebar, but that is
-  // hidden on mobile (`md:flex`) — so the meta page carries its own copy,
-  // making the page self-sufficient on every viewport. Errors surface via the
-  // store's syncError; the throw is swallowed here.
-  const handleSync = async () => {
-    try {
-      await syncMeta();
-    } catch {
-      /* error is shown via the store's syncError */
-    }
-  };
-
   if (selected) {
     return (
       <ArchetypeDetail
@@ -594,27 +581,12 @@ export function MetaPage() {
           </h2>
           <p className="text-sm text-slate-500 mt-0.5">{t('page.subtitle')}</p>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <button
-            onClick={handleSync}
-            disabled={isSyncing}
-            className="btn-primary text-xs disabled:opacity-60"
-          >
-            <Globe
-              className={`w-3.5 h-3.5 ${isSyncing ? 'animate-pulse' : ''}`}
-              aria-hidden="true"
-            />
-            {isSyncing
-              ? t('sidebar.syncing', { ns: 'layout' })
-              : t('sidebar.syncLiveMeta', { ns: 'layout' })}
-          </button>
-          {/* Always reserve the line height so the button doesn't jump on sync. */}
-          <span className="min-h-[0.9rem] text-[11px] text-slate-500">
-            {!isSyncing && lastSynced
-              ? t('sidebar.syncedAt', { ns: 'layout', time: lastSynced.toLocaleTimeString() })
-              : ''}
-          </span>
-        </div>
+        {/* Always reserve the line height so the readout doesn't jump on sync. */}
+        <span className="min-h-[0.9rem] text-[11px] text-slate-500">
+          {!isSyncing && lastSynced
+            ? t('sidebar.syncedAt', { ns: 'layout', time: lastSynced.toLocaleTimeString() })
+            : ''}
+        </span>
       </div>
 
       {/* Reserved status slot — always rendered so starting a sync (progress text
