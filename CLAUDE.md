@@ -30,7 +30,7 @@ Die Richtung steht in [`docs/backend-evolution-plan.md`](./docs/backend-evolutio
 4. **Eine Quelle der Wahrheit.** Die Migration IndexedDB → API ist im Gange. Keine neue Datendoppelung einführen; bei Konflikt die im Plan beschlossene Zielrichtung wählen.
 5. **Tests & Lint grün = „fertig".** Eine Aufgabe gilt erst als erledigt, wenn `npm run typecheck`, `npm run lint` und `npm run test` durchlaufen. Teilimplementierungen werden als solche markiert.
 6. **Anti-Halluzination bei KI-Analyse beibehalten.** Jede LLM-Aussage über ein Spiel braucht einen wörtlichen Evidence-Quote aus dem Log; `temperature=0`; keine Karten vorschlagen, die nicht im Log sichtbar waren. Diese Maßnahmen leben in der geteilten Engine (`@pokekon/shared`, serverseitig aufgerufen über `apps/api/src/ai/`) und dürfen nicht aufgeweicht werden.
-7. **Doku folgt dem Code.** Strukturändernde Arbeit aktualisiert die betroffene Doku in `docs/` im selben Zug. Veraltete Doku ist schlechter als keine.
+7. **Doku folgt dem Code.** Strukturändernde Arbeit aktualisiert die betroffene Doku in `docs/` im selben Zug. Veraltete Doku ist schlechter als keine. Diese Regel wird durch `.claude/hooks/docs-gate.sh` technisch durchgesetzt (siehe Abschnitt 4: Docs-Gate).
 
 ---
 
@@ -56,6 +56,7 @@ Aufgabe verstehen → (nicht-trivial?) plan-agent → implementieren → code-re
 - [ ] Keine Secrets im Diff, kein kostenpflichtiger Dienst eingeführt?
 - [ ] Cold-Start/Empty-State bedacht (kein Deck, keine Logs, kein Meta)?
 - [ ] Doku in `docs/` und ggf. `.md`-Companion aktualisiert?
+- [ ] Docs-Gate grün — strukturändernde Änderungen haben begleitendes Doku-Update (`.claude/hooks/docs-gate.sh` prüft dies automatisch und blockiert `git commit`, bis relevante Dateien in `docs/` angefasst wurden; Override: `rm <marker-pfad>` im Block-Text genannt)?
 
 ---
 
