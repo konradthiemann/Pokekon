@@ -150,8 +150,7 @@
       "notes": "Notizen"
     },
     "logAndAnalysis": "Protokoll + Analyse vorhanden",
-    "logAvailable": "Kampfprotokoll vorhanden",
-    "logMatch": "Match loggen"
+    "logAvailable": "Kampfprotokoll vorhanden"
   },
   "analysis": {
     "apiError": "Anthropic API-Fehler {{status}}: {{message}}",

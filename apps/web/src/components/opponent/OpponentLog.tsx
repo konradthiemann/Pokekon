@@ -190,19 +190,6 @@ export function OpponentLog({ logs, deckId, chrome = 'card' }: Props) {
         )}
       </div>
 
-      {/* FAB — only visible when there are already entries */}
-      {filtered.length > 0 && (
-        <div className="px-4 py-3 border-t border-slate-200 flex justify-end">
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-            {t('logList.logMatch')}
-          </button>
-        </div>
-      )}
-
       {showModal && (
         <AddLogModal
           preselectedDeckId={deckId}
