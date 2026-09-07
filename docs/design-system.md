@@ -37,6 +37,8 @@ UI, follow the tokens below — **do not reintroduce dark utilities** (`bg-gray-
 | Loss | `red-700` text / `red-100` badge | losses | ✓ |
 | Tie | `amber-700` text / `amber-100` badge | ties | ✓ |
 
+**Enforcement:** `slate-400` is monitored in code review. Examples of correct usage: the "—" separator in a matchup matrix, disabled form placeholder text. A visible number, label, or status indicator must never be `slate-400` alone (failing WCAG 1.4.3). The `MatchupMatrix` component correctly uses `slate-400` only for the decorative "—" cell dividers, keeping all win rates at `slate-600` (muted text) minimum.
+
 Type-colour coding for archetypes: Fire `#ef4444`, Water `#3b82f6`, Grass `#22c55e`,
 Electric `#f59e0b`, Psychic `#d946ef` (deepen for chart bars so each clears ~3:1 on white).
 
@@ -64,6 +66,10 @@ The UI moved to a data-panel / finance aesthetic while keeping the Poké-Light p
 | Metric numbers | default kerning | `tabular-nums` (via `.stat-value`) | Digits lock to a fixed grid; columns stay aligned on rerender |
 
 No dark utilities were reintroduced. WCAG-AA contrast ratios remain unchanged.
+
+## Shared action blocks (DRY for multi-viewport patterns)
+
+When a global control (e.g. "Sync Live Meta", account settings) must be accessible on both desktop and mobile but reaches different components (`Sidebar` on desktop, `MobileAccountSheet` on mobile), extract the control into a single shared component (e.g. `SyncControls`) that both parents render. This avoids duplicated logic, ensures consistent progress feedback and error states, and makes future updates faster. The component should not know *where* it's rendered — only *what* it does. A shared block living in one source of truth is easier to test, audit, and update than parallel implementations that drift over time.
 
 ## Accessibility baseline (WCAG 2.2 AA)
 

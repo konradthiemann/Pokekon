@@ -143,7 +143,7 @@ sequenceDiagram
     participant CORSProxy as corsproxy.io
     participant DB as Dexie / IndexedDB
 
-    User->>UI: Click "Sync Live Meta" (sidebar on desktop, Meta header on mobile)
+    User->>UI: Click "Sync Live Meta" (Sidebar on desktop, Account Sheet on mobile)
     UI->>Store: syncMeta()
     Store->>MetaFetch: syncLiveMeta(onProgress)
     MetaFetch->>Limitless: GET /api/tournaments?game=PTCG&completed=true&limit=50&format=standard
