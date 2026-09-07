@@ -203,6 +203,16 @@ flowchart LR
 
 Technisch abgesichert durch husky + lint-staged (Prettier pre-commit) und `.github/workflows/ci.yml`.
 
+### Das Docs-Freshness-Gate
+
+Ein zusätzliches Gate (`.claude/hooks/docs-gate.sh`) läuft lokal als Claude-Code-Hook: Es **erkennt strukturändernde Dateien** (z. B. neue Routes, geänderte Datenbank-Schemas, neue Komponenten) und **blockiert `git commit`** innerhalb einer laufenden Session, solange die betroffenen Doku-Dateien nicht aktualisiert wurden. Die zugehörige Testsuite (`.claude/hooks/docs-gate.test.sh`, eingehängt als `npm run test:hooks`) läuft zusätzlich automatisiert in CI (`.github/workflows/ci.yml` → `npm run test`) — das prüft die Hook-**Logik**, nicht das Blockieren selbst, denn CI führt keinen `git commit` aus. Die Zuordnung „Pfad → betroffene `docs/*.md`" ist differenziert — z. B. `apps/api/src/routes/meta.ts` → `docs/features.md` (Abschnitt „Live Meta Sync").
+
+**Warum:** Golden Rule 7 verlangt „Doku folgt dem Code", aber es gab bisher keine technische Durchsetzung. Ein Agent oder ein Mensch konnte Code ändern und vergessen, die Doku zu aktualisieren — jetzt wird das vom Hook erkannt.
+
+**Übersteuern:** Falls die Heuristik falschpositiviert (z. B. ein interner Refactor ohne fachliche Änderung), nennt der Block-Text beim nächsten `git commit`-Versuch den aufgelösten Pfad zum Dirty-Marker — `rm <pfad>` hebt den Block auf, identisch zu `rm .git/claude-tdd-dirty`.
+
+**Wichtig:** Das Gate **schreibt niemals Doku-Inhalte** — es signalisiert nur „hier könnte Doku veraltet sein." Das Aktualisieren bleibt ein bewusster, vom Agenten oder Menschen durchgeführter Schritt. Der `docs-agent` wird typischerweise von diesem Gate ausgelöst.
+
 ---
 
 ## 7. Gedächtnis-System (Schicht ③)

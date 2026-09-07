@@ -57,7 +57,7 @@ flowchart LR
 - Deciding between competing approaches
 - Any time specialized agents produce conflicting outputs
 
-**Delegates to:** All other agents. Standard feature flow: `plan-agent → react-dev-implementer → code-review-agent + docs-agent`.
+**Delegates to:** All other agents. Standard feature flow: `plan-agent → react-dev-implementer → code-review-agent + docs-agent`. If structural changes are detected (routes, database schema, components) the **Docs-Gate** (`docs-gate.sh`) signals whether `docs-agent` is needed — if it blocks `git commit`, the affected `docs/*.md` files are out of sync.
 
 ---
 
@@ -77,7 +77,7 @@ flowchart LR
 
 **Handoff protocol:** After implementing, explicitly signals:
 - `code-review-agent`: Review TypeScript/React/Dexie standards
-- `docs-agent`: Create companion `.md` documentation
+- `docs-agent`: Create companion `.md` documentation (the Docs-Gate will check whether affected documentation has been updated before allowing commit)
 
 ---
 
@@ -137,9 +137,10 @@ flowchart LR
 **When to trigger:**
 - After any implementation is complete (triggered by `react-dev-implementer` handoff)
 - When the project structure changes significantly
+- **When the Docs-Gate signals stale documentation** — the hook `.claude/hooks/docs-gate.sh` detects structural changes without matching doc updates and blocks `git commit` until affected `docs/*.md` files are touched. This is often the primary trigger for `docs-agent`.
 - For periodic JSDoc audits of `src/lib/` and `src/db/queries.ts`
 
-**Principle:** Documentation must reflect the current code. Reads all affected files before writing.
+**Principle:** Documentation must reflect the current code. Reads all affected files before writing. The Docs-Gate provides a clear, mechanically detected signal of which docs are out of sync — reads the gate's error output to know exactly which `docs/*.md` files and which code changes triggered it.
 
 ---
 
