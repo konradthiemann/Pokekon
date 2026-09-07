@@ -66,7 +66,7 @@
     "title": "List Comparison",
     "statsLine": "{{lists}} lists · {{top}} top-placing · {{time}}",
     "compare": "Compare",
-    "refresh": "Refresh",
+    "refresh": "Refresh list comparison",
     "comparing": "Comparing…",
     "notSetUp": "Deck comparison not set up",
     "setupHint": "Open the <deckSettings>Deck List</deckSettings> section and set your archetype slug there (e.g. <slug>n-zoroark</slug>) to compare your list against tournament results.",

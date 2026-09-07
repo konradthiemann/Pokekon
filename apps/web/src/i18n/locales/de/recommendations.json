@@ -66,7 +66,7 @@
     "title": "Listen-Vergleich",
     "statsLine": "{{lists}} Listen · {{top}} Top-Platzierungen · {{time}}",
     "compare": "Vergleichen",
-    "refresh": "Aktualisieren",
+    "refresh": "Listen-Vergleich aktualisieren",
     "comparing": "Vergleiche…",
     "notSetUp": "Deck-Vergleich nicht eingerichtet",
     "setupHint": "Öffne die <deckSettings>Deckliste</deckSettings> und hinterlege dort deinen Archetype-Slug (z. B. <slug>n-zoroark</slug>), um deine Liste mit Turnierergebnissen zu vergleichen.",
