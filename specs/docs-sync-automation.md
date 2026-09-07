@@ -72,17 +72,22 @@ Root) oder einen automatisch angestoßenen `docs-agent`-Lauf macht.
 - Der `docs-agent` selbst wird inhaltlich nicht verändert — diese Spec baut nur die
   Erkennungs-/Anstoß-Mechanik drumherum.
 
-## Offene Fragen
+## Offene Fragen (entschieden, 2026-09-07)
 
-- **Automatisierungsgrad:** Reiner Hinweis bei `git commit` (wie eine Warnung, kein Block),
-  ein harter Block analog zu `tdd-gate.sh` (verhindert den Commit, bis Doku angefasst wurde),
-  oder ein automatisch angestoßener `docs-agent`-Lauf **mit** anschließendem Pflicht-Review
-  durch Konrad vor dem Commit (mittlere Automatisierung, kein unbeaufsichtigtes Schreiben)?
-  Das ist die zentrale Design-Entscheidung dieser Spec.
-- **Pfad-zu-Doku-Zuordnung:** Reicht eine grobe, hart hinterlegte Zuordnung (z. B. "Änderung
-  an `schema.ts` → `docs/database.md` vermutlich betroffen"), oder soll das differenzierter
-  sein? Eine zu grobe Zuordnung erzeugt viele Fehlalarme, eine zu feine ist pflegeintensiv.
-- **Verhältnis zum bestehenden `tdd-gate.sh`:** Soll das ein eigener, zusätzlicher Commit-Hook
-  sein, oder in denselben Mechanismus integriert werden (ein Commit könnte dann theoretisch an
-  zwei Gates gleichzeitig scheitern — Test-Frische und Doku-Frische)? Getrennte Hooks sind
-  einfacher zu verstehen, ein kombinierter Hook vermeidet doppelte Infrastruktur.
+- **Automatisierungsgrad:** **Entschieden: harter Block, analog zu `tdd-gate.sh`.** `git commit`
+  wird verweigert, solange strukturändernde Arbeit ohne begleitendes Doku-Update erkannt ist.
+  Bewusstes Übersteuern bleibt möglich (siehe Akzeptanzkriterien, analog zu
+  `rm .git/claude-tdd-dirty`). Kein automatischer `docs-agent`-Lauf ohne Anstoß — das Schreiben
+  der Doku bleibt ein bewusster, von Konrad angestoßener Schritt, nicht Teil des Gates selbst.
+- **Pfad-zu-Doku-Zuordnung:** **Entschieden: differenziert.** Statt einer groben Zuordnung auf
+  Verzeichnisebene bekommt jede strukturändernde Pfad-Gruppe aus den Akzeptanzkriterien
+  (`apps/api/src/db/schema.ts`, `apps/api/src/routes/*.ts`, `packages/shared/src/*.ts`,
+  `apps/web/src/components/**`) eine eigene, spezifischere Ziel-Doku-Zuordnung statt eines
+  einzelnen Catch-alls (z. B. `routes/meta.ts` → `docs/features.md` §Meta-Sync statt pauschal
+  `docs/api.md`). Mehr Pflegeaufwand bei neuen Modulen, aber weniger Fehlalarme — passt zum
+  Anspruch aus Golden Rule 6, Genauigkeit über Bequemlichkeit zu stellen.
+- **Verhältnis zum bestehenden `tdd-gate.sh`:** **Entschieden: eigener, separater Hook.** Der
+  Doku-Freshness-Check lebt als eigenständiges Skript neben `tdd-gate.sh`, mit eigenem
+  Dirty-Marker und eigenem Override. Ein Commit kann an beiden Gates unabhängig scheitern; jedes
+  bleibt einzeln verständlich und einzeln übersteuerbar, ohne dass eine Änderung am einen Gate
+  Testfrische-Logik berührt.
