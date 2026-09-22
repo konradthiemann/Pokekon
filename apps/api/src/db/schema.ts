@@ -21,6 +21,7 @@ import {
   FITNESS_DIRECTION_VALUES,
   SYNTHESIS_LANGUAGE_VALUES,
   DECK_SYNTHESIS_SOURCE_VALUES,
+  ARCHETYPE_SYNTHESIS_SCOPE_VALUES,
 } from '@pokekon/shared';
 import type {
   ParsedTurn,
@@ -30,6 +31,7 @@ import type {
   SynthesisFact,
   SynthesisContext,
   SynthesisClaim,
+  ArchetypeSynthesisContext,
 } from '@pokekon/shared';
 
 export const user = pgTable('user', {
@@ -712,5 +714,56 @@ export const deckSynthesis = pgTable(
     // Defence in depth, same pattern as archetype_card_stats_tier_chk
     // (schema.ts:478): a CHECK on `source` limited to 'llm' / 'demo-seed'.
     check('deck_synthesis_source_chk', sql`${table.source} in ('llm', 'demo-seed')`),
+  ],
+);
+
+// ─── Archetype synthesis cache (Spec 10 Slice C) ─────────────────────────────
+// Archetype-level counterpart to deck_synthesis above: one row per
+// (archetypeId, scopeKey, windowDays, language) instead of per deck, since a
+// ranked-decklist-cluster synthesis has no single owning deck. `userId` is
+// nullable — set only for scope='local' (the user's own local-meta field is
+// part of the input, so their cache row cascades away with their account);
+// 'global' rows are shared across all users and have userId = null.
+// `scopeKey` exists purely so the uniqueness constraint works with a plain
+// (non-partial) index: Postgres treats every NULL in a unique index as
+// distinct from every other NULL, so `userId` alone cannot dedupe multiple
+// 'global' rows for the same archetype. `scopeKey` is 'global' for a global
+// row, or `local:${userId}` for a local row — always non-null, always a
+// real value to compare.
+
+export const archetypeSynthesis = pgTable(
+  'archetype_synthesis',
+  {
+    id: serial('id').primaryKey(),
+    archetypeId: text('archetype_id').notNull(),
+    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+    scope: text('scope', { enum: ARCHETYPE_SYNTHESIS_SCOPE_VALUES }).notNull(),
+    /** See table comment above — the actual uniqueness/lookup key. */
+    scopeKey: text('scope_key').notNull(),
+    windowDays: integer('window_days').notNull(),
+    language: text('language', { enum: SYNTHESIS_LANGUAGE_VALUES }).notNull(),
+    promptVersion: integer('prompt_version').notNull(),
+    /** sha256 over canonicalizeFacts(...) — same cache-key mechanism as
+     *  deck_synthesis.input_hash (synthesisInputHash(), reused verbatim). */
+    inputHash: text('input_hash').notNull(),
+    facts: jsonb('facts').$type<SynthesisFact[]>().notNull(),
+    context: jsonb('context').$type<ArchetypeSynthesisContext>().notNull(),
+    claims: jsonb('claims').$type<SynthesisClaim[]>().notNull(),
+    droppedCount: integer('dropped_count').notNull().default(0),
+    source: text('source', { enum: DECK_SYNTHESIS_SOURCE_VALUES }).notNull(),
+    provider: text('provider'),
+    model: text('model'),
+    generatedAt: timestamp('generated_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('archetype_synthesis_uq').on(
+      table.archetypeId,
+      table.scopeKey,
+      table.windowDays,
+      table.language,
+    ),
+    index('archetype_synthesis_userId_idx').on(table.userId),
+    check('archetype_synthesis_source_chk', sql`${table.source} in ('llm', 'demo-seed')`),
+    check('archetype_synthesis_scope_chk', sql`${table.scope} in ('global', 'local')`),
   ],
 );

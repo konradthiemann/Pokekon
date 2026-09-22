@@ -16,6 +16,7 @@
 | Deck comparison vs. tournament lists | Deck → Tips | User triggers |
 | Data-driven recommendations | Deck → Tips | Auto on data change |
 | Deck synthesis (KI-text über aggregierte Daten) | Deck → Tips | User triggers |
+| Archetype synthesis (ranked decklist clusters, KI-text) | API only, no UI yet | `POST /api/analysis/archetype/:archetypeId` |
 | Local meta priority | Deck / Meta | User configures |
 | Recent tournaments view | Meta | User triggers |
 | Matchup matrix | Meta | Auto from meta data |
@@ -533,6 +534,40 @@ Combines three data sources into a closed set of structured **facts** (each with
 | Weighted matchups | Per-opponent `winRatePct`, band, meta share | `matchup.*` facts |
 | Card performance deltas (Spec 5) | `deltaPp`, tier, band, in-deck status | `card.*` facts |
 | Equilibrium signals (Spec 6, optional) | Weight, gap, trend, fitness delta | `equilibrium.*` facts |
+
+---
+
+## 20. Archetype Synthesis (Spec 10 Slice C — API only, no UI yet)
+
+**Route:** `GET`/`POST /api/analysis/archetype/:archetypeId` (`apps/api/src/routes/analysis.ts`)
+
+Archetype-level counterpart to Deck Synthesis (§19) — instead of one user's deck, it synthesizes
+over an archetype's **ranked decklist clusters** (Spec 10 Slice A: near-identical published
+tournament lists merged into one data point; Slice B: ranked by Wilson-score lower bound of the
+tie-weighted win rate, so a lucky small sample can't outrank a proven large one). Reuses the exact
+Spec 8 anti-hallucination gate (`validateSynthesis`) — a claim must reference a real fact id and
+declare a matching `direction`, same as Deck Synthesis.
+
+**No ownership check** (unlike the deck route): archetype data isn't user-owned. An archetype with
+no standings in the window simply returns an empty cluster list, not a 404.
+
+**`scope: 'global' | 'local'`** distinguishes a run against the global meta from one against the
+user's local-meta field — separate cache rows, separate LLM calls (a `'local'` row is tied to the
+requesting user; a `'global'` row is shared across all users). **Known, documented MVP
+limitation:** both scopes currently rank the exact same clusters — `scope` only changes the
+prompt's framing text so far. Real field-reweighting for `'local'` needs a per-opponent-archetype
+breakdown per cluster, which is Slice D's job (see `specs/archetype-meta-analysis.md`).
+
+**Data source:** `tournament_standings` joined to `tournaments`, filtered to the archetype, the
+online-Bo1 window (same scope as every other meta read), and `players >= DEFAULT_MIN_TOURNAMENT_PLAYERS`
+(Spec 10 Slice G, currently 15) — unrepresentative small events don't feed the ranking.
+
+**Caching:** `archetype_synthesis` table (`docs/database.md`), keyed by
+`(archetypeId, scope[+userId for local], windowDays, language)`, same input-hash mechanism as
+`deck_synthesis`.
+
+**Not yet surfaced in the UI** — this slice is the API plumbing only; a UI (e.g. on the archetype
+drilldown, §15) is a follow-up.
 
 ---
 

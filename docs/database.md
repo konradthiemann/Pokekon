@@ -485,6 +485,35 @@ Pre-computed deck synthesis — cached LLM-generated text over aggregated facts 
 
 **Check constraint:** `source IN ('llm','demo-seed')`; `language IN ('de','en')`; `window_days IN (7,14,21,28)`.
 
+### Table: `archetype_synthesis` (migration `0016`, Spec 10 Slice C)
+
+Archetype-level counterpart to `deck_synthesis` above: caches an LLM-generated synthesis over Slice A/B's ranked decklist clusters for a chosen archetype, instead of a single user's deck (a cluster ranking has no single owning deck).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | serial PK | |
+| `archetype_id` | text | Limitless archetype slug (no FK — archetypes aren't a stored entity) |
+| `user_id` | text (nullable) FK → `user.id` | `onDelete: cascade`; set only for `scope = 'local'` — a `'global'` row is shared across all users |
+| `scope` | text | `'global'` or `'local'` (see `ArchetypeSynthesisScope`, `@pokekon/shared`) |
+| `scope_key` | text | `'global'`, or `local:<userId>` for a local row — the actual uniqueness key (see below) |
+| `window_days` | int | Analysis window, default 90 (`ARCHETYPE_SYNTHESIS_DEFAULT_DAYS`) — not snapped to the deck-synthesis card-stats windows |
+| `language` | text | `'de'` or `'en'` |
+| `prompt_version` | int | Same version counter as `deck_synthesis.prompt_version` |
+| `input_hash` | text | sha256 over `canonicalizeFacts(...)` — same mechanism as `deck_synthesis.input_hash` |
+| `facts` | jsonb | `SynthesisFact[]` the text was derived from |
+| `context` | jsonb | `ArchetypeSynthesisContext` |
+| `claims` | jsonb | `SynthesisClaim[]` — surviving claims |
+| `dropped_count` | int | How many model claims the validation gate rejected |
+| `source` | text | `'llm'` or `'demo-seed'` |
+| `provider` / `model` | text (nullable) | Same semantics as `deck_synthesis` |
+| `generated_at` | timestamptz | |
+
+**Unique index:** `(archetype_id, scope_key, window_days, language)`. `scope_key` exists because Postgres treats every `NULL` in a unique index as distinct from every other `NULL` — a nullable `user_id` alone cannot dedupe multiple `'global'` rows for the same archetype. `scope_key` is always a real, non-null value instead.
+
+**Check constraints:** `source IN ('llm','demo-seed')`; `scope IN ('global','local')`.
+
+**Known, documented MVP limitation (Slice C):** `scope` currently only changes the prompt's framing, not the ranking itself — a `'global'` and a `'local'` row for the same archetype/window/language rank the exact same clusters (they still get separate cache rows and separate LLM calls). Real field-reweighting for `'local'` is Slice D's job; see `ArchetypeSynthesisScope`'s doc comment (`packages/shared/src/deckSynthesis.ts`) and `specs/archetype-meta-analysis.md`.
+
 ### Tables: `meta_equilibrium_runs` and `meta_equilibrium_archetypes` (migration `0014`, Spec 6 Nash equilibrium)
 
 Precomputed Nash equilibrium analysis per analysis window, filled by the `computeEquilibrium` job. Two tables (not one) to avoid denormalizing run-level metadata across ~25 archetype rows. Foreign key with `onDelete: cascade` ensures full-replace-per-window atomicity.

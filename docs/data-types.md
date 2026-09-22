@@ -893,5 +893,9 @@ in-prod behaviour. Same six mandatory rules, same JSON schema, same
 framing differs ("Archetyp: X, Bezug: die globale Meta / deine lokale Meta" instead of
 "Deck: X (variant)"), since there is no single deck at this level.
 
-**Not yet wired into any route** — that is the next slice (an API route analogous to
-`POST /api/analysis/deck/:deckId`, using the same BYOK/`AnalysisProvider` infrastructure).
+**Wired into `GET`/`POST /api/analysis/archetype/:archetypeId`** (`apps/api/src/routes/analysis.ts`,
+mirrors the deck routes exactly — same BYOK/rate-limit/cache-short-circuit pattern), backed by the
+`archetype_synthesis` table (`docs/database.md`). `AnalysisProvider` gained a parallel
+`synthesizeArchetype()` method (`apps/api/src/ai/provider.ts`) rather than reusing `synthesize()`
+with a fake deck context — see `docs/features.md` for the route-level description, including the
+documented `scope` limitation.
