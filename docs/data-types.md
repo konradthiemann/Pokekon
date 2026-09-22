@@ -871,7 +871,7 @@ interface ArchetypeSynthesisContext {
   archetypeName: string;
   windowDays: number;
   language: SynthesisLanguage;
-  scope: 'global' | 'local';  // against the global meta, or the user's local-meta field
+  scope: ArchetypeSynthesisScope;  // against the global meta, or the user's local-meta field
 }
 ```
 
