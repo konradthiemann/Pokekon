@@ -1,5 +1,6 @@
 import {
   buildAnalysisPrompts,
+  buildArchetypeSynthesisPrompts,
   buildSynthesisPrompts,
   stripJsonFences,
   validateAnalysis,
@@ -10,6 +11,7 @@ import {
   AnalysisError,
   type AnalysisInput,
   type AnalysisProvider,
+  type ArchetypeSynthesisInput,
   type SynthesisInput,
 } from './provider.js';
 
@@ -102,6 +104,28 @@ export function createGitHubModelsProvider(opts: {
 
     async synthesize({ facts, context }: SynthesisInput) {
       const { system, user } = buildSynthesisPrompts(facts, context);
+
+      const rawText = await chatJson(
+        { apiKey: opts.apiKey, model },
+        [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        2048,
+      );
+
+      let parsed: { claims?: unknown };
+      try {
+        parsed = JSON.parse(stripJsonFences(rawText)) as { claims?: unknown };
+      } catch {
+        throw new AnalysisError('The synthesis model response was not valid JSON.', 502);
+      }
+
+      return validateSynthesis(parsed.claims, facts);
+    },
+
+    async synthesizeArchetype({ facts, context }: ArchetypeSynthesisInput) {
+      const { system, user } = buildArchetypeSynthesisPrompts(facts, context);
 
       const rawText = await chatJson(
         { apiKey: opts.apiKey, model },

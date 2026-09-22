@@ -49,6 +49,16 @@ export type FactDirection = 'positive' | 'negative' | 'neutral';
 export const SYNTHESIS_LANGUAGE_VALUES = ['de', 'en'] as const;
 export type SynthesisLanguage = (typeof SYNTHESIS_LANGUAGE_VALUES)[number];
 
+/** Spec 10 Slice C: whether an archetype synthesis run was computed against
+ *  the global meta or the user's local-meta field. NOTE (Slice C MVP,
+ *  deliberate, documented limitation): scope currently only changes the
+ *  PROMPT FRAMING, not the ranking itself -- both scopes rank the exact same
+ *  clusters until Slice D adds per-opponent-archetype field-reweighting
+ *  (RankedCluster only carries an aggregate W/L/T today, not a
+ *  per-matchup breakdown). See specs/archetype-meta-analysis.md Slice D. */
+export const ARCHETYPE_SYNTHESIS_SCOPE_VALUES = ['global', 'local'] as const;
+export type ArchetypeSynthesisScope = (typeof ARCHETYPE_SYNTHESIS_SCOPE_VALUES)[number];
+
 // ---------------------------------------------------------------------------
 // 3.1 -- types
 // ---------------------------------------------------------------------------
@@ -561,7 +571,7 @@ export interface ArchetypeSynthesisContext {
   archetypeName: string; // sanitizeFactLabel()-behandelt
   windowDays: number;
   language: SynthesisLanguage;
-  scope: 'global' | 'local';
+  scope: ArchetypeSynthesisScope;
 }
 
 export interface ArchetypeSynthesis {
@@ -569,7 +579,7 @@ export interface ArchetypeSynthesis {
   archetypeName: string;
   windowDays: number;
   language: SynthesisLanguage;
-  scope: 'global' | 'local';
+  scope: ArchetypeSynthesisScope;
   promptVersion: number;
   sections: SynthesisSectionBlock[];
   claims: SynthesisClaim[];

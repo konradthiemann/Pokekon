@@ -51,6 +51,12 @@ import {
   synthesisInputHash,
   type BuildFactSetInput,
 } from './lib/synthesisFacts.js';
+// Spec 10 Slice C: the archetype-level counterpart's I/O-side fact-set
+// builder, used by the archetype-synthesis tests to fetch a real, currently
+// computable fact (with its server-derived `direction`) without hand-deriving
+// the Wilson interval — mirrors currentWinRateFact's use of
+// buildSynthesisFactSet for the deck-level tests.
+import { buildArchetypeSynthesisFactSet } from './lib/archetypeSynthesisFacts.js';
 // Scheibe G (plan §3.7/§3.9, §4 step 13): the deck_synthesis cache read/write
 // helpers — do not exist yet, expected to fail module resolution until the
 // implementer adds lib/deckSynthesisStore.ts.
@@ -4787,6 +4793,323 @@ describe('POST /api/analysis/deck/:deckId (plan §3.8, Scheibe I)', () => {
       else expect(res.status).toBe(200);
     }
     expect(got429).toBe(true);
+  });
+});
+
+// Spec 10 Slice C (specs/archetype-meta-analysis.md, plan
+// velvety-finding-bengio.md): archetype-level counterpart to the deck
+// synthesis routes above — ranks a chosen archetype's decklist clusters
+// (Slice A+B) and, on POST, turns the ranking into a KI text synthesis via
+// the same anti-hallucination pipeline (Spec 8), reusing resolveApiKey and
+// the rate limiter verbatim.
+describe('GET/POST /api/analysis/archetype/:archetypeId (Spec 10 Slice C)', () => {
+  async function clearArchetypeSynthesisData(): Promise<void> {
+    await db.delete(schema.tournaments); // standings cascade
+    await db.delete(schema.archetypeSynthesis);
+  }
+
+  const sampleDecklistA: TournamentDecklist = {
+    pokemon: [
+      { name: 'Dragapult ex', count: 3 },
+      { name: 'Dreepy', count: 4 },
+    ],
+    trainer: [
+      { name: 'Iono', count: 4 },
+      { name: 'Ultra Ball', count: 4 },
+    ],
+    energy: [{ name: 'Basic Psychic Energy', count: 9 }],
+  };
+
+  /** Two standings whose decklists overlap enough to cluster together
+   *  (Slice A default threshold) plus one clearly different list, so a test
+   *  can assert clustering actually ran rather than treating each standing
+   *  as its own cluster. */
+  async function seedArchetypeStandings(
+    archetypeId: string,
+    tournamentId: string,
+    players = 40,
+  ): Promise<void> {
+    await db.insert(schema.tournaments).values({
+      id: tournamentId,
+      name: `${tournamentId} Event`,
+      date: new Date(),
+      players,
+      isOnline: true,
+      swissMode: 'BO1',
+    });
+    await db.insert(schema.tournamentStandings).values([
+      {
+        tournamentId,
+        archetypeId,
+        archetypeName: 'Dragapult ex',
+        wins: 6,
+        losses: 1,
+        ties: 0,
+        placing: 1,
+        decklist: sampleDecklistA,
+      },
+      {
+        tournamentId,
+        archetypeId,
+        archetypeName: 'Dragapult ex',
+        wins: 4,
+        losses: 2,
+        ties: 1,
+        placing: 8,
+        decklist: sampleDecklistA, // same list -> same cluster
+      },
+    ]);
+  }
+
+  function modelResponse(content: string): Response {
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  let archUserSeq = 0;
+  async function freshUser(): Promise<string> {
+    archUserSeq += 1;
+    const id = `user-arch-synth-${archUserSeq}`;
+    await createUser(id);
+    return id;
+  }
+
+  describe('GET (read-only)', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('clusters the seeded standings and returns a ranked list, never calling fetch', async () => {
+      await clearArchetypeSynthesisData();
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+
+      const archetypeId = 'get-arch-cluster';
+      await seedArchetypeStandings(archetypeId, 'get-arch-cluster-t1');
+      const user = await freshUser();
+
+      const res = await request(`/api/analysis/archetype/${archetypeId}`, { user });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        archetypeId: string;
+        scope: string;
+        clusters: { totalWins: number; totalLosses: number; totalTies: number; rank: number }[];
+        synthesis: unknown;
+        availableFactCount: number;
+      };
+      expect(body.archetypeId).toBe(archetypeId);
+      expect(body.scope).toBe('global');
+      expect(body.clusters).toHaveLength(1); // both standings clustered together
+      expect(body.clusters[0]).toMatchObject({
+        totalWins: 10,
+        totalLosses: 3,
+        totalTies: 1,
+        rank: 1,
+      });
+      expect(body.synthesis).toBeNull();
+      expect(body.availableFactCount).toBeGreaterThan(0);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('returns an empty cluster list (never an error) for an archetype with no standings in the window', async () => {
+      await clearArchetypeSynthesisData();
+      const user = await freshUser();
+      const res = await request('/api/analysis/archetype/never-played-arch', { user });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { clusters: unknown[]; availableFactCount: number };
+      expect(body.clusters).toEqual([]);
+      expect(body.availableFactCount).toBe(0);
+    });
+
+    it('404s on a malformed archetype id (validation, not a DB lookup)', async () => {
+      const user = await freshUser();
+      const res = await request('/api/analysis/archetype/Not_Valid!', { user });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST (generate or serve cached)', () => {
+    let fetchMock: ReturnType<typeof vi.fn>;
+    beforeEach(() => {
+      fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+    });
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('returns 409 and never calls fetch when the archetype has no computable facts', async () => {
+      await clearArchetypeSynthesisData();
+      const user = await freshUser();
+      const res = await request('/api/analysis/archetype/post-arch-empty', {
+        user,
+        method: 'POST',
+        body: { apiKey: 'ghp_arch_empty' },
+      });
+      expect(res.status).toBe(409);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('generates a synthesis on a successful run: 200, a persisted archetype_synthesis row, an ungrounded claim dropped and counted', async () => {
+      await clearArchetypeSynthesisData();
+      const archetypeId = 'post-arch-success';
+      await seedArchetypeStandings(archetypeId, 'post-arch-success-t1');
+      const user = await freshUser();
+
+      // Only used to derive a real, currently computable fact id below
+      // without hand-deriving the Wilson interval.
+      const getRes = await request(`/api/analysis/archetype/${archetypeId}`, { user });
+      const getBody = (await getRes.json()) as {
+        clusters: { memberStandingIds: number[] }[];
+      };
+      const winRateFactId = `cluster.${getBody.clusters[0]!.memberStandingIds[0]}.winRate`;
+
+      // The real fact, including its server-derived `direction` — a claim's
+      // direction must match exactly (validateSynthesis) or it is dropped
+      // regardless of factId, so this can't be hand-guessed.
+      const factSet = await buildArchetypeSynthesisFactSet(db, {
+        archetypeId,
+        archetypeName: archetypeId,
+        windowDays: 90,
+        language: 'de',
+        scope: 'global',
+      });
+      const winRateFact = factSet.facts.find((f) => f.id === winRateFactId);
+      if (!winRateFact) throw new Error('test fixture did not produce the expected winRate fact');
+
+      const content = JSON.stringify({
+        claims: [
+          {
+            factId: winRateFactId,
+            kind: 'observation',
+            direction: winRateFact.direction,
+            text: 'Diese Liste steht mit {value} % da.',
+          },
+          {
+            factId: 'cluster.does-not-exist.winRate',
+            kind: 'observation',
+            direction: 'positive',
+            text: 'Eine nicht belegbare Aussage über {value} %.',
+          },
+        ],
+      });
+      fetchMock.mockResolvedValue(modelResponse(content));
+
+      const res = await request(`/api/analysis/archetype/${archetypeId}`, {
+        user,
+        method: 'POST',
+        body: { apiKey: 'ghp_arch_success' },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        synthesis: { archetypeId: string; source: string; droppedCount: number; claims: unknown[] };
+        stale: boolean;
+        cached: boolean;
+      };
+      expect(body.stale).toBe(false);
+      expect(body.cached).toBe(false);
+      expect(body.synthesis.archetypeId).toBe(archetypeId);
+      expect(body.synthesis.source).toBe('llm');
+      expect(body.synthesis.droppedCount).toBe(1);
+      expect(body.synthesis.claims).toHaveLength(1);
+
+      const [row] = await db
+        .select()
+        .from(schema.archetypeSynthesis)
+        .where(
+          and(
+            eq(schema.archetypeSynthesis.archetypeId, archetypeId),
+            eq(schema.archetypeSynthesis.scope, 'global'),
+          ),
+        );
+      expect(row).toBeDefined();
+      expect(row?.userId).toBeNull(); // global rows are not user-scoped
+      expect(row?.scopeKey).toBe('global');
+      expect(row?.source).toBe('llm');
+    });
+
+    it('the second call without force returns cached: true and does not call fetch again', async () => {
+      await clearArchetypeSynthesisData();
+      const archetypeId = 'post-arch-cached';
+      await seedArchetypeStandings(archetypeId, 'post-arch-cached-t1');
+      const user = await freshUser();
+
+      fetchMock.mockResolvedValue(modelResponse(JSON.stringify({ claims: [] })));
+      const first = await request(`/api/analysis/archetype/${archetypeId}`, {
+        user,
+        method: 'POST',
+        body: { apiKey: 'ghp_arch_cached' },
+      });
+      expect(first.status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      const second = await request(`/api/analysis/archetype/${archetypeId}`, {
+        user,
+        method: 'POST',
+        body: { apiKey: 'ghp_arch_cached' },
+      });
+      expect(second.status).toBe(200);
+      const body = (await second.json()) as { cached: boolean };
+      expect(body.cached).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1); // no second LLM call
+    });
+
+    it('scope: local caches to a separate, per-user row than scope: global (documented Slice C MVP limitation: same ranking, different cache row)', async () => {
+      await clearArchetypeSynthesisData();
+      const archetypeId = 'post-arch-scope';
+      await seedArchetypeStandings(archetypeId, 'post-arch-scope-t1');
+      const user = await freshUser();
+
+      // mockImplementation (not mockResolvedValue): two real LLM calls happen
+      // in this test, and a Response body can only be read once — reusing
+      // the same Response instance across both calls would throw "Body is
+      // unusable" on the second read inside chatJson.
+      fetchMock.mockImplementation(() => modelResponse(JSON.stringify({ claims: [] })));
+      const globalRes = await request(`/api/analysis/archetype/${archetypeId}`, {
+        user,
+        method: 'POST',
+        body: { apiKey: 'ghp_arch_scope', scope: 'global' },
+      });
+      expect(globalRes.status).toBe(200);
+
+      const localRes = await request(`/api/analysis/archetype/${archetypeId}`, {
+        user,
+        method: 'POST',
+        body: { apiKey: 'ghp_arch_scope', scope: 'local' },
+      });
+      expect(localRes.status).toBe(200);
+      // Two separate LLM calls (two separate cache rows) even though — by
+      // documented MVP design — they rank the exact same clusters.
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      const rows = await db
+        .select()
+        .from(schema.archetypeSynthesis)
+        .where(eq(schema.archetypeSynthesis.archetypeId, archetypeId));
+      expect(rows).toHaveLength(2);
+      const local = rows.find((r) => r.scope === 'local');
+      expect(local?.userId).toBe(user); // local rows ARE user-scoped
+      expect(local?.scopeKey).toBe(`local:${user}`);
+    });
+
+    it('an ephemeral body.apiKey is used but never written to user_ai_settings', async () => {
+      await clearArchetypeSynthesisData();
+      const archetypeId = 'post-arch-ephemeral';
+      await seedArchetypeStandings(archetypeId, 'post-arch-ephemeral-t1');
+      const user = await freshUser();
+
+      fetchMock.mockResolvedValue(modelResponse(JSON.stringify({ claims: [] })));
+      const res = await request(`/api/analysis/archetype/${archetypeId}`, {
+        user,
+        method: 'POST',
+        body: { apiKey: 'ghp_arch_ephemeral_never_stored' },
+      });
+      expect(res.status).toBe(200);
+
+      const [settings] = await db
+        .select()
+        .from(schema.userAiSettings)
+        .where(eq(schema.userAiSettings.userId, user));
+      expect(settings).toBeUndefined();
+    });
   });
 });
 

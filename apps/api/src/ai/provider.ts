@@ -1,4 +1,5 @@
 import type {
+  ArchetypeSynthesisContext,
   BattleAnalysis,
   SynthesisContext,
   SynthesisFact,
@@ -17,6 +18,14 @@ export interface SynthesisInput {
   context: SynthesisContext;
 }
 
+/** Archetype-level counterpart to SynthesisInput (Spec 10 Slice C) — same
+ *  closed fact list, but archetype context instead of deck context (no
+ *  single owning deck for a ranked-decklist-cluster synthesis). */
+export interface ArchetypeSynthesisInput {
+  facts: SynthesisFact[];
+  context: ArchetypeSynthesisContext;
+}
+
 /**
  * Provider-agnostic battle-log analysis. Concrete adapters (GitHub Models, …) wrap
  * a specific LLM API but all reuse the shared anti-hallucination engine and return
@@ -28,6 +37,10 @@ export interface AnalysisProvider {
    *  grounding gate runs inside the adapter, exactly like analyze() calls
    *  validateAnalysis, so no provider can skip it. */
   synthesize(input: SynthesisInput): Promise<ValidatedSynthesis>;
+  /** Archetype-scoped counterpart to synthesize() (Spec 10 Slice C) — same
+   *  validation gate (validateSynthesis), different prompt framing
+   *  (buildArchetypeSynthesisPrompts, no single deck to describe). */
+  synthesizeArchetype(input: ArchetypeSynthesisInput): Promise<ValidatedSynthesis>;
 }
 
 /** Error carrying an HTTP status so the route can surface a sensible code. */

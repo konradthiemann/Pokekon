@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { ARCHETYPE_SLUG_PATTERN, BEST_OF_VALUES, SYNTHESIS_LANGUAGE_VALUES } from '@pokekon/shared';
+import {
+  ARCHETYPE_SLUG_PATTERN,
+  ARCHETYPE_SYNTHESIS_SCOPE_VALUES,
+  BEST_OF_VALUES,
+  SYNTHESIS_LANGUAGE_VALUES,
+} from '@pokekon/shared';
 import {
   aiProviderValues,
   cardTypeValues,
@@ -280,6 +285,41 @@ export const deckSynthesisQuerySchema = z.object({
 export const deckSynthesisPostSchema = z.object({
   days: z.number().int().min(META_WINDOW_MIN_DAYS).max(META_WINDOW_MAX_DAYS).optional(),
   language: z.enum(SYNTHESIS_LANGUAGE_VALUES).default('de'),
+  force: z.boolean().optional(),
+  apiKey: z.string().max(400).optional(),
+  provider: z.enum(aiProviderValues).optional(),
+  model: z.string().max(100).nullish(),
+});
+
+// ─── Archetype synthesis (Spec 10 Slice C) ─────────────────────────────────────
+
+/** The feature request asked for a 90-day window specifically (large offline
+ *  + online events need a wider net than the deck-synthesis default) — this
+ *  is its own constant, not META_WINDOW_DEFAULT_DAYS, so the two can diverge
+ *  without either route silently inheriting the other's tuning. */
+export const ARCHETYPE_SYNTHESIS_DEFAULT_DAYS = 90;
+
+/** Query for GET /api/analysis/archetype/:archetypeId — unlike deck
+ *  synthesis, `days` is NOT snapped (snapCardStatsWindow only applies to the
+ *  card-stats precomputation windows, which this route does not read). */
+export const archetypeSynthesisQuerySchema = z.object({
+  days: z.coerce
+    .number()
+    .int()
+    .min(META_WINDOW_MIN_DAYS)
+    .max(META_WINDOW_MAX_DAYS)
+    .default(ARCHETYPE_SYNTHESIS_DEFAULT_DAYS),
+  language: z.enum(SYNTHESIS_LANGUAGE_VALUES).default('de'),
+  scope: z.enum(ARCHETYPE_SYNTHESIS_SCOPE_VALUES).default('global'),
+});
+
+/** Body for POST /api/analysis/archetype/:archetypeId. `days` defaults to
+ *  ARCHETYPE_SYNTHESIS_DEFAULT_DAYS in the route (not here), same
+ *  omitted-vs-explicit-default reasoning as deckSynthesisPostSchema. */
+export const archetypeSynthesisPostSchema = z.object({
+  days: z.number().int().min(META_WINDOW_MIN_DAYS).max(META_WINDOW_MAX_DAYS).optional(),
+  language: z.enum(SYNTHESIS_LANGUAGE_VALUES).default('de'),
+  scope: z.enum(ARCHETYPE_SYNTHESIS_SCOPE_VALUES).default('global'),
   force: z.boolean().optional(),
   apiKey: z.string().max(400).optional(),
   provider: z.enum(aiProviderValues).optional(),
