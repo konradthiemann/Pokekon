@@ -629,10 +629,14 @@ export function MetaPage() {
       </p>
 
       <div className="space-y-3">
+        {/* Deliberately collapsed by default (unlike the other pre-existing
+            sections below) — the raw deck-vs-deck grid is dense and rarely
+            the first thing worth seeing; same explicit-false pattern as the
+            equilibrium section further down. */}
         <CollapsibleSection
           title={t('page.matchupMatrix')}
           icon={<Grid3X3 className="w-4 h-4 text-brand-700" />}
-          defaultOpen
+          defaultOpen={false}
         >
           <MatchupMatrix window={metaWindow} iconsById={iconsById} />
         </CollapsibleSection>

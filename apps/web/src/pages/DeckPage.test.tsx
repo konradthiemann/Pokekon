@@ -231,3 +231,37 @@ describe('DeckPage — Local Meta moved off the deck list (plan ui-ux-hub-rework
     expect(screen.queryByText('Local Meta')).not.toBeInTheDocument();
   });
 });
+
+// "My Matchups" moved here from OverviewPage: `archetypeStats` is aggregated
+// across ALL decks (db/queries.ts:247 `getOpponentLogs()` — "all logs for
+// global archetype stats"), not the active deck, so it sits next to the
+// deck switcher (deck-list level) rather than inside a per-deck tab — kept
+// distinct from DeckAnalyticsPanel's own `MatchupList`, which is scoped to
+// only the active deck's logs.
+describe('DeckPage — "My Matchups" (moved from Overview, deck-list level)', () => {
+  it('renders the "My Matchups" table next to the deck switcher, regardless of the active section', () => {
+    useTestStore.setState({
+      archetypeStats: [
+        {
+          archetype: 'Gardevoir',
+          encounters: 8,
+          wins: 5,
+          losses: 3,
+          ties: 0,
+          winRate: 62.5,
+          frequencyPct: 12,
+          metaWinRate: 50,
+          bo1EquivalentWinRate: 62.5,
+          bo1Games: 8,
+          bo3Games: 0,
+          unknownFormatGames: 0,
+        },
+      ],
+    });
+    render(<DeckPage />);
+    expect(screen.getByText('My Matchups')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /analytics/i }));
+    expect(screen.getByText('My Matchups')).toBeInTheDocument();
+  });
+});

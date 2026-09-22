@@ -197,16 +197,12 @@ describe('MetaPage — equilibrium section is collapsed by default (plan §4 ste
     expect(experimentalSection).toHaveAttribute('data-default-open', 'false');
   });
 
-  it('keeps the three pre-existing sections (matchup matrix, tournament meta, prediction) defaultOpen — their diff stays empty (AC 6)', async () => {
+  it('keeps tournament meta and prediction defaultOpen', async () => {
     render(<MetaPage />);
     await flushEffects();
 
     const sections = screen.getAllByTestId('collapsible-section');
-    const existingTitles = [
-      i18n.t('meta:page.matchupMatrix'),
-      i18n.t('meta:page.tournamentMeta'),
-      i18n.t('meta:prediction.title'),
-    ];
+    const existingTitles = [i18n.t('meta:page.tournamentMeta'), i18n.t('meta:prediction.title')];
 
     for (const titleText of existingTitles) {
       const section = sections.find((s) =>
@@ -217,6 +213,24 @@ describe('MetaPage — equilibrium section is collapsed by default (plan §4 ste
       expect(section, `expected a section titled "${titleText}"`).toBeDefined();
       expect(section).toHaveAttribute('data-default-open', 'true');
     }
+  });
+
+  // Deliberate, user-requested change (not a silent test tweak, tdd.md): the
+  // matchup matrix used to be defaultOpen like the other pre-existing
+  // sections (AC 6 above). It's now collapsed by default — the raw
+  // deck-vs-deck grid is dense and rarely the first thing worth seeing.
+  it('collapses the matchup matrix by default', async () => {
+    render(<MetaPage />);
+    await flushEffects();
+
+    const sections = screen.getAllByTestId('collapsible-section');
+    const matrixSection = sections.find((s) =>
+      (s.querySelector('[data-testid="collapsible-section-title"]')?.textContent ?? '').includes(
+        i18n.t('meta:page.matchupMatrix'),
+      ),
+    );
+    expect(matrixSection).toBeDefined();
+    expect(matrixSection).toHaveAttribute('data-default-open', 'false');
   });
 });
 
