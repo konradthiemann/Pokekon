@@ -856,3 +856,34 @@ than the raw rate: this is what stops a lucky 3-game 100 %-sample from outrankin
 display-only signal — it can show "this list won the event" even when the win-rate sample is
 too thin to rank it highly, but it never multiplies into the primary rank (that would let a
 single lucky top-8 with few games dominate, exactly the bias Spec 10 asks to avoid).
+
+### Personal-prior blending (Spec 10 Slice E — `@pokekon/shared/src/personalPriorBlend.ts`)
+
+Adjusts a cluster's global win rate (Slice B) toward the user's own track record — but only once
+there is enough of it to mean something. Not yet wired into any route or UI; a standalone,
+composable pure function, same shape as `fieldWinRate.ts`.
+
+```typescript
+interface PersonalPriorBlend {
+  blendedPct: number;          // the number to actually show
+  usedPersonalData: boolean;   // false => blendedPct === clusterWinRatePct, unchanged
+  ownWeight: number;           // 0 when unused; otherwise in (0, maxOwnWeight]
+  ownWinRatePct: number | null; // tie-weighted; null only with 0 personal games
+}
+```
+
+`blendWithPersonalPrior(clusterWinRatePct, { wins, losses, ties }, opts?)`: below
+`DEFAULT_MIN_OWN_GAMES` (5 — the same "not enough data" threshold `MyMatchupsTable` already uses
+for `encounters < 5`), personal data is ignored entirely and `blendedPct` passes the cluster rate
+through unchanged. Above that, `ownWeight = min(encounters / (encounters + globalSampleEquivalent),
+maxOwnWeight)` (defaults 20 and 0.7 respectively, both tunable and not yet validated against real
+usage data — spec "Offene Fragen") grows with the personal sample size but is capped: a personal
+record, however large, only ever reflects the opponents one pilot happened to face, not the whole
+field, so the global number always keeps some influence. Uses the tie-weighted win rate
+(`tournamentWinRatePct`, one implementation in the repo, reused verbatim) for the personal record,
+consistent with every other win-rate figure in the app.
+
+**Deliberate scope note:** the input is a generic `{ wins, losses, ties }` record, not the web
+app's `ArchetypeStats` type — `packages/shared` cannot depend on an `apps/web`-only type, and which
+concrete record a caller should pass (e.g. "my results piloting this archetype" vs "my results
+facing it") is an open design question for whoever wires this into a route/UI, not decided here.
