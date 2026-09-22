@@ -19,3 +19,4 @@ export * from './nashEquilibrium.js';
 export * from './deterministicRandom.js';
 export * from './deckSynthesis.js';
 export * from './decklistClustering.js';
+export * from './clusterRanking.js';
