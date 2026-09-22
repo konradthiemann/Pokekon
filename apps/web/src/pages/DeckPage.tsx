@@ -9,6 +9,7 @@ import { OpponentLog } from '../components/opponent/OpponentLog';
 import { AddLogModal } from '../components/opponent/AddLogModal';
 import { CollapsibleSection } from '../components/layout/CollapsibleSection';
 import { SidePanel } from '../components/deck/SidePanel';
+import { MyMatchupsTable } from '../components/meta/MyMatchupsTable';
 import { Settings2, BarChart2, List, Lightbulb, Plus, Copy, AlertTriangle } from 'lucide-react';
 
 // ─── Deck Settings ────────────────────────────────────────────────────────────
@@ -191,6 +192,7 @@ export function DeckPage() {
     refresh,
     deckSection,
     setDeckSection,
+    archetypeStats,
   } = useDashboardStore();
   const [showAddLogModal, setShowAddLogModal] = useState(false);
 
@@ -205,6 +207,14 @@ export function DeckPage() {
     <div className="space-y-4">
       {/* ── Deck selector (always visible) ──────────────────────────────── */}
       <DeckSwitcher />
+
+      {/* Moved from OverviewPage: `archetypeStats` is aggregated across ALL
+          decks (db/queries.ts `getArchetypeStats`), not just the active one,
+          so it belongs at deck-list level next to the switcher — not inside
+          a single deck's Analytics tab, where it would sit next to
+          DeckAnalyticsPanel's per-deck-scoped MatchupList and read as a
+          duplicate of it. */}
+      <MyMatchupsTable stats={archetypeStats} />
 
       {/* ── Selected-deck content area ──────────────────────────────────── */}
       {activeDeck ? (

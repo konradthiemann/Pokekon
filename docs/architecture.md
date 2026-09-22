@@ -197,9 +197,9 @@ graph TD
     OverviewPage --> StatCard
     OverviewPage --> MetaShareChart
     OverviewPage --> WinRateChart
-    OverviewPage --> MyMatchupsTable["MyMatchupsTable"]
 
     DeckPage --> DeckSwitcher
+    DeckPage --> MyMatchupsTable["MyMatchupsTable"]
     DeckPage --> DeckPanel
     DeckPage --> DeckAnalyticsPanel
     DeckPage --> DeckTipsSection

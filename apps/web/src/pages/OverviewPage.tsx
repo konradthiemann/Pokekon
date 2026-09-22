@@ -2,13 +2,11 @@ import { useTranslation } from 'react-i18next';
 import { tournamentWinRatePct } from '@pokekon/shared';
 import { useDashboardStore } from '../store/dashboardStore';
 import { StatCard } from '../components/layout/StatCard';
-import { MyMatchupsTable } from '../components/meta/MyMatchupsTable';
 import { PokemonIcon } from '../components/shared/PokemonIcon';
 
 export function OverviewPage() {
   const { t } = useTranslation('overview');
-  const { activeDeckId, activeDeck, deckCards, opponentLogs, metaSnapshots, archetypeStats } =
-    useDashboardStore();
+  const { activeDeckId, activeDeck, deckCards, opponentLogs, metaSnapshots } = useDashboardStore();
 
   const deckLogs = opponentLogs.filter((l) => l.deckId === activeDeckId);
   const totalGames = deckLogs.length;
@@ -111,8 +109,6 @@ export function OverviewPage() {
           </ul>
         </div>
       )}
-
-      <MyMatchupsTable stats={archetypeStats} />
     </div>
   );
 }

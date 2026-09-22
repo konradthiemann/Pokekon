@@ -5,6 +5,7 @@
 | Feature | Page | Triggered by |
 |---------|------|-------------|
 | Meta overview with charts | Overview | Auto on load |
+| My matchups (all decks combined) | Deck | Auto on load |
 | Live meta sync | Sidebar / Account Sheet | User clicks "Sync" |
 | Deck management (add, import, edit, delete) | Deck | User actions |
 | Deck versioning (snapshots) | Deck | User clicks "Snapshot" |
@@ -31,9 +32,10 @@ The default landing page shows four summary stat cards (overall win rate, games 
 
 - **Meta Share Chart** (`MetaShareChart`): A pie or bar chart showing the frequency distribution of archetypes from the latest `metaSnapshots`.
 - **Win Rate Chart** (`WinRateChart`): Compares the user's personal win rate against each archetype, on a **Bo1-equivalent** basis — Bo3 results are converted back to their single-game win rate (`bo3ToBo1WinRate`) and logs with no known match format are excluded from the number (shown as an excluded-games footnote) rather than folded in. Both this and the archetype's own tournament win rate weight a tie as a third of a win (`tournamentWinRatePct`, `@pokekon/shared`).
-- **Meta Table** (`MyMatchupsTable`): A sortable table of user's encounters against all archetypes with win/loss and meta frequency.
 
-Data source: Zustand store (`archetypeStats`, `metaSnapshots`). No API calls on this page.
+Data source: Zustand store (`metaSnapshots`). No API calls on this page.
+
+The `MyMatchupsTable` ("My Matchups") used to render here — it now lives on `DeckPage`, next to the deck switcher (see §3), since `archetypeStats` aggregates across **all** decks and doesn't belong to a single deck's per-tab content.
 
 ---
 
@@ -66,6 +68,8 @@ Runs **server-side** (`POST /api/meta/sync` → `apps/api/src/jobs/syncMeta.ts`,
 **Page:** `DeckPage` — "Deck List" section
 
 The app supports multiple decks. Each deck has an archetype (for Limitless matching), an archetype name (display), and a variant label.
+
+**My Matchups** (`MyMatchupsTable`, moved here from Overview — see §1): renders directly below the `DeckSwitcher`, **outside** the section tabs, so it stays visible regardless of the selected deck or tab. It shows `archetypeStats` — the user's personal win/loss/tie record against every archetype **aggregated across all decks** — and is deliberately distinct from `DeckAnalyticsPanel`'s `MatchupList` (§5/§10, Analytics tab), which is scoped to only the currently active deck's logs.
 
 **Operations available:**
 - **Create deck**: Via `CreateDeckModal` — enter name and variant
@@ -382,7 +386,7 @@ This data is **not persisted** — it lives only in Zustand's `recentTournaments
 
 ## 13. Matchup Matrix
 
-**Page:** `MetaPage` (collapsible section) — `MatchupMatrix` component
+**Page:** `MetaPage` (collapsible section, **collapsed by default** — unlike the Tournament Meta and Prediction sections below it) — `MatchupMatrix` component
 
 A head-to-head win-rate cross-table for the current Standard meta. Every cell that has any data shows its win rate — there is no hard sample-size cutoff (Spec 3, plan `confidence-aware-matchups.md`). Colour hue still encodes the win rate (green favorable, red unfavorable), but colour **intensity/opacity** now encodes confidence: a narrow 95 % Wilson interval (`@pokekon/shared`'s `matchupCellInterval`/`confidenceTier`, ≤10/20/35 percentage points wide) renders fully saturated, a wide one washed out. Each cell shows a small second line with its `low–high` band (0 decimals), and the tooltip states the full interval. The mirror diagonal is a documented special case: no band, no tier, plain win rate at reduced opacity — the bundled TrainerHill export double-counts mirror wins/losses (see below), so a Wilson interval over `wins+losses+ties` there would be wrong. The user-controlled **min-games filter** (1/10/20/50, still purely a display filter, never a model cutoff) now defaults to **1** instead of 10, so the view built to retire the cutoff doesn't keep hiding thin cells by default.
 
