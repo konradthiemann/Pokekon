@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { DEFAULT_MIN_TOURNAMENT_PLAYERS } from '@pokekon/shared';
 import { useDashboardStore } from '../store/dashboardStore';
 import {
   TrendingUp,
@@ -389,7 +390,7 @@ function RecentTournaments() {
   const { recentTournaments, isFetchingTournaments, tournamentsError, loadRecentTournaments } =
     useDashboardStore();
   const [days, setDays] = useState(7);
-  const [minPlayers, setMinPlayers] = useState(30);
+  const [minPlayers, setMinPlayers] = useState(DEFAULT_MIN_TOURNAMENT_PLAYERS);
   const [onlineOnly, setOnlineOnly] = useState(true);
 
   const handleFetch = () => loadRecentTournaments({ days, minPlayers, onlineOnly });
@@ -426,6 +427,11 @@ function RecentTournaments() {
               onChange={(e) => setMinPlayers(Number(e.target.value))}
               className="input px-3 py-1.5 text-sm"
             >
+              {/* Below-default options added (Spec 10 Slice G) so a smaller
+                  local scene can actually see its own tournaments — the
+                  filter used to only go up from 30, never down. */}
+              <option value={10}>10</option>
+              <option value={15}>15</option>
               <option value={30}>30</option>
               <option value={50}>50</option>
               <option value={100}>100</option>

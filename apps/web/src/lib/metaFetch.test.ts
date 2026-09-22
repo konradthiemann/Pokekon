@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { summarizeStandings } from './metaFetch';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { DEFAULT_MIN_TOURNAMENT_PLAYERS } from '@pokekon/shared';
+import { summarizeStandings, fetchRecentTournaments } from './metaFetch';
 
 // LimitlessStanding shape: { deck?: {id,name}, record: {wins,losses,ties}, placing: number|null }
 const rec = (wins: number, losses: number) => ({ wins, losses, ties: 0 });
@@ -62,5 +63,57 @@ describe('summarizeStandings', () => {
       { deck: { id: 'b', name: 'Gardevoir' }, record: rec(4, 2), placing: null },
     ]);
     expect(winnerArchetype).toBe('Charizard');
+  });
+});
+
+// Spec 10 Slice G: `fetchRecentTournaments` used to default `minPlayers` to
+// its own local literal (30), independent of `syncMeta.ts` (16) and
+// `MetaPage.tsx` (30) — three values with no shared source of truth. This
+// pins the new shared default end-to-end (not just the constant's value).
+function limitlessTournament(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: 't1',
+    name: 'Test Cup',
+    format: 'standard',
+    players: 20,
+    date: new Date().toISOString(),
+    organizerId: 1,
+    ...overrides,
+  };
+}
+
+describe('fetchRecentTournaments — shared min-player default (Spec 10 Slice G)', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/api/tournaments?')) {
+          return {
+            ok: true,
+            json: async () => [
+              limitlessTournament({ id: 'big', players: 20 }),
+              limitlessTournament({ id: 'small', players: 10 }),
+            ],
+          } as Response;
+        }
+        // Standings lookups for each eligible tournament — empty is fine,
+        // this test only cares about which tournaments pass the filter.
+        return { ok: true, json: async () => [] } as Response;
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it(`defaults to excluding tournaments below ${DEFAULT_MIN_TOURNAMENT_PLAYERS} players`, async () => {
+    const results = await fetchRecentTournaments({ onlineOnly: false });
+    expect(results.map((r) => r.id)).toEqual(['big']);
+  });
+
+  it('includes smaller tournaments when minPlayers is explicitly lowered', async () => {
+    const results = await fetchRecentTournaments({ minPlayers: 5, onlineOnly: false });
+    expect(results.map((r) => r.id).sort()).toEqual(['big', 'small']);
   });
 });
