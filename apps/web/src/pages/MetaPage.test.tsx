@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import i18n from '../i18n';
 import { MetaPage } from './MetaPage';
 import { getMetaEquilibrium } from '../lib/api';
@@ -197,16 +197,12 @@ describe('MetaPage — equilibrium section is collapsed by default (plan §4 ste
     expect(experimentalSection).toHaveAttribute('data-default-open', 'false');
   });
 
-  it('keeps the three pre-existing sections (matchup matrix, tournament meta, prediction) defaultOpen — their diff stays empty (AC 6)', async () => {
+  it('keeps tournament meta and prediction defaultOpen', async () => {
     render(<MetaPage />);
     await flushEffects();
 
     const sections = screen.getAllByTestId('collapsible-section');
-    const existingTitles = [
-      i18n.t('meta:page.matchupMatrix'),
-      i18n.t('meta:page.tournamentMeta'),
-      i18n.t('meta:prediction.title'),
-    ];
+    const existingTitles = [i18n.t('meta:page.tournamentMeta'), i18n.t('meta:prediction.title')];
 
     for (const titleText of existingTitles) {
       const section = sections.find((s) =>
@@ -217,6 +213,24 @@ describe('MetaPage — equilibrium section is collapsed by default (plan §4 ste
       expect(section, `expected a section titled "${titleText}"`).toBeDefined();
       expect(section).toHaveAttribute('data-default-open', 'true');
     }
+  });
+
+  // Deliberate, user-requested change (not a silent test tweak, tdd.md): the
+  // matchup matrix used to be defaultOpen like the other pre-existing
+  // sections (AC 6 above). It's now collapsed by default — the raw
+  // deck-vs-deck grid is dense and rarely the first thing worth seeing.
+  it('collapses the matchup matrix by default', async () => {
+    render(<MetaPage />);
+    await flushEffects();
+
+    const sections = screen.getAllByTestId('collapsible-section');
+    const matrixSection = sections.find((s) =>
+      (s.querySelector('[data-testid="collapsible-section-title"]')?.textContent ?? '').includes(
+        i18n.t('meta:page.matchupMatrix'),
+      ),
+    );
+    expect(matrixSection).toBeDefined();
+    expect(matrixSection).toHaveAttribute('data-default-open', 'false');
   });
 });
 
@@ -230,6 +244,28 @@ describe('MetaPage — renders the local-meta panel (plan §3.5, Slice C)', () =
     await flushEffects();
 
     expect(screen.getByText(i18n.t('deck:localMeta.title'))).toBeInTheDocument();
+  });
+});
+
+// Spec 10 Slice G (plan velvety-finding-bengio.md): the "Recent Tournaments"
+// min-players filter used to default to 30 (its own local literal, out of
+// sync with syncMeta.ts's 16) and could only be raised (30/50/100), never
+// lowered — so a user at a smaller local scene couldn't see tournaments
+// below 30 players at all.
+describe('MetaPage — Recent Tournaments min-players filter defaults to the shared constant (Spec 10 Slice G)', () => {
+  it('defaults to 15 and offers an option below the default', async () => {
+    render(<MetaPage />);
+    await flushEffects();
+
+    // The days select also has numeric options (3/7/14/30) that would collide
+    // with a plain option-text lookup — find the min-players select by its
+    // distinctive "100" option instead.
+    const minPlayersSelect = screen
+      .getAllByRole('combobox')
+      .find((el) => within(el).queryByRole('option', { name: '100' }));
+    expect(minPlayersSelect, 'expected to find the min-players select').toBeDefined();
+    expect(minPlayersSelect).toHaveValue('15');
+    expect(within(minPlayersSelect!).getByRole('option', { name: '10' })).toBeInTheDocument();
   });
 });
 

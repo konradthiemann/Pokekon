@@ -5,6 +5,7 @@ import {
   computeMatchupsFromPairings,
   computeMetaSnapshots,
   computeStandingMatchResults,
+  DEFAULT_MIN_TOURNAMENT_PLAYERS,
   isoWeekBounds,
   isoWeekLabel,
   isPostRotation,
@@ -398,7 +399,7 @@ export async function runMetaSync(
   // caps below simply yields fewer rows (never an error).
   const {
     days = 45,
-    minPlayers = 16,
+    minPlayers = DEFAULT_MIN_TOURNAMENT_PLAYERS,
     maxTournaments = 40,
     maxProbes = 60,
     onlineOnly = true,

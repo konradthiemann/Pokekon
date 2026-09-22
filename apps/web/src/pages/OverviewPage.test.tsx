@@ -98,3 +98,37 @@ describe('OverviewPage — meta works without personal logs (plan §3.8)', () =>
     expect(screen.queryByText(/works without/i)).not.toBeInTheDocument();
   });
 });
+
+// "My Matchups" moved to the Deck page (next to the deck switcher, since the
+// underlying `archetypeStats` is aggregated across ALL decks — not specific
+// to the active one, so it belongs at the deck-list level, not inside a
+// single deck's Overview).
+describe('OverviewPage — "My Matchups" moved off this page', () => {
+  it('does not render the "My Matchups" table anymore, even when archetype stats exist', () => {
+    storeState = {
+      activeDeckId: 1,
+      activeDeck: DECK,
+      deckCards: [],
+      opponentLogs: [],
+      metaSnapshots: [],
+      archetypeStats: [
+        {
+          archetype: 'Gardevoir',
+          encounters: 8,
+          wins: 5,
+          losses: 3,
+          ties: 0,
+          winRate: 62.5,
+          frequencyPct: 12,
+          metaWinRate: 50,
+          bo1EquivalentWinRate: 62.5,
+          bo1Games: 8,
+          bo3Games: 0,
+          unknownFormatGames: 0,
+        },
+      ],
+    };
+    render(<OverviewPage />);
+    expect(screen.queryByText('My Matchups')).not.toBeInTheDocument();
+  });
+});
