@@ -4,7 +4,8 @@
     "subtitle": "Live-Turnierdaten von Limitless TCG",
     "matchupMatrix": "Matchup-Matrix",
     "tournamentMeta": "Turnier-Meta",
-    "tournamentMetaCount": "Turnier-Meta ({{count}})"
+    "tournamentMetaCount": "Turnier-Meta ({{count}})",
+    "localMetaAndPrediction": "Lokales Meta & Prediction"
   },
   "window": {
     "lastDays": "Letzte Tage:",
