@@ -790,3 +790,49 @@ type SynthesisLanguage = 'de' | 'en';
 ```
 
 The output language for synthesis. Separate from the API's locale system; a user can request synthesis in either language regardless of their UI language.
+
+## Decklist Clustering Types (Spec 10 Slice A — `@pokekon/shared/src/decklistClustering.ts`)
+
+Two published tournament decklists that differ by only a tech swap or an energy count are the
+same list for ranking purposes — without merging them, they count as two independent, weaker
+data points instead of one stronger one. Pure functions, no I/O (same shape as
+`fieldWinRate.ts`). Not yet wired into any route or UI — this is the building block Slice B
+(ranking) and Slice C (best-list recommendation) compose on top of.
+
+### `DecklistOverlap`
+```typescript
+interface DecklistOverlap {
+  identicalCards: number;  // sum, per distinct card, of min(count in A, count in B)
+  overlapRatio: number;    // identicalCards / max(totalCardsA, totalCardsB)
+}
+```
+
+Returned by `computeDecklistOverlap(a, b)`. Card identity uses `normalizeCardName()`
+(`cardPerformance.ts`) as the join key — same normalisation already used to match tournament
+decklists against the user's own deck elsewhere in the codebase.
+
+### `ClusterableStanding` / `DecklistCluster`
+```typescript
+interface ClusterableStanding {
+  id: number;
+  decklist: TournamentDecklist;
+  wins: number; losses: number; ties: number;
+  placing: number | null;
+  totalPlayers: number | null;  // for placementPercentile() in Slice B
+}
+
+interface DecklistCluster {
+  representative: TournamentDecklist;  // first member's list encountered
+  memberStandingIds: number[];
+  totalWins: number; totalLosses: number; totalTies: number;
+  placements: { placing: number; totalPlayers: number }[];  // only members with BOTH values
+}
+```
+
+`clusterDecklists(standings, opts?)` greedily merges each standing into the first existing
+cluster whose representative overlaps it by at least `opts.minOverlapRatio` (default
+`DEFAULT_MIN_OVERLAP_RATIO = 55/60 ≈ 91.7 %`), or starts a new cluster. A cluster with a single
+member is kept as its own cluster, never forced into another — protects rare-but-strong lists
+("Nadel im Heuhaufen") from being diluted away by clustering. This is a greedy heuristic
+(O(n·clusters), not an exhaustive pairwise partition) — acceptable because clusters only need
+to be "close enough to pool as one data point", not perfectly optimal.
