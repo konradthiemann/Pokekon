@@ -857,6 +857,49 @@ display-only signal — it can show "this list won the event" even when the win-
 too thin to rank it highly, but it never multiplies into the primary rank (that would let a
 single lucky top-8 with few games dominate, exactly the bias Spec 10 asks to avoid).
 
+### Archetype-level synthesis (Spec 10 Slice C — `@pokekon/shared/src/deckSynthesis.ts`)
+
+Everything above (`SynthesisFact`, `validateSynthesis`, the anti-hallucination discipline) was
+built deck-scoped (Spec 8): `SynthesisContext.deckId` is non-optional, and `factsFromCardStats`'
+actionability rule is deck-relative ("in the deck" / "not in the deck"). Slice C adds a
+**parallel, archetype-scoped envelope** rather than forcing a fake `deckId` through the
+existing one — a ranked decklist cluster set has no single owning deck.
+
+```typescript
+interface ArchetypeSynthesisContext {
+  archetypeId: string;
+  archetypeName: string;
+  windowDays: number;
+  language: SynthesisLanguage;
+  scope: ArchetypeSynthesisScope;  // against the global meta, or the user's local-meta field
+}
+```
+
+`factsFromClusterRanking(clusters, opts?)` turns Slice B's `RankedCluster[]` into facts: one
+`clusterWinRate` fact per cluster (skipped when the cluster has 0 recorded games — nothing to
+write about), plus a `clusterPlacement` fact when the cluster has placement data. The label is
+derived from the representative decklist's key Pokémon (there is no separate "list name" at
+this layer). `assembleArchetypeSynthesis(validated, facts, context, meta)` mirrors
+`assembleSynthesis` exactly for the claims→sections grouping (both now call a shared private
+`buildSynthesisSections` helper, extracted so the two envelopes cannot silently diverge) but
+returns an `ArchetypeSynthesis` envelope instead of `DeckSynthesis`.
+
+`buildArchetypeSynthesisPrompts(facts, context)` is the archetype-level counterpart to
+`buildSynthesisPrompts` — **deliberately not sharing code** with it for the actual prompt text:
+this is safety-critical anti-hallucination wording (CLAUDE.md Golden Rule 6), so the two prompt
+builders stay independent rather than risk one's change silently altering the other's tested,
+in-prod behaviour. Same six mandatory rules, same JSON schema, same
+`{value}/{low}/{high}/{label}` placeholder discipline as the deck-level version; only the
+framing differs ("Archetyp: X, Bezug: die globale Meta / deine lokale Meta" instead of
+"Deck: X (variant)"), since there is no single deck at this level.
+
+**Wired into `GET`/`POST /api/analysis/archetype/:archetypeId`** (`apps/api/src/routes/analysis.ts`,
+mirrors the deck routes exactly — same BYOK/rate-limit/cache-short-circuit pattern), backed by the
+`archetype_synthesis` table (`docs/database.md`). `AnalysisProvider` gained a parallel
+`synthesizeArchetype()` method (`apps/api/src/ai/provider.ts`) rather than reusing `synthesize()`
+with a fake deck context — see `docs/features.md` for the route-level description, including the
+documented `scope` limitation.
+
 ### Personal-prior blending (Spec 10 Slice E — `@pokekon/shared/src/personalPriorBlend.ts`)
 
 Adjusts a cluster's global win rate (Slice B) toward the user's own track record — but only once

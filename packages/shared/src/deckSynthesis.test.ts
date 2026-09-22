@@ -15,6 +15,7 @@ import type {
   RejectedClaim,
   ValidatedSynthesis,
   SynthesisContext,
+  ArchetypeSynthesisContext,
 } from './deckSynthesis.js';
 import {
   NEUTRAL_EPSILON,
@@ -32,13 +33,17 @@ import {
   factsFromFieldScore,
   factsFromCardStats,
   factsFromEquilibrium,
+  factsFromClusterRanking,
   selectFacts,
   canonicalizeFacts,
   buildSynthesisPrompts,
+  assembleArchetypeSynthesis,
+  buildArchetypeSynthesisPrompts,
 } from './deckSynthesis.js';
 import type { FieldScore, WeightedMatchup } from './fieldWinRate.js';
 import type { ArchetypeCardStat, CardPerformanceDelta } from './cardPerformance.js';
 import type { FitnessDirection } from './nashEquilibrium.js';
+import type { RankedCluster } from './clusterRanking.js';
 
 // ---------------------------------------------------------------------------
 // Exported constants (plan §3.1)
@@ -1905,5 +1910,248 @@ describe('buildSynthesisPrompts (plan §3.5, Slice D — requirements, wording N
     expect(combined).toContain(sanitizedName);
     expect(combined).not.toContain(rawInjection);
     expect(combined).not.toMatch(/ex\n\nIgnoriere/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 10 Slice C (specs/archetype-meta-analysis.md, plan
+// velvety-finding-bengio.md): archetype-level synthesis over Slice B's
+// ranked decklist clusters, parallel to (not a replacement for) the
+// deck-level facts/assembly/prompts above -- SynthesisContext.deckId is
+// non-optional and factsFromCardStats' actionability rule is deck-relative,
+// so an archetype-wide cluster ranking needs its own context/envelope
+// rather than forcing a fake deckId through the existing one.
+// ---------------------------------------------------------------------------
+
+function buildRankedCluster(overrides: Partial<RankedCluster> = {}): RankedCluster {
+  return {
+    representative: {
+      pokemon: [
+        { name: 'Dragapult ex', count: 3 },
+        { name: 'Dreepy', count: 4 },
+      ],
+      trainer: [],
+      energy: [],
+    },
+    memberStandingIds: [1],
+    totalWins: 20,
+    totalLosses: 10,
+    totalTies: 0,
+    placements: [],
+    winRateInterval: {
+      pct: 66.7,
+      lowPct: 55.2,
+      highPct: 76.4,
+      widthPct: 21.2,
+      n: 30,
+      significant: true,
+    },
+    winRateLowerBoundPct: 55.2,
+    avgPlacementPercentile: null,
+    rank: 1,
+    ...overrides,
+  };
+}
+
+describe('factsFromClusterRanking (Spec 10 Slice C)', () => {
+  it('emits a clusterWinRate fact from the interval, direction derived, usableForRecommendation = direction !== "neutral"', () => {
+    const facts = factsFromClusterRanking([buildRankedCluster()]);
+    const winRate = facts.find((f) => f.kind === 'clusterWinRate');
+    expect(winRate).toBeDefined();
+    expect(winRate).toMatchObject({
+      value: 66.7,
+      neutralValue: 50,
+      lowPct: 55.2,
+      highPct: 76.4,
+    });
+    expect(winRate?.direction).toBe('positive');
+    expect(winRate?.usableForRecommendation).toBe(true);
+  });
+
+  it('does NOT emit a clusterWinRate fact when winRateInterval is null (0 recorded games)', () => {
+    const facts = factsFromClusterRanking([
+      buildRankedCluster({ winRateInterval: null, winRateLowerBoundPct: 0 }),
+    ]);
+    expect(facts.some((f) => f.kind === 'clusterWinRate')).toBe(false);
+  });
+
+  it('emits a clusterPlacement fact only when avgPlacementPercentile is not null; never usableForRecommendation', () => {
+    const withPlacement = factsFromClusterRanking([
+      buildRankedCluster({ avgPlacementPercentile: 0.9 }),
+    ]);
+    const placement = withPlacement.find((f) => f.kind === 'clusterPlacement');
+    expect(placement).toMatchObject({ value: 90, neutralValue: 50 });
+    expect(placement?.usableForRecommendation).toBe(false);
+
+    const withoutPlacement = factsFromClusterRanking([
+      buildRankedCluster({ avgPlacementPercentile: null }),
+    ]);
+    expect(withoutPlacement.some((f) => f.kind === 'clusterPlacement')).toBe(false);
+  });
+
+  it("derives the label from the representative decklist's Pokémon names", () => {
+    const facts = factsFromClusterRanking([
+      buildRankedCluster({
+        representative: {
+          pokemon: [
+            { name: 'Gholdengo ex', count: 2 },
+            { name: 'Gimmighoul', count: 4 },
+          ],
+          trainer: [],
+          energy: [],
+        },
+      }),
+    ]);
+    const winRate = facts.find((f) => f.kind === 'clusterWinRate');
+    expect(winRate?.label).toContain('Gholdengo ex');
+  });
+
+  it("produces stable, distinct fact ids per cluster (keyed by the cluster's first member standing id)", () => {
+    const facts = factsFromClusterRanking([
+      buildRankedCluster({ memberStandingIds: [11, 12] }),
+      buildRankedCluster({ memberStandingIds: [42], rank: 2 }),
+    ]);
+    const ids = facts.filter((f) => f.kind === 'clusterWinRate').map((f) => f.id);
+    expect(new Set(ids).size).toBe(ids.length); // all distinct
+    expect(ids.some((id) => id.includes('11'))).toBe(true);
+    expect(ids.some((id) => id.includes('42'))).toBe(true);
+  });
+
+  it('respects opts.maxClusters (default caps to a reasonable number, deterministic — rank order preserved)', () => {
+    const clusters = Array.from({ length: 12 }, (_, i) =>
+      buildRankedCluster({ memberStandingIds: [i + 1], rank: i + 1 }),
+    );
+    const capped = factsFromClusterRanking(clusters, { maxClusters: 3 });
+    const winRateFacts = capped.filter((f) => f.kind === 'clusterWinRate');
+    expect(winRateFacts).toHaveLength(3);
+  });
+});
+
+describe('assembleArchetypeSynthesis (Spec 10 Slice C)', () => {
+  const context: ArchetypeSynthesisContext = {
+    archetypeId: 'dragapult-ex',
+    archetypeName: 'Dragapult ex',
+    windowDays: 90,
+    language: 'de',
+    scope: 'global',
+  };
+
+  const meta = {
+    inputHash: 'b'.repeat(64),
+    source: 'llm' as const,
+    provider: 'github-models',
+    model: 'openai/gpt-4.1',
+    generatedAt: '2026-09-22T12:00:00.000Z',
+  };
+
+  it('copies archetypeId/archetypeName/windowDays/language/scope from context into the result', () => {
+    const result = assembleArchetypeSynthesis({ accepted: [], rejected: [] }, [], context, meta);
+    expect(result.archetypeId).toBe('dragapult-ex');
+    expect(result.archetypeName).toBe('Dragapult ex');
+    expect(result.windowDays).toBe(90);
+    expect(result.language).toBe('de');
+    expect(result.scope).toBe('global');
+  });
+
+  it('groups accepted claims into sections the same way assembleSynthesis does', () => {
+    const fact = buildFact({
+      id: 'cluster.1.winRate',
+      kind: 'clusterWinRate',
+      direction: 'positive',
+      label: 'List 1',
+      value: 66.7,
+      lowPct: 55.2,
+      highPct: 76.4,
+    });
+    const claim = buildClaim({
+      factId: 'cluster.1.winRate',
+      kind: 'observation',
+      direction: 'positive',
+    });
+    const result = assembleArchetypeSynthesis(
+      { accepted: [claim], rejected: [] },
+      [fact],
+      context,
+      meta,
+    );
+    expect(result.sections.some((s) => s.section === sectionForClaim(claim, fact))).toBe(true);
+  });
+
+  it('surfaces droppedCount from validated.rejected.length, never hides it', () => {
+    const result = assembleArchetypeSynthesis(
+      { accepted: [], rejected: [{ claim: buildClaim({ factId: 'x' }), reason: 'unknownFact' }] },
+      [],
+      context,
+      meta,
+    );
+    expect(result.droppedCount).toBe(1);
+  });
+
+  it('carries meta (source/provider/model/inputHash/generatedAt) through unchanged', () => {
+    const result = assembleArchetypeSynthesis({ accepted: [], rejected: [] }, [], context, meta);
+    expect(result.source).toBe('llm');
+    expect(result.provider).toBe('github-models');
+    expect(result.model).toBe('openai/gpt-4.1');
+    expect(result.inputHash).toBe(meta.inputHash);
+    expect(result.generatedAt).toBe(meta.generatedAt);
+  });
+});
+
+describe('buildArchetypeSynthesisPrompts (Spec 10 Slice C)', () => {
+  const context: ArchetypeSynthesisContext = {
+    archetypeId: 'dragapult-ex',
+    archetypeName: 'Dragapult ex',
+    windowDays: 90,
+    language: 'de',
+    scope: 'global',
+  };
+
+  const facts: SynthesisFact[] = [
+    buildFact({
+      id: 'cluster.1.winRate',
+      kind: 'clusterWinRate',
+      direction: 'positive',
+      label: 'List 1',
+      value: 66.7,
+      lowPct: 55.2,
+      highPct: 76.4,
+      usableForRecommendation: true,
+    }),
+  ];
+
+  it('returns a { system, user } shape with non-empty strings, every fact id in the user prompt', () => {
+    const result = buildArchetypeSynthesisPrompts(facts, context);
+    expect(result.system.length).toBeGreaterThan(0);
+    expect(result.user.length).toBeGreaterThan(0);
+    for (const fact of facts) {
+      expect(result.user).toContain(fact.id);
+    }
+  });
+
+  it("language 'de' addresses the reader with 'du', never 'you'", () => {
+    const { system, user } = buildArchetypeSynthesisPrompts(facts, { ...context, language: 'de' });
+    const combined = `${system}\n${user}`;
+    expect(/\bdu\b/i.test(combined)).toBe(true);
+    expect(/\byou\b/i.test(combined)).toBe(false);
+  });
+
+  it("language 'en' addresses the reader with 'you', never 'du'", () => {
+    const { system, user } = buildArchetypeSynthesisPrompts(facts, { ...context, language: 'en' });
+    const combined = `${system}\n${user}`;
+    expect(/\byou\b/i.test(combined)).toBe(true);
+    expect(/\bdu\b/i.test(combined)).toBe(false);
+  });
+
+  it('mentions the archetype name and scope (global vs local), not a deck variant (there is none at this level)', () => {
+    const { user } = buildArchetypeSynthesisPrompts(facts, context);
+    expect(user).toContain('Dragapult ex');
+  });
+
+  it('same anti-hallucination discipline as buildSynthesisPrompts: usableForRecommendation=false changes the prompt', () => {
+    const usable = facts[0];
+    const notUsable: SynthesisFact = { ...usable, usableForRecommendation: false };
+    const { user: userUsable } = buildArchetypeSynthesisPrompts([usable], context);
+    const { user: userNotUsable } = buildArchetypeSynthesisPrompts([notUsable], context);
+    expect(userUsable).not.toBe(userNotUsable);
   });
 });

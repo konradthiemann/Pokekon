@@ -2,7 +2,12 @@
 
 const KEYS = {
   localMeta: 'tcg-local-meta-v1',
+  /** Legacy key (Spec 10 Slice D): PredictionPanel used to keep a SECOND,
+   *  independent archetype list with its own weights here, duplicating
+   *  `localMeta` above. Read only by `migrateLocalMetaField()` below, never
+   *  written to again. */
   localMetaField: 'tcg-local-meta-field-v1',
+  localMetaWeightOverrides: 'tcg-local-meta-weight-overrides-v1',
   deckArchSlug: 'tcg-deck-arch-slug-v1',
   activeDeckId: 'tcg-active-deck-id-v3',
   bestOfHint: 'tcg-bestof-hint-dismissed-v1',
@@ -28,11 +33,49 @@ export interface LocalFieldEntry {
   weight: number;
 }
 
-export function getLocalMetaField(): LocalFieldEntry[] {
+/** Per-archetype weight override, keyed by archetypeId (Spec 10 Slice D).
+ *  `LocalMetaPanel`'s `localMeta: string[]` (archetype NAMES) is the single
+ *  source of truth for WHICH archetypes are in the local field; this map
+ *  only overrides individual weights away from their derived default
+ *  (online meta share) — not a second copy of the archetype list itself. */
+export function getLocalMetaWeightOverrides(): Record<string, number> {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(KEYS.localMetaField) ?? '[]');
-    if (!Array.isArray(raw)) return [];
-    return raw.filter(
+    const raw: unknown = JSON.parse(localStorage.getItem(KEYS.localMetaWeightOverrides) ?? '{}');
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
+    const out: Record<string, number> = {};
+    for (const [id, weight] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof weight === 'number' && Number.isFinite(weight)) out[id] = weight;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function setLocalMetaWeightOverrides(overrides: Record<string, number>): void {
+  localStorage.setItem(KEYS.localMetaWeightOverrides, JSON.stringify(overrides));
+}
+
+export interface MigratedLocalMetaField {
+  names: string[];
+  overrides: Record<string, number>;
+}
+
+/** One-time migration off the legacy, duplicated `tcg-local-meta-field-v1`
+ *  key (Spec 10 Slice D). Always deletes the legacy key when present (so
+ *  this runs at most once per browser, even for malformed legacy data);
+ *  returns null when there is nothing usable to migrate, otherwise the
+ *  extracted archetype names (to fold into `localMeta`) and per-archetype
+ *  weight overrides (to fold into `getLocalMetaWeightOverrides()`'s map). */
+export function migrateLocalMetaField(): MigratedLocalMetaField | null {
+  const raw = localStorage.getItem(KEYS.localMetaField);
+  if (raw === null) return null;
+  localStorage.removeItem(KEYS.localMetaField);
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const entries = parsed.filter(
       (e): e is LocalFieldEntry =>
         typeof e === 'object' &&
         e !== null &&
@@ -41,13 +84,14 @@ export function getLocalMetaField(): LocalFieldEntry[] {
         typeof (e as LocalFieldEntry).weight === 'number' &&
         Number.isFinite((e as LocalFieldEntry).weight),
     );
+    if (entries.length === 0) return null;
+    return {
+      names: entries.map((e) => e.name),
+      overrides: Object.fromEntries(entries.map((e) => [e.archetypeId, e.weight])),
+    };
   } catch {
-    return [];
+    return null;
   }
-}
-
-export function setLocalMetaField(field: LocalFieldEntry[]): void {
-  localStorage.setItem(KEYS.localMetaField, JSON.stringify(field));
 }
 
 export function getDeckArchSlug(): string {

@@ -16,6 +16,7 @@
 | Deck comparison vs. tournament lists | Deck → Tips | User triggers |
 | Data-driven recommendations | Deck → Tips | Auto on data change |
 | Deck synthesis (KI-text über aggregierte Daten) | Deck → Tips | User triggers |
+| Archetype synthesis (ranked decklist clusters, KI-text) | API only, no UI yet | `POST /api/analysis/archetype/:archetypeId` |
 | Local meta priority | Deck / Meta | User configures |
 | Recent tournaments view | Meta | User triggers |
 | Matchup matrix | Meta | Auto from meta data |
@@ -358,14 +359,16 @@ future prediction-focused feature, not this one.
 
 ## 11. Local Meta Configuration
 
-**Page:** `DeckPage` — Deck List section, "Local Meta" side panel
+**Page:** `MetaPage` — inside the merged "Local Meta & Prediction" section (§16) — `LocalMetaPanel` component
 
 Users can tag archetypes as frequently played at their local store. This affects the recommendations engine:
 - Tech suggestions for these matchups are always `high` priority
 - Archetypes in local meta with no logged games generate "Log matches" warnings
 - Local meta archetypes bypass the 8% meta frequency threshold for zero-win alerts
 
-Persisted to `localStorage` as `tcg-local-meta-v1`.
+Persisted to `localStorage` as `tcg-local-meta-v1`. Since Spec 10 Slice D this list is also the
+**single source of truth** for §16's Local-Meta Prediction field — Prediction no longer keeps its
+own, independent archetype list.
 
 ---
 
@@ -390,7 +393,7 @@ This data is **not persisted** — it lives only in Zustand's `recentTournaments
 
 ## 13. Matchup Matrix
 
-**Page:** `MetaPage` (collapsible section, **collapsed by default** — unlike the Tournament Meta and Prediction sections below it) — `MatchupMatrix` component
+**Page:** `MetaPage` (collapsible section, **collapsed by default** — unlike the Tournament Meta section below it) — `MatchupMatrix` component
 
 A head-to-head win-rate cross-table for the current Standard meta. Every cell that has any data shows its win rate — there is no hard sample-size cutoff (Spec 3, plan `confidence-aware-matchups.md`). Colour hue still encodes the win rate (green favorable, red unfavorable), but colour **intensity/opacity** now encodes confidence: a narrow 95 % Wilson interval (`@pokekon/shared`'s `matchupCellInterval`/`confidenceTier`, ≤10/20/35 percentage points wide) renders fully saturated, a wide one washed out. Each cell shows a small second line with its `low–high` band (0 decimals), and the tooltip states the full interval. The mirror diagonal is a documented special case: no band, no tier, plain win rate at reduced opacity — the bundled TrainerHill export double-counts mirror wins/losses (see below), so a Wilson interval over `wins+losses+ties` there would be wrong. The user-controlled **min-games filter** (1/10/20/50, still purely a display filter, never a model cutoff) now defaults to **1** instead of 10, so the view built to retire the cutoff doesn't keep hiding thin cells by default.
 
@@ -434,13 +437,15 @@ The overview Meta Table **is** the day-window field analysis itself (`GET /api/m
 
 ---
 
-## 16. Local-Meta Prediction
+## 16. Local Meta & Prediction
 
-**Page:** `MetaPage` → "Prediction" section (`PredictionPanel` component)
+**Page:** `MetaPage` → "Local Meta & Prediction" section, **collapsed by default** — one merged `CollapsibleSection` containing `LocalMetaPanel` (§11, archetype picker) followed by `PredictionPanel`.
 
-Answers "what should I play at *my* local event?". The user builds the field they expect at their local Bo1 tournament — **seedable in one click from the current online meta** (the whole premise: online Bo1 ≈ local Bo1), then editable (add/remove archetypes, adjust weights).
+Answers "what should I play at *my* local event?". Spec 10 Slice D/F merged what used to be two separate sections with two independent ways to manage "which decks do I expect locally" — a documented user complaint ("beide zu ähnlich... man braucht nicht beides", `specs/archetype-meta-analysis.md`). `LocalMetaPanel`'s `localMeta` list (§11) is now the **only** place to add/remove archetypes from the local field; `PredictionPanel` derives its field directly from that list and only adds a per-archetype **weight**.
 
-**Field editor:** The local field table is **collapsible** (header button, `aria-expanded`) so it does not dominate the panel once configured. Each archetype row has an accessible **QuantityStepper** (−/+ buttons + numeric spinbutton, clamped to [0, 99]) to set its relative weight; the live share % is computed and shown beside it. Weights are normalised to shares and fed into the **same** `computeFieldScores` engine (`@pokekon/shared`) as the online field analysis, so every deck in the field gets an expected win rate against that custom field (share × matchup WR, mirror 50 %, coverage shown).
+**Weights:** default to the archetype's current online meta share (`seedWeight`, rounded, min 1); a per-archetype override is stored separately (`tcg-local-meta-weight-overrides-v1`, keyed by archetype id) and takes precedence when set. "Seed from online meta" now populates the **shared** `localMeta` list itself (not a second copy) and resets all overrides back to their online-share defaults. Each row's weight is set via an accessible **QuantityStepper** (−/+ buttons + numeric spinbutton, clamped to [0, 99]); the live share % is computed and shown beside it. Weights are normalised to shares and fed into the **same** `computeFieldScores` engine (`@pokekon/shared`) as the online field analysis, so every deck in the field gets an expected win rate against that custom field (share × matchup WR, mirror 50 %, coverage shown).
+
+**Legacy migration:** before Slice D, `PredictionPanel` kept its own independent list at `tcg-local-meta-field-v1`. On first render after the update, any such legacy data is folded once into `localMeta` (missing names added) and the weight-override map (weights carried over), then the legacy key is deleted — a normal browser reload never sees it again.
 
 **Deck perspective:** Instead of a count-ordered ranking list, a **deck-perspective picker** (a `<select>` ordered by descending field win rate) lets the user choose which deck to evaluate against the field. Above the picker a **best-positioned headline** (Trophy icon) always names the deck with the highest field WR, its score **and its 95 % confidence band** (Spec 3 — `computeFieldScores` propagates the same Wilson-interval error propagation here as it does server-side, since `PredictionPanel` calls it client-side with the fetched `MatchupRow[]`), so the answer is visible at a glance without opening the dropdown.
 
@@ -448,7 +453,7 @@ When a deck is selected the panel shows its field-score and weighted threats/fre
 
 **Per-list drill-down:** Each suggested list has a collapsible "Why?" toggle. Expanding it renders `ListFieldPerformance`, which shows that list's **real game-by-game W/L vs every deck in the local field** — drawn from `StandingMatchResult[]` on `entry.matchResults` (tournament round pairings, see §2). Results are grouped by opponent with a W-L record and per-game chips colour-coded like the match log (green win / red loss / amber tie), sorted with the best matchups first. If pairings have not been synced for that event the component renders an empty-state message; it never fabricates results.
 
-Runs **entirely client-side** over the windowed matchup matrix (`getMetaMatchups` → `GET /api/meta/matchups`) — no extra server round-trip beyond the initial fetch — and the field persists in `localStorage` (`tcg-local-meta-field-v1`). The matchup matrix is the real online-Bo1 blend (own data + TrainerHill fallback), flagged with a source note showing real vs approximate coverage.
+Runs **entirely client-side** over the windowed matchup matrix (`getMetaMatchups` → `GET /api/meta/matchups`) — no extra server round-trip beyond the initial fetch. The matchup matrix is the real online-Bo1 blend (own data + TrainerHill fallback), flagged with a source note showing real vs approximate coverage.
 
 ---
 
@@ -533,6 +538,40 @@ Combines three data sources into a closed set of structured **facts** (each with
 | Weighted matchups | Per-opponent `winRatePct`, band, meta share | `matchup.*` facts |
 | Card performance deltas (Spec 5) | `deltaPp`, tier, band, in-deck status | `card.*` facts |
 | Equilibrium signals (Spec 6, optional) | Weight, gap, trend, fitness delta | `equilibrium.*` facts |
+
+---
+
+## 20. Archetype Synthesis (Spec 10 Slice C — API only, no UI yet)
+
+**Route:** `GET`/`POST /api/analysis/archetype/:archetypeId` (`apps/api/src/routes/analysis.ts`)
+
+Archetype-level counterpart to Deck Synthesis (§19) — instead of one user's deck, it synthesizes
+over an archetype's **ranked decklist clusters** (Spec 10 Slice A: near-identical published
+tournament lists merged into one data point; Slice B: ranked by Wilson-score lower bound of the
+tie-weighted win rate, so a lucky small sample can't outrank a proven large one). Reuses the exact
+Spec 8 anti-hallucination gate (`validateSynthesis`) — a claim must reference a real fact id and
+declare a matching `direction`, same as Deck Synthesis.
+
+**No ownership check** (unlike the deck route): archetype data isn't user-owned. An archetype with
+no standings in the window simply returns an empty cluster list, not a 404.
+
+**`scope: 'global' | 'local'`** distinguishes a run against the global meta from one against the
+user's local-meta field — separate cache rows, separate LLM calls (a `'local'` row is tied to the
+requesting user; a `'global'` row is shared across all users). **Known, documented MVP
+limitation:** both scopes currently rank the exact same clusters — `scope` only changes the
+prompt's framing text so far. Real field-reweighting for `'local'` needs a per-opponent-archetype
+breakdown per cluster, which is Slice D's job (see `specs/archetype-meta-analysis.md`).
+
+**Data source:** `tournament_standings` joined to `tournaments`, filtered to the archetype, the
+online-Bo1 window (same scope as every other meta read), and `players >= DEFAULT_MIN_TOURNAMENT_PLAYERS`
+(Spec 10 Slice G, currently 15) — unrepresentative small events don't feed the ranking.
+
+**Caching:** `archetype_synthesis` table (`docs/database.md`), keyed by
+`(archetypeId, scope[+userId for local], windowDays, language)`, same input-hash mechanism as
+`deck_synthesis`.
+
+**Not yet surfaced in the UI** — this slice is the API plumbing only; a UI (e.g. on the archetype
+drilldown, §15) is a follow-up.
 
 ---
 

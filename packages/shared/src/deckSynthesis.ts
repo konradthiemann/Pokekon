@@ -4,6 +4,7 @@
 // no I/O, same shape as fieldWinRate.ts / cardPerformance.ts.
 import { normalizeCardName } from './cardPerformance.js';
 import type { ArchetypeCardStat } from './cardPerformance.js';
+import type { RankedCluster } from './clusterRanking.js';
 import type { FieldScore, WeightedMatchup } from './fieldWinRate.js';
 import type { FitnessDirection } from './nashEquilibrium.js';
 
@@ -38,6 +39,8 @@ export const SYNTHESIS_FACT_KINDS = [
   'equilibriumWeight', // Nash-Gewicht des eigenen Archetyps, neutral = sharePct
   'equilibriumGap', // paradoxGapPp, neutral = 0, INVERTIERT
   'equilibriumTrend', // fitnessDeltaPp, neutral = 0
+  'clusterWinRate', // Spec 10 Slice C: Wilson-Interval einer Decklist-Cluster-WinRate, neutral = 50
+  'clusterPlacement', // Spec 10 Slice C: mittleres placementPercentile*100 eines Clusters, neutral = 50, bandlos
 ] as const;
 export type SynthesisFactKind = (typeof SYNTHESIS_FACT_KINDS)[number];
 
@@ -45,6 +48,16 @@ export type FactDirection = 'positive' | 'negative' | 'neutral';
 
 export const SYNTHESIS_LANGUAGE_VALUES = ['de', 'en'] as const;
 export type SynthesisLanguage = (typeof SYNTHESIS_LANGUAGE_VALUES)[number];
+
+/** Spec 10 Slice C: whether an archetype synthesis run was computed against
+ *  the global meta or the user's local-meta field. NOTE (Slice C MVP,
+ *  deliberate, documented limitation): scope currently only changes the
+ *  PROMPT FRAMING, not the ranking itself -- both scopes rank the exact same
+ *  clusters until Slice D adds per-opponent-archetype field-reweighting
+ *  (RankedCluster only carries an aggregate W/L/T today, not a
+ *  per-matchup breakdown). See specs/archetype-meta-analysis.md Slice D. */
+export const ARCHETYPE_SYNTHESIS_SCOPE_VALUES = ['global', 'local'] as const;
+export type ArchetypeSynthesisScope = (typeof ARCHETYPE_SYNTHESIS_SCOPE_VALUES)[number];
 
 // ---------------------------------------------------------------------------
 // 3.1 -- types
@@ -491,6 +504,35 @@ export function assembleSynthesis(
     generatedAt: string;
   },
 ): DeckSynthesis {
+  return {
+    deckId: context.deckId,
+    archetypeId: context.archetypeId,
+    archetypeName: context.archetypeName,
+    windowDays: context.windowDays,
+    language: context.language,
+    promptVersion: SYNTHESIS_PROMPT_VERSION,
+    sections: buildSynthesisSections(validated, facts),
+    claims: validated.accepted,
+    facts,
+    context,
+    droppedCount: validated.rejected.length,
+    source: meta.source,
+    provider: meta.provider,
+    model: meta.model,
+    inputHash: meta.inputHash,
+    generatedAt: meta.generatedAt,
+  };
+}
+
+/** Groups accepted claims into their derived sections (sectionForClaim),
+ *  rendered and capped at MAX_SECTION_SENTENCES -- the part of assembly that
+ *  does not depend on whether the envelope is deck- or archetype-scoped.
+ *  Shared by assembleSynthesis and assembleArchetypeSynthesis (Spec 10 Slice
+ *  C) so the two envelopes cannot silently diverge in how they group claims. */
+function buildSynthesisSections(
+  validated: ValidatedSynthesis,
+  facts: SynthesisFact[],
+): SynthesisSectionBlock[] {
   const factsById = new Map(facts.map((fact) => [fact.id, fact]));
 
   const sentencesBySection = new Map<SynthesisSection, string[]>();
@@ -516,15 +558,68 @@ export function assembleSynthesis(
       sections.push({ section, sentences: sentences.slice(0, MAX_SECTION_SENTENCES) });
     }
   }
+  return sections;
+}
 
+/** Archetype-level counterpart to SynthesisContext (Spec 10 Slice C) -- no
+ *  deckId/variant, since this describes an archetype across many pilots'
+ *  lists, not one user's single deck. `scope` distinguishes a synthesis run
+ *  against the global meta from one against the user's local-meta field
+ *  (same shape, different input clusters -- see specs/archetype-meta-analysis.md). */
+export interface ArchetypeSynthesisContext {
+  archetypeId: string;
+  archetypeName: string; // sanitizeFactLabel()-behandelt
+  windowDays: number;
+  language: SynthesisLanguage;
+  scope: ArchetypeSynthesisScope;
+}
+
+export interface ArchetypeSynthesis {
+  archetypeId: string;
+  archetypeName: string;
+  windowDays: number;
+  language: SynthesisLanguage;
+  scope: ArchetypeSynthesisScope;
+  promptVersion: number;
+  sections: SynthesisSectionBlock[];
+  claims: SynthesisClaim[];
+  facts: SynthesisFact[];
+  context: ArchetypeSynthesisContext;
+  droppedCount: number;
+  source: DeckSynthesisSource;
+  provider: string | null;
+  model: string | null;
+  inputHash: string;
+  generatedAt: string; // ISO
+}
+
+/** Pure assembly, archetype-scoped (Spec 10 Slice C) -- structurally
+ *  identical to assembleSynthesis (same buildSynthesisSections call), only
+ *  the envelope fields differ. A deliberately separate function rather than
+ *  a deckId-faking call into assembleSynthesis: SynthesisContext.deckId is
+ *  non-optional and DeckSynthesis.deckId is derived from it, so reusing
+ *  either would mean inventing a fake deck id for something that is not a
+ *  deck. */
+export function assembleArchetypeSynthesis(
+  validated: ValidatedSynthesis,
+  facts: SynthesisFact[],
+  context: ArchetypeSynthesisContext,
+  meta: {
+    inputHash: string;
+    source: DeckSynthesisSource;
+    provider: string | null;
+    model: string | null;
+    generatedAt: string;
+  },
+): ArchetypeSynthesis {
   return {
-    deckId: context.deckId,
     archetypeId: context.archetypeId,
     archetypeName: context.archetypeName,
     windowDays: context.windowDays,
     language: context.language,
+    scope: context.scope,
     promptVersion: SYNTHESIS_PROMPT_VERSION,
-    sections,
+    sections: buildSynthesisSections(validated, facts),
     claims: validated.accepted,
     facts,
     context,
@@ -891,6 +986,77 @@ export function factsFromEquilibrium(
   return facts;
 }
 
+/** Derives a human-readable label for a ranked cluster from its
+ *  representative decklist's most notable Pokémon (up to 2, joined) --
+ *  there is no separate "list name" at this data layer, so the deck's own
+ *  key Pokémon is the most informative stand-in (distinguishes e.g. a
+ *  Dusknoir vs. a Noivern build of the same archetype). */
+function clusterLabel(cluster: RankedCluster): string {
+  const names = cluster.representative.pokemon.slice(0, 2).map((p) => p.name);
+  return sanitizeFactLabel(names.length > 0 ? names.join(' / ') : 'Unknown list');
+}
+
+/** Facts from Slice B's ranked decklist clusters (Spec 10 Slice C,
+ *  specs/archetype-meta-analysis.md) -- the archetype-level counterpart to
+ *  factsFromFieldScore/factsFromCardStats/factsFromEquilibrium above. One
+ *  'clusterWinRate' fact per cluster (skipped when the cluster has 0
+ *  recorded games -- winRateInterval is null, nothing to write about) plus
+ *  one 'clusterPlacement' fact when the cluster has placement data. Clusters
+ *  are consumed in their given (already Slice-B-ranked) order; `maxClusters`
+ *  caps how many are turned into facts at all, mirroring
+ *  factsFromFieldScore's maxThreats/maxFreeWins pattern. */
+export function factsFromClusterRanking(
+  clusters: RankedCluster[],
+  opts?: { maxClusters?: number },
+): SynthesisFact[] {
+  const maxClusters = opts?.maxClusters ?? 8;
+  const facts: SynthesisFact[] = [];
+
+  for (const cluster of clusters.slice(0, maxClusters)) {
+    const label = clusterLabel(cluster);
+    const idBase = `cluster.${cluster.memberStandingIds[0]}`;
+
+    if (cluster.winRateInterval) {
+      const { pct, lowPct, highPct } = cluster.winRateInterval;
+      const direction = deriveFactDirection({ value: pct, neutralValue: 50, lowPct, highPct });
+      facts.push({
+        id: `${idBase}.winRate`,
+        kind: 'clusterWinRate',
+        label,
+        value: pct,
+        unit: 'pct',
+        neutralValue: 50,
+        lowPct,
+        highPct,
+        direction,
+        significant: bandExcludesNeutral(lowPct, highPct, 50),
+        usableForRecommendation: direction !== 'neutral',
+        entityNames: [],
+      });
+    }
+
+    if (cluster.avgPlacementPercentile !== null) {
+      const value = cluster.avgPlacementPercentile * 100;
+      facts.push({
+        id: `${idBase}.placement`,
+        kind: 'clusterPlacement',
+        label,
+        value,
+        unit: 'pct',
+        neutralValue: 50,
+        lowPct: null,
+        highPct: null,
+        direction: deriveFactDirection({ value, neutralValue: 50, lowPct: null, highPct: null }),
+        significant: false,
+        usableForRecommendation: false,
+        entityNames: [],
+      });
+    }
+  }
+
+  return facts;
+}
+
 /** The subset of apps/api's EquilibriumArchetypeRow (equilibriumData.ts:6-29)
  *  that fact production needs. Declared independently here rather than
  *  imported -- packages/shared is browser-safe and does not depend on
@@ -1025,6 +1191,8 @@ const SYNTHESIS_FACT_KIND_LABELS_DE: Record<SynthesisFactKind, string> = {
   equilibriumWeight: 'Nash-Gewicht',
   equilibriumGap: 'Abweichung vom Nash-Gewicht',
   equilibriumTrend: 'Formtrend',
+  clusterWinRate: 'Gewinnrate einer Deckliste',
+  clusterPlacement: 'durchschnittliche Turnier-Platzierung einer Deckliste',
 };
 
 const SYNTHESIS_FACT_KIND_LABELS_EN: Record<SynthesisFactKind, string> = {
@@ -1036,6 +1204,8 @@ const SYNTHESIS_FACT_KIND_LABELS_EN: Record<SynthesisFactKind, string> = {
   equilibriumWeight: 'Nash weight',
   equilibriumGap: 'gap versus the Nash weight',
   equilibriumTrend: 'form trend',
+  clusterWinRate: 'a decklist’s win rate',
+  clusterPlacement: 'a decklist’s average tournament placement',
 };
 
 /**
@@ -1096,6 +1266,82 @@ ${factLines}
 
 Schreibe deine Aussagen jetzt als JSON gemäß dem Schema aus der Systemanweisung.`
     : `Deck: ${context.archetypeName} (${context.variant}), window ${context.windowDays} days.
+
+Facts (use each id as factId):
+${factLines}
+
+Now write your statements as JSON per the schema from the system instructions.`;
+
+  return { system, user };
+}
+
+/**
+ * Archetype-level counterpart to buildSynthesisPrompts (Spec 10 Slice C).
+ * Deliberately NOT sharing code with buildSynthesisPrompts (rather than
+ * extracting the anti-hallucination rules text into a shared helper): this
+ * is safety-critical wording (CLAUDE.md Golden Rule 6, "dürfen nicht
+ * aufgeweicht werden") -- keeping the two prompt builders independent means
+ * a change to one can never silently alter the other's tested, in-prod
+ * behaviour. Same six mandatory rules, same JSON schema, same
+ * {value}/{low}/{high}/{label} placeholder discipline; only the framing
+ * (archetype + scope, not "Deck: X (variant)") differs, since there is no
+ * single deck at this level -- it's one archetype's ranked decklist
+ * clusters, either against the global meta or the user's local field.
+ */
+export function buildArchetypeSynthesisPrompts(
+  facts: SynthesisFact[],
+  context: ArchetypeSynthesisContext,
+): { system: string; user: string } {
+  const isDe = context.language === 'de';
+  const kindLabels = isDe ? SYNTHESIS_FACT_KIND_LABELS_DE : SYNTHESIS_FACT_KIND_LABELS_EN;
+
+  const system = isDe
+    ? `Du bist ein Pokémon-TCG-Meta-Analyst. Du schreibst kurze, belegte Aussagen über einen Deck-Archetyp, ausschließlich auf Basis der dir unten gegebenen Fakten-Liste.
+
+PFLICHTREGELN ZUR VERMEIDUNG VON HALLUZINATIONEN:
+1. Schreibe NUR über die gelisteten Fakten, genau ein factId pro Aussage.
+2. Schreibe NIEMALS eine Zahl in den Text. Nutze ausschließlich die Platzhalter {value}, {low}, {high}, {label}.
+3. Die "direction" deiner Aussage muss exakt der angegebenen direction des Fakts entsprechen.
+4. Eine Aussage vom kind "recommendation" ist nur für Fakten mit usableForRecommendation: true erlaubt.
+5. Bist du dir unsicher: die Aussage weglassen statt zu spekulieren.
+6. Der Leser kennt diesen Archetyp nicht -- keine internen Abkürzungen, erkläre Fachbegriffe einmal in einfachen Worten.
+Antworte ausschließlich mit validem JSON im Schema { "claims": [ { "factId": "...", "kind": "observation"|"recommendation", "direction": "positive"|"negative"|"neutral", "text": "..." } ] }, ohne Markdown-Codeblöcke oder Erklärungen.`
+    : `You are a Pokémon TCG meta analyst. You write short, evidence-based statements about a deck archetype, based exclusively on the fact list given to you below.
+
+MANDATORY RULES TO AVOID HALLUCINATIONS:
+1. Write ONLY about the listed facts, exactly one factId per statement.
+2. NEVER write a number in the text. Use only the placeholders {value}, {low}, {high}, {label}.
+3. The "direction" of your statement must exactly match the fact's stated direction.
+4. A statement of kind "recommendation" is only allowed for facts with usableForRecommendation: true.
+5. When unsure: omit the statement instead of speculating.
+6. The reader does not know this archetype -- no internal abbreviations, explain jargon once in plain words.
+Answer with valid JSON only, in the schema { "claims": [ { "factId": "...", "kind": "observation"|"recommendation", "direction": "positive"|"negative"|"neutral", "text": "..." } ] }, without markdown code fences or explanations.`;
+
+  const factLines = facts
+    .map((fact) => {
+      const kindLabel = kindLabels[fact.kind];
+      return isDe
+        ? `- id: ${fact.id} | Art: ${kindLabel} | Bezeichnung: ${fact.label} | direction: ${fact.direction} | usableForRecommendation: ${fact.usableForRecommendation}`
+        : `- id: ${fact.id} | kind: ${kindLabel} | label: ${fact.label} | direction: ${fact.direction} | usableForRecommendation: ${fact.usableForRecommendation}`;
+    })
+    .join('\n');
+
+  const scopeLabel = isDe
+    ? context.scope === 'local'
+      ? 'deine lokale Meta'
+      : 'die globale Meta'
+    : context.scope === 'local'
+      ? 'your local meta'
+      : 'the global meta';
+
+  const user = isDe
+    ? `Archetyp: ${context.archetypeName}, Zeitfenster ${context.windowDays} Tage, Bezug: ${scopeLabel}.
+
+Fakten (jede id ist als factId zu verwenden):
+${factLines}
+
+Schreibe deine Aussagen jetzt als JSON gemäß dem Schema aus der Systemanweisung.`
+    : `Archetype: ${context.archetypeName}, window ${context.windowDays} days, scope: ${scopeLabel}.
 
 Facts (use each id as factId):
 ${factLines}

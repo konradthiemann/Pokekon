@@ -1,9 +1,15 @@
 import { and, eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
-import { assembleSynthesis, SYNTHESIS_PROMPT_VERSION } from '@pokekon/shared';
+import {
+  assembleArchetypeSynthesis,
+  assembleSynthesis,
+  SYNTHESIS_PROMPT_VERSION,
+} from '@pokekon/shared';
 import { AnalysisError, getAnalysisProvider } from '../ai/index.js';
 import { decks, deckCards, userAiSettings, type AiProvider } from '../db/schema.js';
 import { decryptSecret, encryptSecret } from '../lib/crypto.js';
+import { buildArchetypeSynthesisFactSet } from '../lib/archetypeSynthesisFacts.js';
+import { loadArchetypeSynthesis, saveArchetypeSynthesis } from '../lib/archetypeSynthesisStore.js';
 import { loadDeckSynthesis, saveDeckSynthesis } from '../lib/deckSynthesisStore.js';
 import { rateLimit } from '../lib/rateLimit.js';
 import { buildSynthesisFactSet, synthesisInputHash } from '../lib/synthesisFacts.js';
@@ -11,6 +17,10 @@ import type { ApiEnv } from '../middleware/session.js';
 import {
   aiSettingsPutSchema,
   analyzeLogSchema,
+  ARCHETYPE_SYNTHESIS_DEFAULT_DAYS,
+  archetypeIdParamSchema,
+  archetypeSynthesisPostSchema,
+  archetypeSynthesisQuerySchema,
   deckSynthesisPostSchema,
   deckSynthesisQuerySchema,
   META_WINDOW_DEFAULT_DAYS,
@@ -333,6 +343,150 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
       return c.json({ error: 'Synthesis failed.' }, 500);
     }
   });
+
+  // GET /api/analysis/archetype/:archetypeId — read-only: current ranked
+  // decklist clusters + the cached synthesis (if any), never an LLM call
+  // (Spec 10 Slice C, mirrors GET /deck/:deckId). No ownership check —
+  // archetype data is not user-owned; a missing/unknown archetype simply
+  // yields an empty ranking (same "honestly empty" contract as the field
+  // score reads), not a 404.
+  routes.get('/archetype/:archetypeId', async (c) => {
+    const parsedId = archetypeIdParamSchema.safeParse(c.req.param('archetypeId'));
+    if (!parsedId.success) return c.json({ error: 'Not found' }, 404);
+    const archetypeId = parsedId.data;
+
+    const parsed = archetypeSynthesisQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid query', issues: parsed.error.issues }, 400);
+    }
+    const { days: windowDays, language, scope } = parsed.data;
+
+    const db = c.get('db');
+    const userId = c.get('user').id;
+
+    const [factSet, row, settings] = await Promise.all([
+      buildArchetypeSynthesisFactSet(db, {
+        archetypeId,
+        archetypeName: archetypeId,
+        windowDays,
+        language,
+        scope,
+      }),
+      loadArchetypeSynthesis(db, archetypeId, scope, userId, windowDays, language),
+      db.select().from(userAiSettings).where(eq(userAiSettings.userId, userId)).limit(1),
+    ]);
+
+    const currentInputHash = synthesisInputHash(factSet.facts, {
+      archetypeId,
+      windowDays,
+      language,
+      promptVersion: SYNTHESIS_PROMPT_VERSION,
+    });
+
+    // Same serve rule as GET /deck/:deckId (plan §3.7): no row -> not stale;
+    // matching hash -> not stale; mismatched hash on an 'llm' row -> stale.
+    const stale = row !== null && row.inputHash !== currentInputHash && row.source === 'llm';
+
+    return c.json({
+      archetypeId,
+      windowDays,
+      language,
+      scope,
+      clusters: factSet.rankedClusters,
+      synthesis: row,
+      stale,
+      currentInputHash,
+      availableFactCount: factSet.facts.length,
+      hasApiKey: settings[0]?.encryptedApiKey != null,
+    });
+  });
+
+  // POST /api/analysis/archetype/:archetypeId — generate (or serve a cached)
+  // synthesis over the archetype's currently ranked decklist clusters (Spec
+  // 10 Slice C, mirrors POST /deck/:deckId). Same rate limit, same BYOK
+  // resolution, same pre-LLM-call empty-facts short circuit.
+  routes.post(
+    '/archetype/:archetypeId',
+    rateLimit({ windowMs: 60 * 60_000, max: 20 }),
+    async (c) => {
+      const parsedId = archetypeIdParamSchema.safeParse(c.req.param('archetypeId'));
+      if (!parsedId.success) return c.json({ error: 'Not found' }, 404);
+      const archetypeId = parsedId.data;
+
+      const parsed = archetypeSynthesisPostSchema.safeParse(await readJson(c));
+      if (!parsed.success) {
+        return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
+      }
+      const body = parsed.data;
+
+      const db = c.get('db');
+      const userId = c.get('user').id;
+
+      const windowDays = body.days ?? ARCHETYPE_SYNTHESIS_DEFAULT_DAYS;
+      const { language, scope } = body;
+
+      const factSet = await buildArchetypeSynthesisFactSet(db, {
+        archetypeId,
+        archetypeName: archetypeId,
+        windowDays,
+        language,
+        scope,
+      });
+
+      // Never spend a token on an archetype with nothing to rank yet (same
+      // guard as POST /deck/:deckId) — checked before any key resolution.
+      if (factSet.facts.length === 0) {
+        return c.json({ error: 'Not enough meta data to synthesise yet.' }, 409);
+      }
+
+      const currentHash = synthesisInputHash(factSet.facts, {
+        archetypeId,
+        windowDays,
+        language,
+        promptVersion: SYNTHESIS_PROMPT_VERSION,
+      });
+
+      if (!body.force) {
+        const cached = await loadArchetypeSynthesis(
+          db,
+          archetypeId,
+          scope,
+          userId,
+          windowDays,
+          language,
+        );
+        if (cached && cached.inputHash === currentHash) {
+          return c.json({ synthesis: cached, stale: false, cached: true });
+        }
+      }
+
+      const resolved = await resolveApiKey(c, userId, body);
+      if (!resolved.ok) return resolved.response;
+      const { apiKey, providerName, model } = resolved;
+
+      const provider = getAnalysisProvider(providerName, { apiKey, model });
+      try {
+        const validated = await provider.synthesizeArchetype({
+          facts: factSet.facts,
+          context: factSet.context,
+        });
+        const synthesis = assembleArchetypeSynthesis(validated, factSet.facts, factSet.context, {
+          inputHash: currentHash,
+          source: 'llm',
+          provider: providerName,
+          model,
+          generatedAt: new Date().toISOString(),
+        });
+        await saveArchetypeSynthesis(db, userId, synthesis);
+        return c.json({ synthesis, stale: false, cached: false });
+      } catch (err) {
+        if (err instanceof AnalysisError) {
+          return c.json({ error: err.message }, err.status as 401 | 403 | 429 | 500 | 502);
+        }
+        return c.json({ error: 'Synthesis failed.' }, 500);
+      }
+    },
+  );
 
   return routes;
 }
