@@ -836,3 +836,23 @@ member is kept as its own cluster, never forced into another — protects rare-b
 ("Nadel im Heuhaufen") from being diluted away by clustering. This is a greedy heuristic
 (O(n·clusters), not an exhaustive pairwise partition) — acceptable because clusters only need
 to be "close enough to pool as one data point", not perfectly optimal.
+
+### `RankedCluster`
+```typescript
+interface RankedCluster extends DecklistCluster {
+  winRateLowerBoundPct: number;         // PRIMARY ranking signal
+  winRateInterval: WilsonInterval | null; // null only when the cluster has 0 recorded games
+  avgPlacementPercentile: number | null;  // SECONDARY/display signal, never a multiplier
+  rank: number;                           // 1-based, descending winRateLowerBoundPct
+}
+```
+
+`rankClusters(clusters)` (`@pokekon/shared/src/clusterRanking.ts`) turns Slice A's clusters into
+a ranked list. Sorts by the Wilson-score **lower bound** of the tie-weighted win rate
+(`wilsonInterval()`, one implementation in the repo — reused verbatim, not re-derived) rather
+than the raw rate: this is what stops a lucky 3-game 100 %-sample from outranking a proven
+40-game 65 %-sample, without excluding the small sample from the output altogether. Mean
+`placementPercentile()` across the cluster's member standings is carried as a secondary,
+display-only signal — it can show "this list won the event" even when the win-rate sample is
+too thin to rank it highly, but it never multiplies into the primary rank (that would let a
+single lucky top-8 with few games dominate, exactly the bias Spec 10 asks to avoid).
