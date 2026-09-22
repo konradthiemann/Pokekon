@@ -4,7 +4,8 @@
     "subtitle": "Live competitive data from Limitless TCG",
     "matchupMatrix": "Matchup Matrix",
     "tournamentMeta": "Tournament Meta",
-    "tournamentMetaCount": "Tournament Meta ({{count}})"
+    "tournamentMetaCount": "Tournament Meta ({{count}})",
+    "localMetaAndPrediction": "Local Meta & Prediction"
   },
   "window": {
     "lastDays": "Last days:",

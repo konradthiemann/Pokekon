@@ -670,14 +670,6 @@ export function MetaPage() {
           )}
         </CollapsibleSection>
 
-        <CollapsibleSection
-          title={t('prediction.title')}
-          icon={<FlaskConical className="w-4 h-4 text-brand-700" />}
-          defaultOpen
-        >
-          <PredictionPanel archetypes={archetypes} window={metaWindow} />
-        </CollapsibleSection>
-
         {/* Experimental, additive game-theoretic layer (plan §3.8, AC 5/6) —
             collapsed by default, never a replacement for the field score
             above. Explicit `defaultOpen={false}` (not just omitted): the
@@ -698,13 +690,25 @@ export function MetaPage() {
         </CollapsibleSection>
       </div>
 
-      {/* Local-meta configuration moved here from "My Deck" (plan
-          ui-ux-hub-rework.md §3.5): it feeds the field score above, so it
-          belongs on the axis that consumes it. Not wrapped in a
-          CollapsibleSection — SidePanel already brings its own title/icon/
-          description, and the defaultOpen contract for the section list
-          above stays untouched. */}
-      <LocalMetaPanel />
+      {/* Local Meta + Prediction merged into one section (Spec 10 Slice D/F,
+          specs/archetype-meta-analysis.md): they used to be two separate
+          CollapsibleSections with two independent ways to manage "which
+          decks do I expect locally" — LocalMetaPanel picks the archetypes
+          (feeds PredictionPanel's field), PredictionPanel weights/predicts
+          against them, so one collapsible home for both. Collapsed by
+          default (deliberate change from Prediction's previous
+          defaultOpen) — dense, config-heavy content that isn't the first
+          thing worth seeing. */}
+      <CollapsibleSection
+        title={t('page.localMetaAndPrediction')}
+        icon={<FlaskConical className="w-4 h-4 text-brand-700" />}
+        defaultOpen={false}
+      >
+        <div className="space-y-4">
+          <LocalMetaPanel />
+          <PredictionPanel archetypes={archetypes} window={metaWindow} />
+        </div>
+      </CollapsibleSection>
 
       <RecentTournaments />
     </div>

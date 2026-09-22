@@ -197,22 +197,18 @@ describe('MetaPage — equilibrium section is collapsed by default (plan §4 ste
     expect(experimentalSection).toHaveAttribute('data-default-open', 'false');
   });
 
-  it('keeps tournament meta and prediction defaultOpen', async () => {
+  it('keeps tournament meta defaultOpen', async () => {
     render(<MetaPage />);
     await flushEffects();
 
     const sections = screen.getAllByTestId('collapsible-section');
-    const existingTitles = [i18n.t('meta:page.tournamentMeta'), i18n.t('meta:prediction.title')];
-
-    for (const titleText of existingTitles) {
-      const section = sections.find((s) =>
-        (s.querySelector('[data-testid="collapsible-section-title"]')?.textContent ?? '').includes(
-          titleText,
-        ),
-      );
-      expect(section, `expected a section titled "${titleText}"`).toBeDefined();
-      expect(section).toHaveAttribute('data-default-open', 'true');
-    }
+    const section = sections.find((s) =>
+      (s.querySelector('[data-testid="collapsible-section-title"]')?.textContent ?? '').includes(
+        i18n.t('meta:page.tournamentMeta'),
+      ),
+    );
+    expect(section).toBeDefined();
+    expect(section).toHaveAttribute('data-default-open', 'true');
   });
 
   // Deliberate, user-requested change (not a silent test tweak, tdd.md): the
@@ -234,16 +230,56 @@ describe('MetaPage — equilibrium section is collapsed by default (plan §4 ste
   });
 });
 
-// Plan ui-ux-hub-rework.md §3.5 / §4 Slice C: the local-meta configuration
-// moves onto the Meta page (LocalMetaPanel is rendered by MetaPage, after
-// the four existing CollapsibleSections and before RecentTournaments) — its
-// own screen migrated, not its file or i18n namespace (still `deck:localMeta.*`).
-describe('MetaPage — renders the local-meta panel (plan §3.5, Slice C)', () => {
-  it('renders the local-meta panel title', async () => {
+// Spec 10 Slice D/F (specs/archetype-meta-analysis.md, plan
+// velvety-finding-bengio.md): "Lokales Meta" (LocalMetaPanel) and
+// "Prediction — deine lokale Meta" (PredictionPanel) used to be two
+// separate CollapsibleSections with two independent ways to manage the same
+// underlying idea — Konrad's explicit complaint ("beide zu ähnlich... man
+// braucht nicht beides"). They are now ONE CollapsibleSection, collapsed by
+// default (deliberate change from Prediction's previous defaultOpen — see
+// the removed assertion in the describe block above), positioned where
+// LocalMetaPanel used to sit (after Equilibrium, before RecentTournaments).
+describe('MetaPage — Local Meta and Prediction merged into one section (Spec 10 Slice D/F)', () => {
+  it('renders exactly one section containing both the local-meta panel and the prediction intro', async () => {
     render(<MetaPage />);
     await flushEffects();
 
-    expect(screen.getByText(i18n.t('deck:localMeta.title'))).toBeInTheDocument();
+    const sections = screen.getAllByTestId('collapsible-section');
+    const merged = sections.find((s) =>
+      (s.querySelector('[data-testid="collapsible-section-title"]')?.textContent ?? '').includes(
+        i18n.t('meta:page.localMetaAndPrediction'),
+      ),
+    );
+    expect(merged).toBeDefined();
+    const body = merged!.querySelector('[data-testid="collapsible-section-body"]')!;
+    expect(body.textContent).toContain(i18n.t('deck:localMeta.title'));
+    expect(body.textContent).toContain(i18n.t('meta:prediction.intro'));
+  });
+
+  it('is collapsed by default', async () => {
+    render(<MetaPage />);
+    await flushEffects();
+
+    const sections = screen.getAllByTestId('collapsible-section');
+    const merged = sections.find((s) =>
+      (s.querySelector('[data-testid="collapsible-section-title"]')?.textContent ?? '').includes(
+        i18n.t('meta:page.localMetaAndPrediction'),
+      ),
+    );
+    expect(merged).toHaveAttribute('data-default-open', 'false');
+  });
+
+  it('no longer renders a standalone "Prediction — deine lokale Meta" section', async () => {
+    render(<MetaPage />);
+    await flushEffects();
+
+    const sections = screen.getAllByTestId('collapsible-section');
+    const standalonePrediction = sections.find(
+      (s) =>
+        (s.querySelector('[data-testid="collapsible-section-title"]')?.textContent ?? '') ===
+        i18n.t('meta:prediction.title'),
+    );
+    expect(standalonePrediction).toBeUndefined();
   });
 });
 
