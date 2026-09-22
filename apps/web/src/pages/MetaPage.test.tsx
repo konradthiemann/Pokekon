@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import i18n from '../i18n';
 import { MetaPage } from './MetaPage';
 import { getMetaEquilibrium } from '../lib/api';
@@ -230,6 +230,28 @@ describe('MetaPage — renders the local-meta panel (plan §3.5, Slice C)', () =
     await flushEffects();
 
     expect(screen.getByText(i18n.t('deck:localMeta.title'))).toBeInTheDocument();
+  });
+});
+
+// Spec 10 Slice G (plan velvety-finding-bengio.md): the "Recent Tournaments"
+// min-players filter used to default to 30 (its own local literal, out of
+// sync with syncMeta.ts's 16) and could only be raised (30/50/100), never
+// lowered — so a user at a smaller local scene couldn't see tournaments
+// below 30 players at all.
+describe('MetaPage — Recent Tournaments min-players filter defaults to the shared constant (Spec 10 Slice G)', () => {
+  it('defaults to 15 and offers an option below the default', async () => {
+    render(<MetaPage />);
+    await flushEffects();
+
+    // The days select also has numeric options (3/7/14/30) that would collide
+    // with a plain option-text lookup — find the min-players select by its
+    // distinctive "100" option instead.
+    const minPlayersSelect = screen
+      .getAllByRole('combobox')
+      .find((el) => within(el).queryByRole('option', { name: '100' }));
+    expect(minPlayersSelect, 'expected to find the min-players select').toBeDefined();
+    expect(minPlayersSelect).toHaveValue('15');
+    expect(within(minPlayersSelect!).getByRole('option', { name: '10' })).toBeInTheDocument();
   });
 });
 

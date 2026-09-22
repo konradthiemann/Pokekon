@@ -1,4 +1,4 @@
-import { isLikelyOnlineName } from '@pokekon/shared';
+import { DEFAULT_MIN_TOURNAMENT_PLAYERS, isLikelyOnlineName } from '@pokekon/shared';
 import type { RecentTournament } from '../types';
 import { isPostRotation } from '../constants/season';
 import i18n from '../i18n';
@@ -123,7 +123,7 @@ export function summarizeStandings(standings: LimitlessStanding[]): {
 export async function fetchRecentTournaments(
   options: { days?: number; minPlayers?: number; onlineOnly?: boolean } = {},
 ): Promise<RecentTournament[]> {
-  const { days = 7, minPlayers = 30, onlineOnly = true } = options;
+  const { days = 7, minPlayers = DEFAULT_MIN_TOURNAMENT_PLAYERS, onlineOnly = true } = options;
 
   const res = await limitlessFetch(
     '/api/tournaments?game=PTCG&completed=true&limit=100&format=standard',

@@ -123,6 +123,13 @@ export const OTHER_ARCHETYPE_ID = 'other';
  *  normalisation so the three can never drift apart. */
 export const ARCHETYPE_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,79}$/;
 
+/** Single source of truth for "how big must a tournament be to count as a
+ *  representative sample". Spec 10 Slice G: three call sites (server ingest
+ *  `syncMeta.ts`, client-side `metaFetch.ts`, and the "Recent Tournaments" UI
+ *  default in `MetaPage.tsx`) each hardcoded their own value (16/30/30) with
+ *  no shared constant — this replaces all three. */
+export const DEFAULT_MIN_TOURNAMENT_PLAYERS = 15;
+
 /**
  * Normalise an untrusted Limitless deck id to a safe slug. Anything that is
  * not a plain kebab-case slug collapses to 'other' — the same bucket used for

@@ -371,7 +371,11 @@ Persisted to `localStorage` as `tcg-local-meta-v1`.
 
 Fetches individual recent tournaments from Limitless with configurable filters:
 - Days back (3, 7, 14, 30)
-- Minimum players (30, 50, 100)
+- Minimum players (10, 15, 30, 50, 100) — defaults to `DEFAULT_MIN_TOURNAMENT_PLAYERS`
+  (`@pokekon/shared`, currently 15), the single shared default also used by the server-side
+  sync job (`syncMeta.ts`) and the client-side `metaFetch.ts`. Used to be three independent,
+  out-of-sync literals (16/30/30) with no way to filter below 30 at all — unified in
+  Spec 10 Slice G (`specs/archetype-meta-analysis.md`).
 - Online only toggle (uses heuristic: name contains "online", "live", "ptcgl", "weekly", or player count ≥150)
 
 For each tournament, shows the top 5 archetypes by player count with their win rates. Links to the Limitless standings page.
