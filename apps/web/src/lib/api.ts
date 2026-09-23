@@ -1,6 +1,8 @@
 import type {
   AiSettings,
   ArchetypeCardStat,
+  ArchetypeSynthesis,
+  ArchetypeSynthesisScope,
   BattleAnalysis,
   DeckAnalytics,
   DeckSynthesis,
@@ -8,6 +10,7 @@ import type {
   FitnessDirection,
   MatchupRow,
   MetaSyncResult,
+  RankedCluster,
   StandingMatchResult,
   SynthesisLanguage,
   TournamentDecklist,
@@ -812,4 +815,84 @@ export async function generateDeckSynthesis(
       ...(opts?.model !== undefined ? { model: opts.model } : {}),
     }),
   });
+}
+
+// ─── Archetype synthesis (Spec 10 Slice C, specs/archetype-meta-analysis.md)
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /api/analysis/archetype/{archetypeId} — the currently ranked decklist
+ *  clusters (already sorted by `rank`) + the cached synthesis (if any), never
+ *  triggers an LLM call. `synthesis: null` is a cold start, not a 404 — a
+ *  missing/unknown archetype simply answers with `clusters: []` ("honestly
+ *  empty" contract, mirrors `analysis.ts`'s GET /archetype/:archetypeId). */
+export interface ArchetypeSynthesisReadResponse {
+  archetypeId: string;
+  windowDays: number;
+  language: SynthesisLanguage;
+  scope: ArchetypeSynthesisScope;
+  clusters: RankedCluster[];
+  synthesis: ArchetypeSynthesis | null;
+  /** true when the stored text was generated from different numbers. */
+  stale: boolean;
+  /** Hash of the CURRENT numbers, regardless of whether a synthesis exists. */
+  currentInputHash: string;
+  /** How many facts would be available right now; 0 disables the generate button. */
+  availableFactCount: number;
+  /** Mirrors GET /api/analysis/settings so the panel needs only one call. */
+  hasApiKey: boolean;
+}
+
+/** POST /api/analysis/archetype/{archetypeId} — generate (or serve a cached) synthesis. */
+export interface ArchetypeSynthesisWriteResponse {
+  synthesis: ArchetypeSynthesis;
+  stale: boolean;
+  /** true when a cache hit served the response and no LLM call was made. */
+  cached: boolean;
+}
+
+/** Read-only: current ranked clusters + the cached synthesis, no token cost.
+ *  Safe to call on mount / window / scope change. */
+export async function getArchetypeSynthesis(
+  archetypeId: string,
+  params?: { days?: number; language?: SynthesisLanguage; scope?: ArchetypeSynthesisScope },
+): Promise<ArchetypeSynthesisReadResponse> {
+  const query = new URLSearchParams();
+  if (params?.days !== undefined) query.set('days', String(params.days));
+  if (params?.language !== undefined) query.set('language', params.language);
+  if (params?.scope !== undefined) query.set('scope', params.scope);
+  const qs = query.toString();
+  return request<ArchetypeSynthesisReadResponse>(
+    `/api/analysis/archetype/${encodeURIComponent(archetypeId)}${qs ? `?${qs}` : ''}`,
+  );
+}
+
+/** Trigger a generation. `apiKey` is the demo-mode ephemeral token path —
+ *  identical to `generateDeckSynthesis`'s BYOK contract. */
+export async function generateArchetypeSynthesis(
+  archetypeId: string,
+  opts?: {
+    days?: number;
+    language?: SynthesisLanguage;
+    scope?: ArchetypeSynthesisScope;
+    force?: boolean;
+    apiKey?: string;
+    provider?: string;
+    model?: string | null;
+  },
+): Promise<ArchetypeSynthesisWriteResponse> {
+  return request<ArchetypeSynthesisWriteResponse>(
+    `/api/analysis/archetype/${encodeURIComponent(archetypeId)}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        ...(opts?.days !== undefined ? { days: opts.days } : {}),
+        ...(opts?.language !== undefined ? { language: opts.language } : {}),
+        ...(opts?.scope !== undefined ? { scope: opts.scope } : {}),
+        ...(opts?.force !== undefined ? { force: opts.force } : {}),
+        ...(opts?.apiKey ? { apiKey: opts.apiKey } : {}),
+        ...(opts?.provider ? { provider: opts.provider } : {}),
+        ...(opts?.model !== undefined ? { model: opts.model } : {}),
+      }),
+    },
+  );
 }

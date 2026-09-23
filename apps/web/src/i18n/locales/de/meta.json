@@ -136,6 +136,40 @@
       "energy": "Energie",
       "cardCount": "{{count}} Karten",
       "openTournament": "Turnier-Standings öffnen"
+    },
+    "recommendation": {
+      "title": "KI-Empfehlung",
+      "scope": {
+        "global": "Global",
+        "local": "Lokal"
+      },
+      "stale": "Zahlen haben sich geändert",
+      "noFacts": "Noch zu wenig geclusterte Turnierdaten — nach dem nächsten \"Sync Live Meta\" oder einem größeren Zeitfenster verfügbar.",
+      "noKey": "Noch kein KI-Schlüssel hinterlegt. Trage einen in den KI-Einstellungen ein, um eine Zusammenfassung zu erzeugen.",
+      "noKeyDemo": "Demo-Modus: Gib unten einen GitHub-Models-Token ein, um das auszuprobieren, ohne dass serverseitig etwas gespeichert wird.",
+      "empty": "Diesmal hat keine Aussage unsere Faktenprüfung überstanden — bitte erneut versuchen.",
+      "intro": "Verwandelt die geclusterte Rangliste unten in eine kurze, lesbare Empfehlung.",
+      "generate": "Text erzeugen",
+      "regenerate": "Neu erzeugen",
+      "generating": "Erzeuge…",
+      "generatedAt": "Erzeugt am {{date}}",
+      "disclosure": "Worauf beruht das?",
+      "disclosureDropped": "{{count}} weitere Aussagen wurden von der Faktenprüfung verworfen und werden nicht angezeigt.",
+      "clustersEmpty": "Noch keine geclusterten Decklisten in diesem Zeitfenster.",
+      "sections": {
+        "headline": "Überblick",
+        "strengths": "Stärken",
+        "risks": "Risiken",
+        "listLevers": "Mögliche Listen-Änderungen",
+        "context": "Kontext"
+      },
+      "cluster": {
+        "rank": "Rang {{rank}}",
+        "games": "Bilanz {{record}}",
+        "members_one": "{{count}} Liste",
+        "members_other": "{{count}} Listen",
+        "placement": "Ø Platzierung: Top {{pct}} %"
+      }
     }
   },
   "tournaments": {

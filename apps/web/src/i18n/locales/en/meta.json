@@ -136,6 +136,40 @@
       "energy": "Energy",
       "cardCount": "{{count}} cards",
       "openTournament": "Open tournament standings"
+    },
+    "recommendation": {
+      "title": "AI recommendation",
+      "scope": {
+        "global": "Global",
+        "local": "Local"
+      },
+      "stale": "Numbers have changed",
+      "noFacts": "Not enough clustered tournament data yet — available after the next \"Sync Live Meta\" or a wider window.",
+      "noKey": "No AI key configured yet. Add one in the AI settings to generate a summary.",
+      "noKeyDemo": "Demo mode: enter a GitHub Models token below to try this without storing anything server-side.",
+      "empty": "This time no statement survived our fact check — please try again.",
+      "intro": "Turns the ranked cluster list below into a short, readable recommendation.",
+      "generate": "Generate text",
+      "regenerate": "Regenerate",
+      "generating": "Generating…",
+      "generatedAt": "Generated on {{date}}",
+      "disclosure": "What is this based on?",
+      "disclosureDropped": "{{count}} more statements were dropped by the fact check and are not shown.",
+      "clustersEmpty": "No clustered decklists in this window yet.",
+      "sections": {
+        "headline": "Overview",
+        "strengths": "Strengths",
+        "risks": "Risks",
+        "listLevers": "Possible list changes",
+        "context": "Context"
+      },
+      "cluster": {
+        "rank": "Rank {{rank}}",
+        "games": "Record {{record}}",
+        "members_one": "{{count}} list",
+        "members_other": "{{count}} lists",
+        "placement": "Avg. placement: top {{pct}} %"
+      }
     }
   },
   "tournaments": {
