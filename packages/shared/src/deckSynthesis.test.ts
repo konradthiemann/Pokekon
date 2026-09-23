@@ -39,11 +39,13 @@ import {
   buildSynthesisPrompts,
   assembleArchetypeSynthesis,
   buildArchetypeSynthesisPrompts,
+  factsFromPersonalPriorBlend,
 } from './deckSynthesis.js';
 import type { FieldScore, WeightedMatchup } from './fieldWinRate.js';
 import type { ArchetypeCardStat, CardPerformanceDelta } from './cardPerformance.js';
 import type { FitnessDirection } from './nashEquilibrium.js';
 import type { RankedCluster } from './clusterRanking.js';
+import type { PersonalPriorBlend } from './personalPriorBlend.js';
 
 // ---------------------------------------------------------------------------
 // Exported constants (plan §3.1)
@@ -2024,6 +2026,66 @@ describe('factsFromClusterRanking (Spec 10 Slice C)', () => {
     const capped = factsFromClusterRanking(clusters, { maxClusters: 3 });
     const winRateFacts = capped.filter((f) => f.kind === 'clusterWinRate');
     expect(winRateFacts).toHaveLength(3);
+  });
+});
+
+function buildPersonalPriorBlend(overrides: Partial<PersonalPriorBlend> = {}): PersonalPriorBlend {
+  return {
+    blendedPct: 60,
+    usedPersonalData: true,
+    ownWeight: 0.3,
+    ownWinRatePct: 70,
+    ...overrides,
+  };
+}
+
+describe('factsFromPersonalPriorBlend (Spec 10 Slice E)', () => {
+  it('returns an empty array when usedPersonalData is false — no silent substitute for the global facts', () => {
+    const facts = factsFromPersonalPriorBlend(
+      'Dragapult ex',
+      buildPersonalPriorBlend({ usedPersonalData: false, ownWeight: 0, ownWinRatePct: null }),
+    );
+    expect(facts).toEqual([]);
+  });
+
+  it('emits exactly one personalPrior fact with the blended value when usedPersonalData is true', () => {
+    const facts = factsFromPersonalPriorBlend(
+      'Dragapult ex',
+      buildPersonalPriorBlend({ blendedPct: 62.5 }),
+    );
+    expect(facts).toHaveLength(1);
+    expect(facts[0]).toMatchObject({
+      kind: 'personalPrior',
+      label: 'Dragapult ex',
+      value: 62.5,
+      unit: 'pct',
+      neutralValue: 50,
+      lowPct: null,
+      highPct: null,
+      significant: false,
+      usableForRecommendation: false,
+      entityNames: [],
+    });
+  });
+
+  it('derives direction from the blended value against the neutral 50 baseline (bandless)', () => {
+    const positive = factsFromPersonalPriorBlend(
+      'Dragapult ex',
+      buildPersonalPriorBlend({ blendedPct: 65 }),
+    );
+    expect(positive[0]?.direction).toBe('positive');
+
+    const negative = factsFromPersonalPriorBlend(
+      'Dragapult ex',
+      buildPersonalPriorBlend({ blendedPct: 35 }),
+    );
+    expect(negative[0]?.direction).toBe('negative');
+
+    const neutral = factsFromPersonalPriorBlend(
+      'Dragapult ex',
+      buildPersonalPriorBlend({ blendedPct: 50 }),
+    );
+    expect(neutral[0]?.direction).toBe('neutral');
   });
 });
 

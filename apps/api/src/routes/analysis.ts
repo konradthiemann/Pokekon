@@ -359,7 +359,23 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
     if (!parsed.success) {
       return c.json({ error: 'Invalid query', issues: parsed.error.issues }, 400);
     }
-    const { days: windowDays, language, scope } = parsed.data;
+    const {
+      days: windowDays,
+      language,
+      scope,
+      usePersonalPrior,
+      personalWins,
+      personalLosses,
+      personalTies,
+    } = parsed.data;
+    // Spec 10 Slice E: only build a personalRecord once all three counts are
+    // present — a partial record (e.g. only wins) is treated the same as
+    // "not provided", matching the POST body's all-or-nothing personalRecord
+    // shape so GET/POST stay comparable for the currentInputHash check below.
+    const personalRecord =
+      personalWins !== undefined && personalLosses !== undefined && personalTies !== undefined
+        ? { wins: personalWins, losses: personalLosses, ties: personalTies }
+        : undefined;
 
     const db = c.get('db');
     const userId = c.get('user').id;
@@ -371,6 +387,8 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
         windowDays,
         language,
         scope,
+        usePersonalPrior,
+        personalRecord,
       }),
       loadArchetypeSynthesis(db, archetypeId, scope, userId, windowDays, language),
       db.select().from(userAiSettings).where(eq(userAiSettings.userId, userId)).limit(1),
@@ -423,7 +441,7 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
       const userId = c.get('user').id;
 
       const windowDays = body.days ?? ARCHETYPE_SYNTHESIS_DEFAULT_DAYS;
-      const { language, scope } = body;
+      const { language, scope, usePersonalPrior, personalRecord } = body;
 
       const factSet = await buildArchetypeSynthesisFactSet(db, {
         archetypeId,
@@ -431,6 +449,8 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
         windowDays,
         language,
         scope,
+        usePersonalPrior,
+        personalRecord,
       });
 
       // Never spend a token on an archetype with nothing to rank yet (same

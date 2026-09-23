@@ -903,8 +903,9 @@ documented `scope` limitation.
 ### Personal-prior blending (Spec 10 Slice E — `@pokekon/shared/src/personalPriorBlend.ts`)
 
 Adjusts a cluster's global win rate (Slice B) toward the user's own track record — but only once
-there is enough of it to mean something. Not yet wired into any route or UI; a standalone,
-composable pure function, same shape as `fieldWinRate.ts`.
+there is enough of it to mean something. A standalone, composable pure function, same shape as
+`fieldWinRate.ts`, now wired into the backend (see below); the web UI toggle ("Mein Spielstil")
+is a separate, later slice.
 
 ```typescript
 interface PersonalPriorBlend {
@@ -926,7 +927,39 @@ field, so the global number always keeps some influence. Uses the tie-weighted w
 (`tournamentWinRatePct`, one implementation in the repo, reused verbatim) for the personal record,
 consistent with every other win-rate figure in the app.
 
-**Deliberate scope note:** the input is a generic `{ wins, losses, ties }` record, not the web
-app's `ArchetypeStats` type — `packages/shared` cannot depend on an `apps/web`-only type, and which
-concrete record a caller should pass (e.g. "my results piloting this archetype" vs "my results
-facing it") is an open design question for whoever wires this into a route/UI, not decided here.
+**Deliberate scope note:** the input is a generic `{ wins, losses, ties }` record
+(`PersonalRecord`), not the web app's `ArchetypeStats` type — `packages/shared` cannot depend on
+an `apps/web`-only type.
+
+**Resolved (Konrad decision, 2026-09-23):** the caller (backend route, see below) passes the
+**opponent-facing** `ArchetypeStats` record — "how well do I do playing AGAINST this archetype",
+the same record `MyMatchupsTable` already shows — not a "my results piloting this archetype"
+record, which does not exist as a data source yet. Different reference frames (cluster win rate =
+performance of this list's pilots against the field; the blended `personalPrior` fact = MY
+performance against this archetype as an opponent), accepted as a known, documented compromise
+rather than blocking on a new data source.
+
+### `personalPrior` fact + backend wiring (Spec 10 Slice E)
+
+`factsFromPersonalPriorBlend(archetypeName, blend)` (`@pokekon/shared/src/deckSynthesis.ts`) turns
+a `PersonalPriorBlend` into at most one `personalPrior`-kind `SynthesisFact` — none when
+`blend.usedPersonalData` is false (a below-threshold personal record contributes nothing, it never
+silently replaces the global `clusterWinRate`/`clusterPlacement` facts). The fact is bandless
+(`lowPct`/`highPct: null`, `significant: false`, `usableForRecommendation: false`, same convention
+as `clusterPlacement`) with `neutralValue: 50`, `value: blend.blendedPct`.
+
+Wired into `buildArchetypeSynthesisFactSet` (`apps/api/src/lib/archetypeSynthesisFacts.ts`): when
+`scope === 'local'` **and** the caller passes both `usePersonalPrior: true` and a `personalRecord`,
+the top-ranked cluster's Wilson-conservative `winRateLowerBoundPct` (not the raw mean, consistent
+with Slice B) is blended via `blendWithPersonalPrior` and the resulting fact is appended. For
+`scope === 'global'`, `usePersonalPrior`/`personalRecord` are silently ignored — no validation
+error, simply no effect (deliberately simple, not over-engineered).
+
+`GET`/`POST /api/analysis/archetype/:archetypeId` (`apps/api/src/routes/analysis.ts`,
+`apps/api/src/validation.ts`) both accept `usePersonalPrior` + a personal win/loss/tie record
+(`personalWins`/`personalLosses`/`personalTies` query params on GET, a nested `personalRecord`
+object on POST). GET needs these too, not just POST: `currentInputHash` is computed from the same
+facts a POST would use, so GET must be given the identical personalisation inputs to avoid
+wrongly reporting `stale: true` right after the user generated a personalised synthesis via POST.
+The `apps/web` UI toggle that reads `ArchetypeStats` from the store and sends `personalRecord` is
+a separate, later slice (not part of this backend wiring).

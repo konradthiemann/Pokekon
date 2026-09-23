@@ -4926,6 +4926,40 @@ describe('GET/POST /api/analysis/archetype/:archetypeId (Spec 10 Slice C)', () =
       const res = await request('/api/analysis/archetype/Not_Valid!', { user });
       expect(res.status).toBe(404);
     });
+
+    it('GET with the same usePersonalPrior/personalWins/personalLosses/personalTies query params as a prior POST yields an identical currentInputHash (Spec 10 Slice E — prevents GET falsely reporting stale:true after a personalised POST)', async () => {
+      await clearArchetypeSynthesisData();
+      const archetypeId = 'get-arch-hash-consistency';
+      await seedArchetypeStandings(archetypeId, 'get-arch-hash-consistency-t1');
+      const user = await freshUser();
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(modelResponse(JSON.stringify({ claims: [] }))),
+      );
+
+      const query =
+        'scope=local&usePersonalPrior=true&personalWins=8&personalLosses=2&personalTies=0';
+
+      const postRes = await request(`/api/analysis/archetype/${archetypeId}`, {
+        user,
+        method: 'POST',
+        body: {
+          scope: 'local',
+          usePersonalPrior: true,
+          personalRecord: { wins: 8, losses: 2, ties: 0 },
+          apiKey: 'ghp_arch_hash_consistency',
+        },
+      });
+      expect(postRes.status).toBe(200);
+      const postBody = (await postRes.json()) as { synthesis: { inputHash: string } };
+
+      const getRes = await request(`/api/analysis/archetype/${archetypeId}?${query}`, { user });
+      expect(getRes.status).toBe(200);
+      const getBody = (await getRes.json()) as { currentInputHash: string };
+
+      expect(getBody.currentInputHash).toBe(postBody.synthesis.inputHash);
+    });
   });
 
   describe('POST (generate or serve cached)', () => {
@@ -5109,6 +5143,82 @@ describe('GET/POST /api/analysis/archetype/:archetypeId (Spec 10 Slice C)', () =
         .from(schema.userAiSettings)
         .where(eq(schema.userAiSettings.userId, user));
       expect(settings).toBeUndefined();
+    });
+
+    describe('usePersonalPrior / personalRecord (Spec 10 Slice E)', () => {
+      it("scope:'local' + usePersonalPrior:true + a sufficient personalRecord (>= 5 games) includes a personalPrior fact among the facts sent to the LLM", async () => {
+        await clearArchetypeSynthesisData();
+        const archetypeId = 'post-arch-personal-sufficient';
+        await seedArchetypeStandings(archetypeId, 'post-arch-personal-sufficient-t1');
+        const user = await freshUser();
+
+        const factSet = await buildArchetypeSynthesisFactSet(db, {
+          archetypeId,
+          archetypeName: archetypeId,
+          windowDays: 90,
+          language: 'de',
+          scope: 'local',
+          usePersonalPrior: true,
+          personalRecord: { wins: 8, losses: 2, ties: 0 },
+        });
+        expect(factSet.facts.some((f) => f.kind === 'personalPrior')).toBe(true);
+
+        fetchMock.mockResolvedValue(modelResponse(JSON.stringify({ claims: [] })));
+        const res = await request(`/api/analysis/archetype/${archetypeId}`, {
+          user,
+          method: 'POST',
+          body: {
+            scope: 'local',
+            usePersonalPrior: true,
+            personalRecord: { wins: 8, losses: 2, ties: 0 },
+            apiKey: 'ghp_arch_personal_sufficient',
+          },
+        });
+        expect(res.status).toBe(200);
+        // The LLM was actually called with the personalPrior fact included --
+        // asserted via the request body captured by fetchMock, not just the
+        // shared-package unit above, so the route's wiring itself is covered.
+        const [, init] = fetchMock.mock.calls[0] as [string, { body: string }];
+        const requestBody = JSON.parse(init.body) as {
+          messages: { content: string }[];
+        };
+        const promptText = requestBody.messages.map((m) => m.content).join('\n');
+        expect(promptText).toContain('personalPrior.winRate');
+      });
+
+      it("scope:'global' + usePersonalPrior:true is silently ignored — no personalPrior fact, no validation error", async () => {
+        await clearArchetypeSynthesisData();
+        const archetypeId = 'post-arch-personal-global-ignored';
+        await seedArchetypeStandings(archetypeId, 'post-arch-personal-global-ignored-t1');
+
+        const factSet = await buildArchetypeSynthesisFactSet(db, {
+          archetypeId,
+          archetypeName: archetypeId,
+          windowDays: 90,
+          language: 'de',
+          scope: 'global',
+          usePersonalPrior: true,
+          personalRecord: { wins: 8, losses: 2, ties: 0 },
+        });
+        expect(factSet.facts.some((f) => f.kind === 'personalPrior')).toBe(false);
+      });
+
+      it('usePersonalPrior:true with fewer than 5 personal games yields no personalPrior fact', async () => {
+        await clearArchetypeSynthesisData();
+        const archetypeId = 'post-arch-personal-insufficient';
+        await seedArchetypeStandings(archetypeId, 'post-arch-personal-insufficient-t1');
+
+        const factSet = await buildArchetypeSynthesisFactSet(db, {
+          archetypeId,
+          archetypeName: archetypeId,
+          windowDays: 90,
+          language: 'de',
+          scope: 'local',
+          usePersonalPrior: true,
+          personalRecord: { wins: 2, losses: 1, ties: 0 }, // 3 games < DEFAULT_MIN_OWN_GAMES (5)
+        });
+        expect(factSet.facts.some((f) => f.kind === 'personalPrior')).toBe(false);
+      });
     });
   });
 });

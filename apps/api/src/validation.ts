@@ -311,6 +311,15 @@ export const archetypeSynthesisQuerySchema = z.object({
     .default(ARCHETYPE_SYNTHESIS_DEFAULT_DAYS),
   language: z.enum(SYNTHESIS_LANGUAGE_VALUES).default('de'),
   scope: z.enum(ARCHETYPE_SYNTHESIS_SCOPE_VALUES).default('global'),
+  // Spec 10 Slice E: GET needs these too, not just POST — currentInputHash
+  // (computed from the same facts a POST would use) must match a prior
+  // personalised POST's inputHash exactly, otherwise GET would wrongly
+  // report `stale: true` right after the user just generated a personalised
+  // synthesis.
+  usePersonalPrior: queryBool(false),
+  personalWins: z.coerce.number().int().min(0).optional(),
+  personalLosses: z.coerce.number().int().min(0).optional(),
+  personalTies: z.coerce.number().int().min(0).optional(),
 });
 
 /** Body for POST /api/analysis/archetype/:archetypeId. `days` defaults to
@@ -324,4 +333,16 @@ export const archetypeSynthesisPostSchema = z.object({
   apiKey: z.string().max(400).optional(),
   provider: z.enum(aiProviderValues).optional(),
   model: z.string().max(100).nullish(),
+  // Spec 10 Slice E: personalisation is opt-in and only takes effect for
+  // scope:'local' (enforced in buildArchetypeSynthesisFactSet, not here) —
+  // scope:'global' + usePersonalPrior:true is a valid, harmless request that
+  // simply has no effect, not a validation error.
+  usePersonalPrior: z.boolean().optional(),
+  personalRecord: z
+    .object({
+      wins: z.number().int().min(0),
+      losses: z.number().int().min(0),
+      ties: z.number().int().min(0),
+    })
+    .optional(),
 });

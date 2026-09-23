@@ -7,6 +7,7 @@ import type { ArchetypeCardStat } from './cardPerformance.js';
 import type { RankedCluster } from './clusterRanking.js';
 import type { FieldScore, WeightedMatchup } from './fieldWinRate.js';
 import type { FitnessDirection } from './nashEquilibrium.js';
+import type { PersonalPriorBlend } from './personalPriorBlend.js';
 
 // ---------------------------------------------------------------------------
 // 3.1 -- constants
@@ -41,6 +42,7 @@ export const SYNTHESIS_FACT_KINDS = [
   'equilibriumTrend', // fitnessDeltaPp, neutral = 0
   'clusterWinRate', // Spec 10 Slice C: Wilson-Interval einer Decklist-Cluster-WinRate, neutral = 50
   'clusterPlacement', // Spec 10 Slice C: mittleres placementPercentile*100 eines Clusters, neutral = 50, bandlos
+  'personalPrior', // Spec 10 Slice E: geblendete Win-Rate aus Cluster + eigener Bilanz gegen den Archetyp, neutral = 50, bandlos
 ] as const;
 export type SynthesisFactKind = (typeof SYNTHESIS_FACT_KINDS)[number];
 
@@ -1057,6 +1059,58 @@ export function factsFromClusterRanking(
   return facts;
 }
 
+/** Spec 10 Slice E (specs/archetype-meta-analysis.md, plan
+ *  velvety-finding-bengio.md): emits exactly ONE 'personalPrior' fact when
+ *  enough personal games were available for the blend
+ *  (`blend.usedPersonalData`), otherwise an empty array -- a below-threshold
+ *  personal record must NOT silently replace or hide the global cluster
+ *  facts from factsFromClusterRanking above, it simply contributes nothing.
+ *
+ *  KNOWN, DOCUMENTED COMPROMISE (Konrad decision, 2026-09-23): `blend` is
+ *  typically built from the OPPONENT-facing `ArchetypeStats` record (how well
+ *  do I do AGAINST this archetype as an opponent, see `MyMatchupsTable`), not
+ *  from a "my own results piloting this archetype" record -- that second data
+ *  source does not exist yet. Different reference frames (cluster win rate =
+ *  performance of this list's pilots against the field; personalPrior =
+ *  MY performance against this archetype as an opponent), accepted
+ *  deliberately rather than blocking on a new data source. */
+export function factsFromPersonalPriorBlend(
+  archetypeName: string,
+  blend: PersonalPriorBlend,
+): SynthesisFact[] {
+  if (!blend.usedPersonalData) return [];
+
+  const direction = deriveFactDirection({
+    value: blend.blendedPct,
+    neutralValue: 50,
+    lowPct: null,
+    highPct: null,
+  });
+
+  return [
+    {
+      id: 'personalPrior.winRate',
+      kind: 'personalPrior',
+      label: sanitizeFactLabel(archetypeName),
+      value: blend.blendedPct,
+      unit: 'pct',
+      neutralValue: 50,
+      lowPct: null,
+      highPct: null,
+      direction,
+      // Bandless, same convention as clusterPlacement/metaShare/coverage above.
+      significant: false,
+      // Bandless -> context only, not a basis for a 'recommendation' claim --
+      // same convention factsFromClusterRanking uses for clusterPlacement
+      // (the codebase has no bandless fact with usableForRecommendation:true,
+      // see factsFromFieldScore's coverage fact and factsFromEquilibrium's
+      // metaShare-style facts above).
+      usableForRecommendation: false,
+      entityNames: [],
+    },
+  ];
+}
+
 /** The subset of apps/api's EquilibriumArchetypeRow (equilibriumData.ts:6-29)
  *  that fact production needs. Declared independently here rather than
  *  imported -- packages/shared is browser-safe and does not depend on
@@ -1193,6 +1247,7 @@ const SYNTHESIS_FACT_KIND_LABELS_DE: Record<SynthesisFactKind, string> = {
   equilibriumTrend: 'Formtrend',
   clusterWinRate: 'Gewinnrate einer Deckliste',
   clusterPlacement: 'durchschnittliche Turnier-Platzierung einer Deckliste',
+  personalPrior: 'mit deiner eigenen Bilanz gegen diesen Archetyp geblendete Gewinnrate',
 };
 
 const SYNTHESIS_FACT_KIND_LABELS_EN: Record<SynthesisFactKind, string> = {
@@ -1206,6 +1261,7 @@ const SYNTHESIS_FACT_KIND_LABELS_EN: Record<SynthesisFactKind, string> = {
   equilibriumTrend: 'form trend',
   clusterWinRate: 'a decklist’s win rate',
   clusterPlacement: 'a decklist’s average tournament placement',
+  personalPrior: 'a win rate blended with your own record against this archetype',
 };
 
 /**
