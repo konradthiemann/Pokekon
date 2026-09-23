@@ -430,7 +430,7 @@ Every archetype row is clickable and opens an in-tab drilldown. The whole Meta t
 - **Preparation panel:** opponents weighted by *frequency × matchup weakness* — common **and** bad-for-you decks rank first ("Darauf musst du vorbereitet sein"), plus the mirror probability and the good matchups (free wins). Each entry shows its own confidence band; entries whose interval still includes 50 % (`significant === false`) carry an explicit "unreliable" label (not just a colour, for accessibility) and sort behind significant entries at the same weight tier, rather than disappearing.
 - **Matchups vs the field:** a table (`MatchupTable`) listing this archetype's record against every covered opponent — win rate, its 95 % interval, game count, and meta share — sorted from most favourable to least favourable. Data comes from the same real online-Bo1 blend (`tournament_matchups` + TrainerHill fallback) as the matrix. Opponent icons are data-driven from `iconsById` returned by `GET /api/meta/archetypes/:id/analysis`.
 - **Most successful decklists:** published lists from the persisted standings, ordered by relative finish (placing ÷ field size, ties → bigger event, then more recent), 4 per page with a load-more button (`GET /api/meta/archetypes/:id/lists`). Each card shows placing, record, player, event and the full list grouped Pokémon/Trainer/Energy, linking to the Limitless standings. Pokémon icons are data-driven from Limitless `deck.icons`.
-- **Archetype recommendation (`ArchetypeRecommendationPanel`, Spec 10 Slice C UI, between the matchup table and the raw decklists):** a ranked decklist-cluster list (`RankedCluster[]`, already sorted by `rank`) plus an optional KI-text recommendation, backed by `GET`/`POST /api/analysis/archetype/:archetypeId`. Two toggle chips, "Global"/"Lokal" (`scope`), re-fetch the ranking on click — **documented, deliberate limitation:** both scopes currently return the identical ranking (`scope` only changes the LLM prompt framing so far; real per-opponent field-reweighting for "lokal" needs a per-matchup breakdown `RankedCluster` does not carry yet, see `specs/archetype-meta-analysis.md` Slice D and the `ArchetypeSynthesisScope` comment in `packages/shared/src/deckSynthesis.ts`). Each cluster shows its rank, Wilson-lower-bound win rate + interval, average placement percentile (when available), W/L/T record, member-list count, and a compact Pokémon-card overview of the representative list. The KI-text half follows the exact same state machine as `DeckSynthesisPanel` (§ "Deck synthesis" above) — cold start / missing key (+ demo ephemeral-token path) / stale badge / honest empty / error — generation is **user-triggered only**, a scope switch never auto-regenerates. Deliberately uses its own local component state (request-key pattern, like `ArchetypeDetail` itself) rather than the `dashboardStore`. The "Mein Spielstil" (`usePersonalPrior`) third toggle from the original plan is **not** built yet — needs its own backend wiring (`blendWithPersonalPrior` → a real match-history source, HANDOVER_SPEC10.md point 5), tracked as a separate follow-up slice.
+- **Archetype recommendation (`ArchetypeRecommendationPanel`, Spec 10 Slice C UI, between the matchup table and the raw decklists):** a ranked decklist-cluster list (`RankedCluster[]`, already sorted by `rank`) plus an optional KI-text recommendation, backed by `GET`/`POST /api/analysis/archetype/:archetypeId`. Three toggle chips, "Global"/"Lokal"/"Mein Spielstil" (a `mode` state, not a fourth backend `scope`), re-fetch the ranking on click — **documented, deliberate limitation:** all three modes currently return the identical cluster ranking (`scope` only changes the LLM prompt framing so far; real per-opponent field-reweighting for "lokal" needs a per-matchup breakdown `RankedCluster` does not carry yet, see `specs/archetype-meta-analysis.md` Slice D and the `ArchetypeSynthesisScope` comment in `packages/shared/src/deckSynthesis.ts`). Each cluster shows its rank, Wilson-lower-bound win rate + interval, average placement percentile (when available), W/L/T record, member-list count, and a compact Pokémon-card overview of the representative list. The KI-text half follows the exact same state machine as `DeckSynthesisPanel` (§ "Deck synthesis" above) — cold start / missing key (+ demo ephemeral-token path) / stale badge / honest empty / error — generation is **user-triggered only**, a mode switch never auto-regenerates. Deliberately uses its own local component state (request-key pattern, like `ArchetypeDetail` itself) rather than the `dashboardStore`. **"Mein Spielstil" (Spec 10 Slice E UI, completing the backend from § "Archetype synthesis" below):** sends `scope: 'local'` + `usePersonalPrior: true` + a `personalRecord` derived from the `ArchetypeStats` entry matching `archetypeId` (same Limitless-slug identifier space) — `archetypeStats` is passed down `MetaPage` → `ArchetypeDetail` → this panel as a prop, so the panel itself stays store-free. Below the shared `DEFAULT_MIN_OWN_GAMES` (5) threshold (same one the server silently applies), a `data-testid="archetype-recommendation-personal-insufficient-data"` hint explains that the recommendation currently matches the local mode, without duplicating the server's threshold value.
 
 The overview Meta Table **is** the day-window field analysis itself (`GET /api/meta/field-analysis?days&online&bo1`): share, win rate, record **and** a sortable **Feld-Score** column per archetype, so the best-positioned deck — not merely the most-played one — is visible at a glance, and the day/online controls genuinely drive the metashare (not just the score).
 
@@ -542,7 +542,7 @@ Combines three data sources into a closed set of structured **facts** (each with
 
 ---
 
-## 20. Archetype Synthesis (Spec 10 Slice C — API only, no UI yet)
+## 20. Archetype Synthesis (Spec 10 Slice C — UI in § 15, `ArchetypeRecommendationPanel`)
 
 **Route:** `GET`/`POST /api/analysis/archetype/:archetypeId` (`apps/api/src/routes/analysis.ts`)
 
@@ -571,10 +571,9 @@ online-Bo1 window (same scope as every other meta read), and `players >= DEFAULT
 `(archetypeId, scope[+userId for local], windowDays, language)`, same input-hash mechanism as
 `deck_synthesis`.
 
-**Not yet surfaced in the UI** — this slice is the API plumbing only; a UI (e.g. on the archetype
-drilldown, §15) is a follow-up.
+**Surfaced in the UI** as `ArchetypeRecommendationPanel` on the archetype drilldown (§15).
 
-**Personalisation ("Mein Spielstil", Spec 10 Slice E — backend only, no UI yet):** optional
+**Personalisation ("Mein Spielstil", Spec 10 Slice E, UI in § 15):** optional
 `usePersonalPrior: boolean` + a personal win/loss/tie record (`personalWins`/`personalLosses`/
 `personalTies` query params on GET, a `personalRecord: { wins, losses, ties }` object on POST).
 Only takes effect for `scope: 'local'` — on `scope: 'global'` it is silently ignored (no
@@ -592,8 +591,9 @@ consistent between a personalised POST and a matching GET (otherwise GET would w
 as a data source. Two different reference frames intentionally coexist: the cluster win rate
 answers "how do this list's pilots perform against the field", `personalPrior` answers "how does
 *this user* perform against this archetype as an opponent". See `docs/data-types.md` for the full
-rationale. The `apps/web` UI (a third "Mein Spielstil" toggle chip reading `ArchetypeStats` from
-the store) is a separate follow-up session, not part of this backend slice.
+rationale. The `apps/web` UI is the third "Mein Spielstil" toggle chip on
+`ArchetypeRecommendationPanel` (§15), reading `ArchetypeStats` passed down from the store via
+`MetaPage` → `ArchetypeDetail` (the panel itself stays store-free).
 
 ---
 

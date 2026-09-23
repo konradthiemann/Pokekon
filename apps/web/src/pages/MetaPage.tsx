@@ -485,7 +485,7 @@ function RecentTournaments() {
 
 export function MetaPage() {
   const { t } = useTranslation('meta');
-  const { isSyncing, syncProgress, syncError, lastSynced } = useDashboardStore();
+  const { isSyncing, syncProgress, syncError, lastSynced, archetypeStats } = useDashboardStore();
   const [selected, setSelected] = useState<ArchetypeSelection | null>(null);
 
   // Meta window (days back + online Bo1-Swiss scope). Drives BOTH the overview
@@ -566,6 +566,7 @@ export function MetaPage() {
         onDaysChange={setDays}
         onOnlineBo1Change={setOnlineBo1}
         onBack={() => setSelected(null)}
+        archetypeStats={archetypeStats}
       />
     );
   }

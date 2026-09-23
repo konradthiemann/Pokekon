@@ -10,6 +10,7 @@ import {
   type ArchetypeListEntry,
   type MetaWindow,
 } from '../../lib/api';
+import type { ArchetypeStats } from '../../types';
 import { PokemonIcon } from '../shared/PokemonIcon';
 import { ArchetypeRecommendationPanel } from './ArchetypeRecommendationPanel';
 import { DecklistCard } from './DecklistCard';
@@ -59,6 +60,11 @@ interface ArchetypeDetailProps {
   onDaysChange: (days: number) => void;
   onOnlineBo1Change: (onlineBo1: boolean) => void;
   onBack: () => void;
+  /** Own opponent-facing record for every archetype (dashboardStore, always
+   *  `[]` at minimum -- never `undefined`), passed through to
+   *  `ArchetypeRecommendationPanel`'s "Mein Spielstil" mode (Spec 10 Slice E
+   *  UI). This component stays store-free itself, see that panel's docstring. */
+  archetypeStats: ArchetypeStats[];
 }
 
 /** One successful load, tagged with the request key it answers. */
@@ -92,6 +98,7 @@ export function ArchetypeDetail({
   onDaysChange,
   onOnlineBo1Change,
   onBack,
+  archetypeStats,
 }: ArchetypeDetailProps) {
   const { t } = useTranslation('meta');
   const { days, online, bo1 } = window;
@@ -302,6 +309,7 @@ export function ArchetypeDetail({
             archetypeId={archetypeId}
             archetypeName={archetypeName}
             windowDays={days}
+            archetypeStats={archetypeStats}
           />
 
           {/* Decklists */}

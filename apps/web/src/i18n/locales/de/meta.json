@@ -141,8 +141,10 @@
       "title": "KI-Empfehlung",
       "scope": {
         "global": "Global",
-        "local": "Lokal"
+        "local": "Lokal",
+        "personal": "Mein Spielstil"
       },
+      "personalInsufficientData": "Noch zu wenig eigene Spiele gegen dieses Archetyp ({{count}} von {{min}}) — die Empfehlung entspricht bisher dem lokalen Modus.",
       "stale": "Zahlen haben sich geändert",
       "noFacts": "Noch zu wenig geclusterte Turnierdaten — nach dem nächsten \"Sync Live Meta\" oder einem größeren Zeitfenster verfügbar.",
       "noKey": "Noch kein KI-Schlüssel hinterlegt. Trage einen in den KI-Einstellungen ein, um eine Zusammenfassung zu erzeugen.",
