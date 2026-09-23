@@ -867,7 +867,7 @@ export interface PersonalRecordInput {
  *  (`personalWins`/`personalLosses`/`personalTies`, see
  *  `archetypeSynthesisQuerySchema`) so a personalised GET can match the
  *  `currentInputHash` a personalised POST just produced. `localField`
- *  (Spec 10 Slice D, HANDOVER_SPEC10.md "Was fehlt" 3) travels as a
+ *  (Spec 10 Slice D, specs/archetype-meta-analysis.md) travels as a
  *  JSON-encoded query string — same `localFieldQueryParam` encoding the
  *  server expects (apps/api/src/validation.ts) — for the same
  *  hash-consistency reason. */
@@ -905,7 +905,7 @@ export async function getArchetypeSynthesis(
  *  identical to `generateDeckSynthesis`'s BYOK contract. `usePersonalPrior`/
  *  `personalRecord`/`localField` match `archetypeSynthesisPostSchema` exactly
  *  and only take effect for `scope: 'local'` (enforced server-side).
- *  `localField` is Spec 10 Slice D (HANDOVER_SPEC10.md "Was fehlt" 3). */
+ *  `localField` is Spec 10 Slice D (specs/archetype-meta-analysis.md). */
 export async function generateArchetypeSynthesis(
   archetypeId: string,
   opts?: {
@@ -943,8 +943,8 @@ export async function generateArchetypeSynthesis(
   );
 }
 
-// ─── Per-tournament best list (Spec 10 AC-G third bullet, HANDOVER_SPEC10.md
-// "Was fehlt" point 4) ───────────────────────────────────────────────────────
+// ─── Per-tournament best list (Spec 10 AC-G third bullet,
+// specs/archetype-meta-analysis.md) ─────────────────────────────────────────
 
 /** GET /api/analysis/tournament/{tournamentId}/archetype/{archetypeId} —
  *  read-only, never triggers an LLM call: which (clustered) decklist of this

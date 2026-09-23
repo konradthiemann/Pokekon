@@ -560,8 +560,8 @@ export function MetaPage() {
 
   // Moved above the `selected` early return (below) so both branches can use
   // it: the drilldown passes it to `ArchetypeRecommendationPanel`'s
-  // local-field derivation (Spec 10 Slice D, HANDOVER_SPEC10.md "Was fehlt"
-  // 3), the overview uses it for the matchup matrix/icons. Safe to hoist --
+  // local-field derivation (Spec 10 Slice D, specs/archetype-meta-analysis.md),
+  // the overview uses it for the matchup matrix/icons. Safe to hoist --
   // no hooks are called between here and the previous position, and
   // `archetypes` itself is not a hook.
   const archetypes = fieldAnalysis?.archetypes ?? [];

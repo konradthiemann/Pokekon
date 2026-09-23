@@ -5376,7 +5376,7 @@ describe('GET/POST /api/analysis/archetype/:archetypeId (Spec 10 Slice C)', () =
   });
 });
 
-// Spec 10 AC-G third bullet / HANDOVER_SPEC10.md "Was fehlt" point 4: per
+// Spec 10 AC-G third bullet (specs/archetype-meta-analysis.md): per
 // tournament recommendation. Reuses the exact same clusterDecklists/
 // rankClusters/computeClusterFieldScores/reorderClustersByFieldScore
 // composition as buildArchetypeSynthesisFactSet (Slice C/D), but scoped to

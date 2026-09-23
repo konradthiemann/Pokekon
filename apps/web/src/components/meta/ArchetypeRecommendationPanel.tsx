@@ -32,7 +32,7 @@ interface ArchetypeRecommendationPanelProps {
    *  to resolve `localMeta`'s archetype NAMES to their real
    *  archetypeId/Limitless-slug and a default weight (`seedWeight`), the same
    *  lookup `PredictionPanel.tsx` uses for the same purpose (Spec 10 Slice D,
-   *  HANDOVER_SPEC10.md "Was fehlt" 3). */
+   *  specs/archetype-meta-analysis.md). */
   archetypes: FieldAnalysisArchetype[];
   /** The user's configured local-meta archetype NAMES (dashboardStore slice,
    *  Spec 10 Slice D), passed down from `MetaPage` like `archetypeStats`
@@ -51,7 +51,7 @@ type RecommendationMode = 'global' | 'local' | 'personal';
 /** One successful GET, tagged with the request key it answers (archetype +
  *  window + scope) — same "ignore stale responses" pattern as
  *  ArchetypeDetail.tsx's LoadedDetail, deliberately local state instead of
- *  the dashboardStore (Spec 10 Slice C UI, HANDOVER_SPEC10.md "Was fehlt" 1+2). */
+ *  the dashboardStore (Spec 10 Slice C UI, specs/archetype-meta-analysis.md). */
 interface LoadedSynthesis {
   key: string;
   data: ArchetypeSynthesisReadResponse;
@@ -86,7 +86,7 @@ function ClusterItem({ cluster }: { cluster: RankedCluster }) {
         </p>
       )}
       {/* Field-weighted re-ranking against the user's local meta (Spec 10
-          Slice D, HANDOVER_SPEC10.md "Was fehlt" 3) -- only present when the
+          Slice D, specs/archetype-meta-analysis.md) -- only present when the
           server actually re-ranked this cluster (scope:'local' + a non-empty
           localField), regardless of this panel's current `mode` prop drift. */}
       {cluster.fieldScore?.fieldWinRatePct != null && (
@@ -176,8 +176,8 @@ export function ArchetypeRecommendationPanel({
   const personalDataInsufficient =
     usePersonalPrior && (!matchingStats || personalGames < DEFAULT_MIN_OWN_GAMES);
 
-  // The user's local meta field (Spec 10 Slice D, HANDOVER_SPEC10.md "Was
-  // fehlt" 3) -- same derivation as PredictionPanel.tsx's own `field`: one
+  // The user's local meta field (Spec 10 Slice D, specs/archetype-meta-analysis.md)
+  // -- same derivation as PredictionPanel.tsx's own `field`: one
   // entry per `localMeta` archetype NAME, resolved to its real archetypeId
   // via the current online meta (`archetypes`) and weighted by its stored
   // override or (default) `seedWeight(sharePct)`. `weightOverrides` is read

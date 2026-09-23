@@ -24,8 +24,8 @@ import type { ArchetypeStats } from '../../types';
 
 /**
  * Spec 10 (specs/archetype-meta-analysis.md) + plan
- * ~/.claude/plans/velvety-finding-bengio.md — UI slice ("Was fehlt", point 1+2
- * of HANDOVER_SPEC10.md). This panel deliberately uses its own local state
+ * ~/.claude/plans/velvety-finding-bengio.md — UI slice (AC C/D/E). This panel
+ * deliberately uses its own local state
  * (request-key pattern, same as ArchetypeDetail.tsx) instead of the
  * dashboardStore, so — unlike DeckSynthesisPanel.test.tsx — the API module
  * itself is mocked, not a store.

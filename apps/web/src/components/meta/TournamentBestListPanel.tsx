@@ -103,7 +103,7 @@ interface Failed {
 
 /**
  * Per-tournament "which list would have been best here" panel (Spec 10 AC-G
- * third bullet, HANDOVER_SPEC10.md "Was fehlt" point 4). Mounted in
+ * third bullet, specs/archetype-meta-analysis.md). Mounted in
  * `ArchetypeDetail.tsx` after the raw decklists. Conceptually separate from
  * `ArchetypeRecommendationPanel`'s multi-tournament KI recommendation: this
  * is a pure read (`GET /api/analysis/tournament/:tournamentId/archetype/:archetypeId`,

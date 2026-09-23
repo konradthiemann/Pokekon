@@ -1,5 +1,10 @@
 # Spec 10: Archetyp-zentrierte Meta-Analyse (Listen-Clustering, personalisierte Prediction, Lokale-Meta-Konsolidierung)
 
+> **Status (2026-09-23): vollständig umgesetzt.** Alle Akzeptanzkriterien A–G sind erfüllt,
+> über die PRs #81–#95 (Details siehe `docs/features.md` §15/§16/§20 und die dort verlinkten
+> Komponenten). Einzige bewusst nicht umgesetzte, in "Out of Scope" benannte Erweiterung: die
+> RK9-Labs/PokeData.ovh-Datenquellen-Prüfung (Out-of-Scope-Abschnitt unten).
+
 > Kein Teil der ursprünglichen 9-Spec-Kette aus [`deck-improvement-hub-vision.md`](./deck-improvement-hub-vision.md)
 > (bestätigt 2026-08-31) — neue Anforderung aus Live-Nutzung der bereits gebauten Specs 3/5/6/7/8.
 > Baut auf vorhandener Infrastruktur auf, die **nicht neu gebaut** wird:
@@ -65,84 +70,84 @@ filterbaren Turnier-Mindestgrößen.
 
 ### A — Listen-Clustering (neu, kein bestehender Code)
 
-- [ ] Neue reine Funktion in `packages/shared/` (Analogie zu `matchupConflict.ts`), die zwei
+- [x] Neue reine Funktion in `packages/shared/` (Analogie zu `matchupConflict.ts`), die zwei
       60-Karten-Decklisten auf Kartenidentität vergleicht und einen Overlap-Score liefert
       (z. B. Anteil identischer Karten inkl. Anzahl).
-- [ ] Listen eines Archetyps aus dem Analysefenster werden anhand eines Schwellenwerts zu
+- [x] Listen eines Archetyps aus dem Analysefenster werden anhand eines Schwellenwerts zu
       Clustern zusammengefasst (Schwellenwert: siehe Offene Fragen); jedes Cluster trägt die
       **Summe** der Spiele/Ergebnisse seiner Mitgliedslisten, nicht nur die des Cluster-Vertreters.
-- [ ] Ein Cluster mit nur einer Liste bleibt erhalten (keine erzwungene Zusammenfassung) — das
+- [x] Ein Cluster mit nur einer Liste bleibt erhalten (keine erzwungene Zusammenfassung) — das
       schützt explizit die "Nadel im Heuhaufen"-Anforderung aus der Nutzeranfrage.
 
 ### B — Gewichtung/Ranking (erweitert `wilsonInterval.ts`/`fieldWinRate.ts`)
 
-- [ ] Ranking der Cluster nutzt den Wilson-Score-**Lower-Bound** (nicht den rohen Mittelwert)
+- [x] Ranking der Cluster nutzt den Wilson-Score-**Lower-Bound** (nicht den rohen Mittelwert)
       über die kombinierte Spielzahl des Clusters — schützt gegen kleine-Stichprobe-Verzerrung,
       ohne seltene Cluster kategorisch auszuschließen (kein hartes Mindest-Spiele-Cutoff, analog
       zur in Spec 3 bereits getroffenen Entscheidung gegen einen binären Cutoff).
-- [ ] Turnier-Platzierung eines Piloten fließt als zusätzlicher, dokumentierter Faktor ein
+- [x] Turnier-Platzierung eines Piloten fließt als zusätzlicher, dokumentierter Faktor ein
       (z. B. Top-8/Top-16/Top-32-Bonus oder Platzierungs-Perzentil) — Gewichtungsformel ist im
       Code kommentiert nachvollziehbar, kein Black-Box-Score ohne Herleitung.
-- [ ] Bestehende `fieldWinRate.ts`/`computeFieldScores`-Logik wird für die Feld-gewichtete
+- [x] Bestehende `fieldWinRate.ts`/`computeFieldScores`-Logik wird für die Feld-gewichtete
       Performance pro Cluster wiederverwendet, nicht dupliziert.
 
 ### C — Beste Liste global + KI-Empfehlung (erweitert Spec 8)
 
-- [ ] Neuer Analyse-Input-Typ für `assembleSynthesis`/`validateSynthesis`
+- [x] Neuer Analyse-Input-Typ für `assembleSynthesis`/`validateSynthesis`
       (`packages/shared/src/deckSynthesis.ts`), der Cluster-Ranking + Konfidenzband +
       Verbesserungsvorschlag (Kartentausch-Ebene, nicht Spielweise — Unterscheidung aus
       `CLAUDE.md` §5 bleibt erhalten) als strukturierte Datenpunkte durchreicht.
-- [ ] Jede Aussage der generierten Empfehlung ist auf einen konkreten Cluster-Datenpunkt
+- [x] Jede Aussage der generierten Empfehlung ist auf einen konkreten Cluster-Datenpunkt
       zurückführbar (gleiches Prinzip wie Spec 8 AC 3), inklusive Kartentausch-Vorschlägen, die
       nur Karten nennen, die tatsächlich in mindestens einer Liste des Analysefensters
       vorkommen.
-- [ ] Nutzt das bestehende `AnalysisProvider`-Interface (`apps/api/src/ai/provider.ts`) und die
+- [x] Nutzt das bestehende `AnalysisProvider`-Interface (`apps/api/src/ai/provider.ts`) und die
       bestehende BYOK-Schlüsselverwaltung — kein zweiter KI-Integrationsweg.
 
 ### D — Lokale Meta: Konsolidierung + eigene beste Liste
 
-- [ ] `LocalMetaPanel` (Archetyp-Namensliste) wird die **einzige** Eingabe-Quelle für "welche
+- [x] `LocalMetaPanel` (Archetyp-Namensliste) wird die **einzige** Eingabe-Quelle für "welche
       Decks erwarte ich lokal"; `PredictionPanel`s separates, redundantes Eingabefeld
       (`LocalFieldEntry[]`, `tcg-local-meta-field-v1`) entfällt als zweite manuelle Eingabe.
-- [ ] Gewichte für das lokale Feld werden aus `localMeta` **abgeleitet** (sinnvoller Default,
+- [x] Gewichte für das lokale Feld werden aus `localMeta` **abgeleitet** (sinnvoller Default,
       z. B. Gleichgewichtung oder aus globaler Meta-Frequenz übernommen), mit Override-Möglichkeit
       pro Eintrag statt einer komplett separaten zweiten Liste.
-- [ ] Dieselbe Cluster-Ranking- und KI-Empfehlungs-Pipeline aus B/C läuft wahlweise gegen das
+- [x] Dieselbe Cluster-Ranking- und KI-Empfehlungs-Pipeline aus B/C läuft wahlweise gegen das
       lokale Feld statt der globalen Meta-Verteilung und kann zu einer anderen empfohlenen
       Liste führen als die globale Analyse — beide Ergebnisse sind nebeneinander sichtbar oder
       eindeutig umschaltbar (UI-Detail: Plan-Phase).
-- [ ] Keine neue `localStorage`-Datendoppelung eingeführt (CLAUDE.md Golden Rule 4).
+- [x] Keine neue `localStorage`-Datendoppelung eingeführt (CLAUDE.md Golden Rule 4).
 
 ### E — Spielstil-Anpassung
 
-- [ ] Eigene Matchup-Historie (`ArchetypeStats`) fließt optional als zusätzlicher Gewichtungsfaktor
+- [x] Eigene Matchup-Historie (`ArchetypeStats`) fließt optional als zusätzlicher Gewichtungsfaktor
       in die Cluster-Bewertung ein (Bayes-Prior-artige Blendung: je mehr eigene Spiele gegen ein
       Matchup, desto mehr Gewicht auf die eigene Erfahrung statt auf die globale Zahl).
-- [ ] Ein dokumentierter Mindest-Stichprobenumfang eigener Spiele pro Matchup ist Voraussetzung,
+- [x] Ein dokumentierter Mindest-Stichprobenumfang eigener Spiele pro Matchup ist Voraussetzung,
       bevor die eigene Erfahrung überhaupt einfließt (schützt vor Overfitting auf z. B. 2 eigene
       Spiele) — konkreter Schwellenwert: siehe Offene Fragen.
-- [ ] Diese Anpassung ist klar als "an deinen Spielstil angepasst" von der reinen
+- [x] Diese Anpassung ist klar als "an deinen Spielstil angepasst" von der reinen
       Meta-Empfehlung unterscheidbar (Nutzer sieht, welche der beiden Empfehlungen er ansieht).
 
 ### F — Prediction-Panel UI
 
-- [ ] `PredictionPanel`s äußere `CollapsibleSection` in `MetaPage.tsx` ist standardmäßig
+- [x] `PredictionPanel`s äußere `CollapsibleSection` in `MetaPage.tsx` ist standardmäßig
       **eingeklappt** (`defaultOpen={false}`, gleiches Muster wie bereits beim Equilibrium-Layer
       aus Spec 6 und der in dieser Runde bereits umgesetzten Matchup-Matrix).
-- [ ] Internes `fieldOpen`-`useState(true)` in `PredictionPanel.tsx` wird konsistent zum äußeren
+- [x] Internes `fieldOpen`-`useState(true)` in `PredictionPanel.tsx` wird konsistent zum äußeren
       Collapse-Zustand behandelt (kein doppelt offener/geschlossener Widerspruch beim ersten
       Aufklappen).
-- [ ] Platzierung auf der Seite folgt aus der D-Konsolidierung (Prediction erscheint im
+- [x] Platzierung auf der Seite folgt aus der D-Konsolidierung (Prediction erscheint im
       Kontext des — nun einzigen — lokalen Feldes, nicht als eigenständiger, gleichrangiger
       Abschnitt danebem) — konkretes Layout ist Aufgabe der Plan-Phase, nicht dieser Spec.
 
 ### G — Turnier-Filter + Pro-Turnier-Empfehlung
 
-- [ ] Ein einheitlicher, an **einer** Stelle konfigurierter Mindestspieler-Default ersetzt die
+- [x] Ein einheitlicher, an **einer** Stelle konfigurierter Mindestspieler-Default ersetzt die
       drei aktuell abweichenden Werte (`syncMeta.ts` 16, `metaFetch.ts` 30, `MetaPage.tsx` 30).
-- [ ] UI-Filter erlaubt, Turniere unterhalb des Defaults anzuzeigen (nicht nur strenger, auch
+- [x] UI-Filter erlaubt, Turniere unterhalb des Defaults anzuzeigen (nicht nur strenger, auch
       lockerer als der Default einstellbar).
-- [ ] Für ein ausgewähltes Turnier + einen ausgewählten Archetyp zeigt die App, welche
+- [x] Für ein ausgewähltes Turnier + einen ausgewählten Archetyp zeigt die App, welche
       (geclusterte) Liste dieses Archetyps für **dieses spezifische Turnierfeld** die beste
       erwartete Performance gehabt hätte, mit Begründung, die auf die tatsächlichen
       Turnier-Gegner-Daten verweist (baut auf `ArchetypeDetail.tsx`/`getArchetypeLists` auf).
@@ -173,26 +178,49 @@ filterbaren Turnier-Mindestgrößen.
   Rate-Limits, Nutzungsbedingungen, tatsächliche API-Stabilität sind offen. Klärung: eigener
   kurzer Recherche-Task (`ptcg-meta-researcher`) vor der Plan-Phase, falls diese Datenquelle
   gewünscht ist — sonst bleibt es bei Limitless + TrainerHill.
+  **Weiterhin offen** (bewusst out of scope, siehe oben) — keine Umsetzung in Spec 10.
 - **Cluster-Schwellenwert (A):** Der Nutzer nannte "58 von 60 gleichen Karten" als Beispiel.
   Ob das exakt der Schwellenwert sein soll oder ob ein anderer (z. B. prozentual, oder
   kartenkategorie-gewichtet — ein getauschtes Tech-Tool wiegt anders als eine getauschte
   Kernkarte) sinnvoller ist, ist offen und sollte in der Plan-Phase mit konkreten
   Beispiel-Listenpaaren aus echten Daten geprüft werden.
+  **Entschieden (Plan-Phase):** 55/60 (≈91,7 %) als Default-Konstante
+  (`DEFAULT_MIN_OVERLAP_RATIO`, `packages/shared/src/decklistClustering.ts`) — bewusst etwas
+  toleranter als das "58/60"-Beispiel, damit ein reiner 1-Energie-Swap zusammenfällt; per
+  `opts.minOverlapRatio` überschreibbar, nicht an echten Turnierdaten nachjustiert.
 - **90-Tage-Fenster vs. bestehendes 1/2/3/4-Wochen-Konzept:** CLAUDE.md §5 nennt das
   Wochen-Fenster als "durchgängigen Analyse-Parameter". Offen, ob 90 Tage dieses Konzept für
   diese Analyse ersetzt, als fünfte Fenstergröße ergänzt, oder ob 90 Tage nur der Standardwert
   eines weiterhin frei wählbaren Fensters wird.
+  **Entschieden (Plan-Phase):** 90 Tage ist der Default (`ARCHETYPE_SYNTHESIS_DEFAULT_DAYS`,
+  `apps/api/src/validation.ts`) eines weiterhin frei wählbaren `days`-Parameters — ersetzt das
+  bestehende Wochen-Konzept nicht, ergänzt es für diese Analyse.
 - **Platzierungs-Gewichtungsformel (B):** Konkrete Kurve (linear nach Perzentil? Stufen wie
   Top-8/16/32? Turniergröße als zusätzlicher Faktor, da Platz 8 bei 200 Spielern etwas anderes
   bedeutet als Platz 8 bei 20?) ist nicht spezifiziert — Vorschlag für die Plan-Phase, keine
   Vorwegnahme hier.
+  **Entschieden (Plan-Phase):** kein Multiplikator — `avgPlacementPercentile` ist ein reines
+  Sekundär-/Tie-Breaker-Signal neben dem primären Wilson-Lower-Bound-Ranking (`rankClusters`,
+  `packages/shared/src/clusterRanking.ts`), keine eigene Kurve/Stufenformel.
 - **Mindest-Stichprobe für Spielstil-Blending (E):** Kein konkreter Schwellenwert festgelegt
   (Vorschlag als Diskussionsgrundlage: analog zur bestehenden `encounters < 5`-Schwelle in
   `MyMatchupsTable`, aber ggf. pro Matchup statt insgesamt) — mit Konrad zu klären.
+  **Entschieden:** `DEFAULT_MIN_OWN_GAMES = 5` (`packages/shared/src/personalPriorBlend.ts`),
+  gesamt (nicht pro Matchup) — konsistent mit `MyMatchupsTable`s bestehender Schwelle. Zusätzlich
+  mit Konrad geklärt (2026-09-23): die geblendete Bilanz ist die **gegner-bezogene**
+  `ArchetypeStats` (wie gut man GEGEN den Archetyp abschneidet), nicht eine eigene
+  Piloten-Bilanz — bewusster, dokumentierter Kompromiss (kein neuer Datenpfad nötig).
 - **UI für global vs. lokal vs. spielstil-angepasst (C/D/E):** Drei mögliche Empfehlungen
   nebeneinander — als Tabs, als umschaltbarer Einzel-Slot, oder alle drei gleichzeitig sichtbar?
   Nicht entschieden, Aufgabe der Plan-Phase in Abstimmung mit Konrad.
+  **Entschieden:** drei Toggle-Chips ("Global"/"Lokal"/"Mein Spielstil") über EINER
+  Ergebnis-Fläche (`ArchetypeRecommendationPanel.tsx`), kein Nebeneinander mehrerer Panels.
 - **Pro-Turnier-Empfehlung (G):** Reicht die bestehende `ArchetypeDetail`/`getArchetypeLists`-
   Datenlage aus, oder braucht es zusätzliche Persistenz (z. B. welche Liste in welchem
   konkreten Turnier gegen wen spielte), um "beste Liste für DIESES Turnier" wirklich zu
   begründen statt zu schätzen? Zu prüfen in der Plan-Phase.
+  **Entschieden:** die bestehende Datenlage reicht aus (`tournament_standings.match_results` +
+  `.decklist`), keine zusätzliche Persistenz nötig — `GET
+  /api/analysis/tournament/:tournamentId/archetype/:archetypeId` komponiert die bereits
+  vorhandenen `clusterDecklists`/`rankClusters`/`computeClusterFieldScores` auf einen einzelnen
+  Turnier-Kontext statt eines Zeitfensters.
