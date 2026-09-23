@@ -942,3 +942,35 @@ export async function generateArchetypeSynthesis(
     },
   );
 }
+
+// ─── Per-tournament best list (Spec 10 AC-G third bullet, HANDOVER_SPEC10.md
+// "Was fehlt" point 4) ───────────────────────────────────────────────────────
+
+/** GET /api/analysis/tournament/{tournamentId}/archetype/{archetypeId} —
+ *  read-only, never triggers an LLM call: which (clustered) decklist of this
+ *  archetype would have performed best against THIS ONE tournament's actual
+ *  field, with the field-weighted evidence (real per-opponent match results,
+ *  no generated text). `clusters: []` is "honestly empty" (the archetype
+ *  simply wasn't played at this tournament), not an error. */
+export interface TournamentArchetypeBestListResponse {
+  tournamentId: string;
+  tournamentName: string;
+  tournamentDate: string;
+  totalPlayers: number;
+  archetypeId: string;
+  archetypeName: string;
+  clusters: RankedCluster[];
+  /** This tournament's own field (every archetype actually present here) —
+   *  lets the UI resolve opponent names for `ListFieldPerformance` without a
+   *  second request. */
+  field: { archetypeId: string; archetypeName: string }[];
+}
+
+export async function getTournamentArchetypeBestList(
+  tournamentId: string,
+  archetypeId: string,
+): Promise<TournamentArchetypeBestListResponse> {
+  return request<TournamentArchetypeBestListResponse>(
+    `/api/analysis/tournament/${encodeURIComponent(tournamentId)}/archetype/${encodeURIComponent(archetypeId)}`,
+  );
+}

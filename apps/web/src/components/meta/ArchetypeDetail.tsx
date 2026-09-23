@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Loader2, TrendingUp } from 'lucide-react';
 import { wilsonInterval } from '@pokekon/shared';
@@ -19,6 +19,7 @@ import { FieldScorePanel } from './FieldScorePanel';
 import { MatchupTable } from './MatchupTable';
 import { MetaWindowControl } from './MetaWindowControl';
 import { ThreatsPanel } from './ThreatsPanel';
+import { TournamentBestListPanel } from './TournamentBestListPanel';
 import { WinRateBadge } from './WinRateBadge';
 import { winRateColorClass, winRatePct1 } from './winRateColor';
 
@@ -154,10 +155,21 @@ export function ArchetypeDetail({
   const failure = failed?.key === requestKey ? failed : null;
   const isLoading = current === null && failure === null;
   const analysis = current?.analysis ?? null;
-  const lists = current?.lists ?? [];
+  const lists = useMemo(() => current?.lists ?? [], [current]);
   const listsTotal = current?.listsTotal ?? 0;
   const notInWindow = failure?.notInWindow ?? false;
   const error = failure !== null && !failure.notInWindow ? failure.message : null;
+
+  // DISTINCT tournaments the currently loaded lists were drawn from (Spec 10
+  // AC-G third bullet, HANDOVER_SPEC10.md "Was fehlt" point 4) — deduplicated
+  // by tournament id, for the TournamentBestListPanel's selector below.
+  const tournaments = useMemo(() => {
+    const byId = new Map<string, { id: string; name: string; date: string; players: number }>();
+    for (const entry of lists) {
+      if (!byId.has(entry.tournament.id)) byId.set(entry.tournament.id, entry.tournament);
+    }
+    return [...byId.values()];
+  }, [lists]);
 
   const loadMoreLists = useCallback(() => {
     if (current === null) return;
@@ -375,6 +387,13 @@ export function ArchetypeDetail({
               </div>
             )}
           </div>
+
+          {/* Per-tournament "best list for this field" (Spec 10 AC-G third
+              bullet, HANDOVER_SPEC10.md "Was fehlt" point 4) -- only once at
+              least one tournament is known from the currently loaded lists. */}
+          {tournaments.length > 0 && (
+            <TournamentBestListPanel archetypeId={archetypeId} tournaments={tournaments} />
+          )}
         </>
       )}
     </div>

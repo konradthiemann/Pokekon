@@ -5376,6 +5376,202 @@ describe('GET/POST /api/analysis/archetype/:archetypeId (Spec 10 Slice C)', () =
   });
 });
 
+// Spec 10 AC-G third bullet / HANDOVER_SPEC10.md "Was fehlt" point 4: per
+// tournament recommendation. Reuses the exact same clusterDecklists/
+// rankClusters/computeClusterFieldScores/reorderClustersByFieldScore
+// composition as buildArchetypeSynthesisFactSet (Slice C/D), but scoped to
+// ONE tournament's own field instead of a multi-tournament window — no new
+// packages/shared functions needed.
+describe('GET /api/analysis/tournament/:tournamentId/archetype/:archetypeId', () => {
+  async function clearTournamentBestListData(): Promise<void> {
+    await db.delete(schema.tournaments); // standings cascade
+  }
+
+  const decklistA: TournamentDecklist = {
+    pokemon: [
+      { name: 'Dragapult ex', count: 3 },
+      { name: 'Dreepy', count: 4 },
+    ],
+    trainer: [
+      { name: 'Iono', count: 4 },
+      { name: 'Ultra Ball', count: 4 },
+    ],
+    energy: [{ name: 'Basic Psychic Energy', count: 9 }],
+  };
+
+  /** Shares no cards with decklistA (overlapRatio 0) -- used to force two
+   *  distinct clusters within the same archetype, same precedent as
+   *  sampleDecklistB in the Slice D localField tests above. */
+  const decklistB: TournamentDecklist = {
+    pokemon: [{ name: 'Charizard ex', count: 2 }],
+    trainer: [{ name: "Professor's Research", count: 4 }],
+    energy: [{ name: 'Basic Fire Energy', count: 10 }],
+  };
+
+  let userSeq = 0;
+  async function freshUser(): Promise<string> {
+    userSeq += 1;
+    const id = `user-tournament-best-list-${userSeq}`;
+    await createUser(id);
+    return id;
+  }
+
+  /** One tournament with THREE standings: two decklists of `archetypeId`
+   *  (A beats the field overall but loses every recorded game vs
+   *  'rival-arch'; B is weaker overall but beats 'rival-arch' every time) and
+   *  one standing of 'rival-arch' itself, so the tournament's real field is
+   *  {archetypeId: ~67%, 'rival-arch': ~33%} — deliberately NOT a
+   *  multi-tournament window, the field-reweighting must only ever see this
+   *  one tournament's opponents. */
+  async function seedTournamentField(
+    tournamentId: string,
+    archetypeId: string,
+    players = 3,
+  ): Promise<void> {
+    await db.insert(schema.tournaments).values({
+      id: tournamentId,
+      name: `${tournamentId} Event`,
+      date: new Date('2026-08-01T00:00:00.000Z'),
+      players,
+      isOnline: true,
+      swissMode: 'BO1',
+    });
+    const lossesVsRival: StandingMatchResult[] = Array.from({ length: 3 }, (_, i) => ({
+      opponentArchetypeId: 'rival-arch',
+      result: 'L' as const,
+      round: i + 1,
+    }));
+    const winsVsRival: StandingMatchResult[] = Array.from({ length: 3 }, (_, i) => ({
+      opponentArchetypeId: 'rival-arch',
+      result: 'W' as const,
+      round: i + 1,
+    }));
+    await db.insert(schema.tournamentStandings).values([
+      {
+        tournamentId,
+        archetypeId,
+        archetypeName: 'Strong Overall',
+        wins: 20,
+        losses: 2,
+        ties: 0,
+        placing: 1,
+        decklist: decklistA,
+        matchResults: lossesVsRival,
+      },
+      {
+        tournamentId,
+        archetypeId,
+        archetypeName: 'Weak Overall, Beats The Rival',
+        wins: 5,
+        losses: 5,
+        ties: 0,
+        placing: 2,
+        decklist: decklistB,
+        matchResults: winsVsRival,
+      },
+      {
+        tournamentId,
+        archetypeId: 'rival-arch',
+        archetypeName: 'Rival Arch',
+        wins: 3,
+        losses: 3,
+        ties: 0,
+        placing: 3,
+        decklist: decklistA, // irrelevant to this archetype's own ranking
+      },
+    ]);
+  }
+
+  it("clusters the two decklists and reorders them by field-weighted score against ONLY this tournament's field", async () => {
+    await clearTournamentBestListData();
+    const tournamentId = 'best-list-t1';
+    const archetypeId = 'best-list-arch';
+    await seedTournamentField(tournamentId, archetypeId);
+    const user = await freshUser();
+
+    const res = await request(`/api/analysis/tournament/${tournamentId}/archetype/${archetypeId}`, {
+      user,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      tournamentId: string;
+      tournamentName: string;
+      tournamentDate: string;
+      totalPlayers: number;
+      archetypeId: string;
+      archetypeName: string;
+      clusters: { representative: TournamentDecklist; rank: number; fieldScore?: unknown }[];
+      field: { archetypeId: string; archetypeName: string }[];
+    };
+
+    expect(body.tournamentId).toBe(tournamentId);
+    expect(body.tournamentName).toBe(`${tournamentId} Event`);
+    expect(body.totalPlayers).toBe(3);
+    expect(body.archetypeId).toBe(archetypeId);
+    // The decklist that actually beats the rival leads once the field
+    // (drawn ONLY from this tournament's own standings) is applied.
+    expect(body.clusters).toHaveLength(2);
+    expect(body.clusters[0]?.representative.pokemon[0]?.name).toBe('Charizard ex');
+    expect(body.clusters[0]?.fieldScore).toBeDefined();
+    // The field is this tournament's own archetypes, not a window aggregate.
+    expect(body.field.map((f) => f.archetypeId).sort()).toEqual([archetypeId, 'rival-arch'].sort());
+  });
+
+  it('returns empty clusters (never an error) for an archetype with no standings at this tournament, falling back to the archetypeId as its name', async () => {
+    await clearTournamentBestListData();
+    const tournamentId = 'best-list-t2';
+    await seedTournamentField(tournamentId, 'played-arch');
+    const user = await freshUser();
+
+    const res = await request(
+      `/api/analysis/tournament/${tournamentId}/archetype/never-played-arch`,
+      { user },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      clusters: unknown[];
+      archetypeName: string;
+      field: { archetypeId: string }[];
+    };
+    expect(body.clusters).toEqual([]);
+    expect(body.archetypeName).toBe('never-played-arch');
+    // The tournament's real field is still reported even though the
+    // requested archetype itself wasn't part of it.
+    expect(body.field.length).toBeGreaterThan(0);
+  });
+
+  it('404s on an unknown tournament id (a valid-shaped but non-existent id is a bad parameter, not an empty result)', async () => {
+    const user = await freshUser();
+    const res = await request(
+      '/api/analysis/tournament/not-a-real-tournament/archetype/some-arch',
+      {
+        user,
+      },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('404s on a malformed tournament id (validation, not a DB lookup)', async () => {
+    const user = await freshUser();
+    const res = await request('/api/analysis/tournament/not valid!/archetype/some-arch', {
+      user,
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('404s on a malformed archetype id (validation, not a DB lookup)', async () => {
+    await clearTournamentBestListData();
+    const tournamentId = 'best-list-t3';
+    await seedTournamentField(tournamentId, 'played-arch');
+    const user = await freshUser();
+
+    const res = await request(`/api/analysis/tournament/${tournamentId}/archetype/Not_Valid!`, {
+      user,
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
 // Scheibe J (plan §3.11, §4 step 19): seedDemoData is expected to write a
 // pre-baked deck_synthesis row (source: 'demo-seed', both languages) for Deck
 // A only — Deck B intentionally stays at the cold-start `synthesis: null`
