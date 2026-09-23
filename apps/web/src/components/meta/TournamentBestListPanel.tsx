@@ -226,14 +226,35 @@ export function TournamentBestListPanel({
       )}
 
       {current && clusters.length > 0 && (
-        <div
-          data-testid="tournament-best-list-cluster-list"
-          className="grid grid-cols-1 sm:grid-cols-2 gap-2"
-        >
-          {clusters.map((cluster) => (
-            <TournamentClusterItem key={cluster.rank} cluster={cluster} />
-          ))}
-        </div>
+        <>
+          {/* Methodology, collapsed by default -- same explanation as
+              ArchetypeRecommendationPanel's ClusterItem, since both render
+              the identical rank/interval/record/placement/field-score
+              numbers with no inline explanation of how they were derived. */}
+          <details data-testid="tournament-best-list-methodology" className="text-xs">
+            <summary
+              data-testid="tournament-best-list-methodology-toggle"
+              className="cursor-pointer w-fit text-slate-500"
+            >
+              {t('archetypeDetail.tournamentBestList.methodology.toggle')}
+            </summary>
+            <ul className="mt-1.5 ml-5 list-disc space-y-1 text-slate-500">
+              <li>{t('archetypeDetail.tournamentBestList.methodology.rank')}</li>
+              <li>{t('archetypeDetail.tournamentBestList.methodology.interval')}</li>
+              <li>{t('archetypeDetail.tournamentBestList.methodology.record')}</li>
+              <li>{t('archetypeDetail.tournamentBestList.methodology.placement')}</li>
+              <li>{t('archetypeDetail.tournamentBestList.methodology.fieldScore')}</li>
+            </ul>
+          </details>
+          <div
+            data-testid="tournament-best-list-cluster-list"
+            className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+          >
+            {clusters.map((cluster) => (
+              <TournamentClusterItem key={cluster.rank} cluster={cluster} />
+            ))}
+          </div>
+        </>
       )}
 
       {current && topCluster && (

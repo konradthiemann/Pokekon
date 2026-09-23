@@ -174,6 +174,14 @@
         "placement": "Avg. placement: top {{pct}} %",
         "fieldScore": "Local field score",
         "viewDecklist": "View full list"
+      },
+      "methodology": {
+        "toggle": "How is this calculated?",
+        "rank": "Rank: tournament decklists with nearly identical cards (55 of 60 or more matching) are merged into one cluster and sorted by the lower bound of the estimated win rate (a Wilson score), not the raw win rate — so a list with few games and a lucky run doesn't automatically land on top.",
+        "interval": "The percentage and range (e.g. 55.2–83.0 %) are the estimated true win rate with a 95% confidence interval — the more games recorded in this cluster, the narrower the range.",
+        "record": "The record sums wins and losses across every list in this cluster, not just the one example list shown.",
+        "placement": "Avg. placement is the average tournament percentile across all cluster members — \"top 1%\" means it placed, on average, in the best 1% of the field.",
+        "fieldScore": "The field score (when shown) is the same win rate, but weighted against your configured local field instead of evenly against every opponent."
       }
     },
     "tournamentBestList": {
@@ -191,6 +199,14 @@
         "placement": "Avg. placement: top {{pct}} %",
         "fieldScore": "Score vs this tournament's field",
         "viewDecklist": "View full list"
+      },
+      "methodology": {
+        "toggle": "How is this calculated?",
+        "rank": "Rank: this archetype's decklists at this tournament with nearly identical cards (55 of 60 or more matching) are merged into one cluster and sorted by the lower bound of the estimated win rate (a Wilson score), not the raw win rate.",
+        "interval": "The percentage and range are the estimated true win rate with a 95% confidence interval — the more games recorded in this cluster, the narrower the range.",
+        "record": "The record sums wins and losses across every list in this cluster at this tournament, not just the one example list shown.",
+        "placement": "Avg. placement is the average tournament percentile across all cluster members — \"top 1%\" means it placed, on average, in the best 1% of the field.",
+        "fieldScore": "The field score is the same win rate, but weighted against this one tournament's actual field, not a multi-tournament window."
       }
     }
   },

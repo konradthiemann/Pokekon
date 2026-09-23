@@ -335,6 +335,21 @@ describe('ArchetypeRecommendationPanel — initial load', () => {
     expect(within(decklist).getByText('Basic Psychic Energy')).toBeVisible();
   });
 
+  it('explains the ranking methodology behind a toggle', async () => {
+    getArchetypeSynthesisMock.mockResolvedValue(makeReadResponse());
+    const user = userEvent.setup();
+
+    render(<ArchetypeRecommendationPanel {...defaultProps} />);
+    await screen.findAllByTestId('archetype-recommendation-cluster-item');
+
+    const methodology = screen.getByTestId('archetype-recommendation-methodology');
+    expect(within(methodology).getByText(/Wilson/)).not.toBeVisible();
+
+    await user.click(screen.getByTestId('archetype-recommendation-methodology-toggle'));
+
+    expect(within(methodology).getByText(/Wilson/)).toBeVisible();
+  });
+
   it('switches to a new GET when the "Local" scope chip is clicked', async () => {
     getArchetypeSynthesisMock.mockResolvedValue(makeReadResponse());
     const user = userEvent.setup();
