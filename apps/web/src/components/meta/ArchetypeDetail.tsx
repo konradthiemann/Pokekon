@@ -8,6 +8,7 @@ import {
   getArchetypeLists,
   type ArchetypeAnalysis,
   type ArchetypeListEntry,
+  type FieldAnalysisArchetype,
   type MetaWindow,
 } from '../../lib/api';
 import type { ArchetypeStats } from '../../types';
@@ -65,6 +66,14 @@ interface ArchetypeDetailProps {
    *  `ArchetypeRecommendationPanel`'s "Mein Spielstil" mode (Spec 10 Slice E
    *  UI). This component stays store-free itself, see that panel's docstring. */
   archetypeStats: ArchetypeStats[];
+  /** Current online meta (MetaPage's `fieldAnalysis.archetypes`), passed
+   *  through to `ArchetypeRecommendationPanel`'s local-field derivation
+   *  (Spec 10 Slice D, HANDOVER_SPEC10.md "Was fehlt" 3). Same store-free
+   *  pass-through precedent as `archetypeStats` above. */
+  archetypes: FieldAnalysisArchetype[];
+  /** The user's configured local-meta archetype NAMES (dashboardStore
+   *  slice), passed through the same way. */
+  localMeta: string[];
 }
 
 /** One successful load, tagged with the request key it answers. */
@@ -99,6 +108,8 @@ export function ArchetypeDetail({
   onOnlineBo1Change,
   onBack,
   archetypeStats,
+  archetypes,
+  localMeta,
 }: ArchetypeDetailProps) {
   const { t } = useTranslation('meta');
   const { days, online, bo1 } = window;
@@ -310,6 +321,8 @@ export function ArchetypeDetail({
             archetypeName={archetypeName}
             windowDays={days}
             archetypeStats={archetypeStats}
+            archetypes={archetypes}
+            localMeta={localMeta}
           />
 
           {/* Decklists */}

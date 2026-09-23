@@ -158,6 +158,7 @@
       "disclosure": "What is this based on?",
       "disclosureDropped": "{{count}} more statements were dropped by the fact check and are not shown.",
       "clustersEmpty": "No clustered decklists in this window yet.",
+      "localFieldEmpty": "No local field configured yet — this currently shows the same ranking as global. Add archetypes to your local field in the meta overview's prediction section to see field-weighted rankings here.",
       "sections": {
         "headline": "Overview",
         "strengths": "Strengths",
@@ -170,7 +171,8 @@
         "games": "Record {{record}}",
         "members_one": "{{count}} list",
         "members_other": "{{count}} lists",
-        "placement": "Avg. placement: top {{pct}} %"
+        "placement": "Avg. placement: top {{pct}} %",
+        "fieldScore": "Local field score"
       }
     }
   },

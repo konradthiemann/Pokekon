@@ -485,7 +485,8 @@ function RecentTournaments() {
 
 export function MetaPage() {
   const { t } = useTranslation('meta');
-  const { isSyncing, syncProgress, syncError, lastSynced, archetypeStats } = useDashboardStore();
+  const { isSyncing, syncProgress, syncError, lastSynced, archetypeStats, localMeta } =
+    useDashboardStore();
   const [selected, setSelected] = useState<ArchetypeSelection | null>(null);
 
   // Meta window (days back + online Bo1-Swiss scope). Drives BOTH the overview
@@ -557,6 +558,14 @@ export function MetaPage() {
     loadedEquilibrium?.key === equilibriumRequestKey ? loadedEquilibrium.data : null;
   const equilibriumError = equilibriumFailedKey === equilibriumRequestKey;
 
+  // Moved above the `selected` early return (below) so both branches can use
+  // it: the drilldown passes it to `ArchetypeRecommendationPanel`'s
+  // local-field derivation (Spec 10 Slice D, HANDOVER_SPEC10.md "Was fehlt"
+  // 3), the overview uses it for the matchup matrix/icons. Safe to hoist --
+  // no hooks are called between here and the previous position, and
+  // `archetypes` itself is not a hook.
+  const archetypes = fieldAnalysis?.archetypes ?? [];
+
   if (selected) {
     return (
       <ArchetypeDetail
@@ -567,11 +576,12 @@ export function MetaPage() {
         onOnlineBo1Change={setOnlineBo1}
         onBack={() => setSelected(null)}
         archetypeStats={archetypeStats}
+        archetypes={archetypes}
+        localMeta={localMeta}
       />
     );
   }
 
-  const archetypes = fieldAnalysis?.archetypes ?? [];
   // Data-driven archetype icons (Limitless deck.icons), keyed by slug — shared
   // with the matchup matrix so every deck renders the icons the source publishes.
   // `icons` is additive: an API that predates it (rollout window) or legacy

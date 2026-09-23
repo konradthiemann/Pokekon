@@ -9,10 +9,13 @@ import { getArchetypeSynthesis, generateArchetypeSynthesis } from '../../lib/api
 import type {
   ArchetypeSynthesisReadResponse,
   ArchetypeSynthesisWriteResponse,
+  FieldAnalysisArchetype,
 } from '../../lib/api';
+import { setLocalMetaWeightOverrides } from '../../lib/preferences';
 import type {
   ArchetypeSynthesis,
   ArchetypeSynthesisContext,
+  FieldScore,
   RankedCluster,
   SynthesisClaim,
   SynthesisFact,
@@ -230,10 +233,49 @@ function makeArchetypeStats(overrides: Partial<ArchetypeStats> = {}): ArchetypeS
   };
 }
 
+function makeFieldAnalysisArchetype(
+  overrides: Partial<FieldAnalysisArchetype> = {},
+): FieldAnalysisArchetype {
+  return {
+    archetypeId: 'lost-box',
+    archetypeName: 'Lost Box',
+    sharePct: 12,
+    winRatePct: 55,
+    wins: 10,
+    losses: 8,
+    ties: 0,
+    playerCount: 20,
+    icons: [],
+    fieldWinRatePct: 52,
+    coveragePct: 90,
+    rank: 2,
+    ...overrides,
+  };
+}
+
+function makeFieldScore(overrides: Partial<FieldScore> = {}): FieldScore {
+  return {
+    archetypeId: 'dragapult-ex',
+    archetypeName: 'Dragapult ex',
+    sharePct: 20,
+    fieldWinRatePct: 58.4,
+    fieldWinRateLowPct: 48.1,
+    fieldWinRateHighPct: 68.7,
+    coveragePct: 90,
+    mirrorSharePct: 5,
+    rank: 1,
+    threats: [],
+    freeWins: [],
+    ...overrides,
+  };
+}
+
 const defaultProps = {
   archetypeId: 'dragapult-ex',
   archetypeName: 'Dragapult ex',
   windowDays: 90,
+  archetypes: [] as FieldAnalysisArchetype[],
+  localMeta: [] as string[],
 };
 
 describe('ArchetypeRecommendationPanel — initial load', () => {
@@ -523,5 +565,182 @@ describe('ArchetypeRecommendationPanel — personal mode (Spec 10 Slice E UI)', 
       usePersonalPrior: true,
       personalRecord: { wins: 6, losses: 3, ties: 1 },
     });
+  });
+});
+
+describe('ArchetypeRecommendationPanel — local field weighting (Spec 10 Slice D UI)', () => {
+  const archetypes = [
+    makeFieldAnalysisArchetype({
+      archetypeId: 'lost-box',
+      archetypeName: 'Lost Box',
+      sharePct: 12,
+    }),
+  ];
+  const localMeta = ['Lost Box'];
+
+  it('switches to a new GET with localField (seed weight from online share) when the "Local" chip is clicked', async () => {
+    getArchetypeSynthesisMock.mockResolvedValue(makeReadResponse());
+    const user = userEvent.setup();
+
+    render(
+      <ArchetypeRecommendationPanel
+        {...defaultProps}
+        archetypes={archetypes}
+        localMeta={localMeta}
+      />,
+    );
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByTestId('archetype-recommendation-scope-local'));
+
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(2));
+    expect(getArchetypeSynthesisMock).toHaveBeenLastCalledWith('dragapult-ex', {
+      days: 90,
+      scope: 'local',
+      localField: [{ archetypeId: 'lost-box', name: 'Lost Box', weight: 12 }],
+    });
+  });
+
+  it('uses a stored weight override instead of the online-share seed weight', async () => {
+    setLocalMetaWeightOverrides({ 'lost-box': 7 });
+    getArchetypeSynthesisMock.mockResolvedValue(makeReadResponse());
+    const user = userEvent.setup();
+
+    render(
+      <ArchetypeRecommendationPanel
+        {...defaultProps}
+        archetypes={archetypes}
+        localMeta={localMeta}
+      />,
+    );
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByTestId('archetype-recommendation-scope-local'));
+
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(2));
+    expect(getArchetypeSynthesisMock).toHaveBeenLastCalledWith('dragapult-ex', {
+      days: 90,
+      scope: 'local',
+      localField: [{ archetypeId: 'lost-box', name: 'Lost Box', weight: 7 }],
+    });
+  });
+
+  it('shows the empty-field hint and sends no localField when localMeta is empty', async () => {
+    getArchetypeSynthesisMock.mockResolvedValue(makeReadResponse());
+    const user = userEvent.setup();
+
+    render(<ArchetypeRecommendationPanel {...defaultProps} archetypes={[]} localMeta={[]} />);
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByTestId('archetype-recommendation-scope-local'));
+
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(2));
+    expect(getArchetypeSynthesisMock).toHaveBeenLastCalledWith('dragapult-ex', {
+      days: 90,
+      scope: 'local',
+    });
+    expect(
+      await screen.findByTestId('archetype-recommendation-local-field-empty'),
+    ).toBeInTheDocument();
+  });
+
+  it('also sends localField in "Mein Spielstil" mode, alongside usePersonalPrior/personalRecord', async () => {
+    getArchetypeSynthesisMock.mockResolvedValue(makeReadResponse());
+    const user = userEvent.setup();
+    const archetypeStats = [
+      makeArchetypeStats({ archetype: 'dragapult-ex', wins: 6, losses: 3, ties: 1 }),
+    ];
+
+    render(
+      <ArchetypeRecommendationPanel
+        {...defaultProps}
+        archetypes={archetypes}
+        localMeta={localMeta}
+        archetypeStats={archetypeStats}
+      />,
+    );
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByTestId('archetype-recommendation-scope-personal'));
+
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(2));
+    expect(getArchetypeSynthesisMock).toHaveBeenLastCalledWith('dragapult-ex', {
+      days: 90,
+      scope: 'local',
+      usePersonalPrior: true,
+      personalRecord: { wins: 6, losses: 3, ties: 1 },
+      localField: [{ archetypeId: 'lost-box', name: 'Lost Box', weight: 12 }],
+    });
+  });
+
+  it('never sends localField in global mode, even with a non-empty localMeta', async () => {
+    getArchetypeSynthesisMock.mockResolvedValue(makeReadResponse());
+
+    render(
+      <ArchetypeRecommendationPanel
+        {...defaultProps}
+        archetypes={archetypes}
+        localMeta={localMeta}
+      />,
+    );
+
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(1));
+    expect(getArchetypeSynthesisMock).toHaveBeenCalledWith('dragapult-ex', {
+      days: 90,
+      scope: 'global',
+    });
+  });
+
+  it('sends localField in the POST body when generating in local mode', async () => {
+    getArchetypeSynthesisMock.mockResolvedValue(
+      makeReadResponse({ synthesis: null, hasApiKey: true, availableFactCount: 3 }),
+    );
+    generateArchetypeSynthesisMock.mockResolvedValue(makeWriteResponse());
+    const user = userEvent.setup();
+
+    render(
+      <ArchetypeRecommendationPanel
+        {...defaultProps}
+        archetypes={archetypes}
+        localMeta={localMeta}
+      />,
+    );
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByTestId('archetype-recommendation-scope-local'));
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(2));
+
+    await user.click(await screen.findByTestId('archetype-recommendation-generate-button'));
+
+    await waitFor(() => expect(generateArchetypeSynthesisMock).toHaveBeenCalledTimes(1));
+    expect(generateArchetypeSynthesisMock).toHaveBeenCalledWith('dragapult-ex', {
+      days: 90,
+      scope: 'local',
+      localField: [{ archetypeId: 'lost-box', name: 'Lost Box', weight: 12 }],
+    });
+  });
+
+  it('renders the field-weighted score on a cluster that has one', async () => {
+    getArchetypeSynthesisMock.mockResolvedValue(
+      makeReadResponse({
+        clusters: [makeCluster({ fieldScore: makeFieldScore({ fieldWinRatePct: 58.4 }) })],
+      }),
+    );
+
+    render(<ArchetypeRecommendationPanel {...defaultProps} />);
+
+    const badge = await screen.findByTestId('archetype-recommendation-cluster-field-score');
+    expect(badge).toHaveTextContent('58.4%');
+  });
+
+  it('does not render the field-score line on a cluster without one', async () => {
+    getArchetypeSynthesisMock.mockResolvedValue(makeReadResponse({ clusters: [makeCluster()] }));
+
+    render(<ArchetypeRecommendationPanel {...defaultProps} />);
+    await screen.findAllByTestId('archetype-recommendation-cluster-item');
+
+    expect(
+      screen.queryByTestId('archetype-recommendation-cluster-field-score'),
+    ).not.toBeInTheDocument();
   });
 });

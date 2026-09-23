@@ -25,6 +25,7 @@ import type {
   MetaSnapshot,
   OpponentLog,
 } from '../types';
+import type { LocalFieldEntry } from './preferences';
 
 /**
  * Thin typed client for the deployed REST API (apps/api).
@@ -865,7 +866,11 @@ export interface PersonalRecordInput {
  *  `personalRecord` mirror the POST body fields as query params
  *  (`personalWins`/`personalLosses`/`personalTies`, see
  *  `archetypeSynthesisQuerySchema`) so a personalised GET can match the
- *  `currentInputHash` a personalised POST just produced. */
+ *  `currentInputHash` a personalised POST just produced. `localField`
+ *  (Spec 10 Slice D, HANDOVER_SPEC10.md "Was fehlt" 3) travels as a
+ *  JSON-encoded query string — same `localFieldQueryParam` encoding the
+ *  server expects (apps/api/src/validation.ts) — for the same
+ *  hash-consistency reason. */
 export async function getArchetypeSynthesis(
   archetypeId: string,
   params?: {
@@ -874,6 +879,7 @@ export async function getArchetypeSynthesis(
     scope?: ArchetypeSynthesisScope;
     usePersonalPrior?: boolean;
     personalRecord?: PersonalRecordInput;
+    localField?: LocalFieldEntry[];
   },
 ): Promise<ArchetypeSynthesisReadResponse> {
   const query = new URLSearchParams();
@@ -886,6 +892,9 @@ export async function getArchetypeSynthesis(
     query.set('personalLosses', String(params.personalRecord.losses));
     query.set('personalTies', String(params.personalRecord.ties));
   }
+  if (params?.localField && params.localField.length > 0) {
+    query.set('localField', JSON.stringify(params.localField));
+  }
   const qs = query.toString();
   return request<ArchetypeSynthesisReadResponse>(
     `/api/analysis/archetype/${encodeURIComponent(archetypeId)}${qs ? `?${qs}` : ''}`,
@@ -894,8 +903,9 @@ export async function getArchetypeSynthesis(
 
 /** Trigger a generation. `apiKey` is the demo-mode ephemeral token path —
  *  identical to `generateDeckSynthesis`'s BYOK contract. `usePersonalPrior`/
- *  `personalRecord` match `archetypeSynthesisPostSchema` exactly and only
- *  take effect for `scope: 'local'` (enforced server-side). */
+ *  `personalRecord`/`localField` match `archetypeSynthesisPostSchema` exactly
+ *  and only take effect for `scope: 'local'` (enforced server-side).
+ *  `localField` is Spec 10 Slice D (HANDOVER_SPEC10.md "Was fehlt" 3). */
 export async function generateArchetypeSynthesis(
   archetypeId: string,
   opts?: {
@@ -908,6 +918,7 @@ export async function generateArchetypeSynthesis(
     model?: string | null;
     usePersonalPrior?: boolean;
     personalRecord?: PersonalRecordInput;
+    localField?: LocalFieldEntry[];
   },
 ): Promise<ArchetypeSynthesisWriteResponse> {
   return request<ArchetypeSynthesisWriteResponse>(
@@ -926,6 +937,7 @@ export async function generateArchetypeSynthesis(
           ? { usePersonalPrior: opts.usePersonalPrior }
           : {}),
         ...(opts?.personalRecord ? { personalRecord: opts.personalRecord } : {}),
+        ...(opts?.localField && opts.localField.length > 0 ? { localField: opts.localField } : {}),
       }),
     },
   );
