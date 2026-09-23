@@ -573,6 +573,27 @@ online-Bo1 window (same scope as every other meta read), and `players >= DEFAULT
 **Not yet surfaced in the UI** — this slice is the API plumbing only; a UI (e.g. on the archetype
 drilldown, §15) is a follow-up.
 
+**Personalisation ("Mein Spielstil", Spec 10 Slice E — backend only, no UI yet):** optional
+`usePersonalPrior: boolean` + a personal win/loss/tie record (`personalWins`/`personalLosses`/
+`personalTies` query params on GET, a `personalRecord: { wins, losses, ties }` object on POST).
+Only takes effect for `scope: 'local'` — on `scope: 'global'` it is silently ignored (no
+validation error). When active and the record has at least `DEFAULT_MIN_OWN_GAMES` (5) games, the
+top-ranked cluster's win rate is blended with the personal record
+(`blendWithPersonalPrior`/`personalPriorBlend.ts`) and surfaces as one extra `personalPrior` fact
+that the LLM prompt can reference — a below-threshold record contributes nothing (no silent
+substitute for the global facts). GET accepts the same fields as POST so `currentInputHash` stays
+consistent between a personalised POST and a matching GET (otherwise GET would wrongly report
+`stale: true` right after generating a personalised synthesis).
+
+**Known, documented compromise:** the personal record is meant to be the **opponent-facing**
+`ArchetypeStats` balance (how well the user does playing AGAINST this archetype, same numbers
+`MyMatchupsTable` shows) — not a "my results piloting this archetype" record, which does not exist
+as a data source. Two different reference frames intentionally coexist: the cluster win rate
+answers "how do this list's pilots perform against the field", `personalPrior` answers "how does
+*this user* perform against this archetype as an opponent". See `docs/data-types.md` for the full
+rationale. The `apps/web` UI (a third "Mein Spielstil" toggle chip reading `ArchetypeStats` from
+the store) is a separate follow-up session, not part of this backend slice.
+
 ---
 
 ## 18. Game-Theoretic Meta Layer (Experimental)

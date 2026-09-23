@@ -1,14 +1,17 @@
 import { and, eq, gte } from 'drizzle-orm';
 import {
+  blendWithPersonalPrior,
   clusterDecklists,
   DEFAULT_MIN_TOURNAMENT_PLAYERS,
   factsFromClusterRanking,
+  factsFromPersonalPriorBlend,
   rankClusters,
   sanitizeFactLabel,
   selectFacts,
   type ArchetypeSynthesisContext,
   type ArchetypeSynthesisScope,
   type ClusterableStanding,
+  type PersonalRecord,
   type RankedCluster,
   type SynthesisFact,
   type SynthesisLanguage,
@@ -24,6 +27,10 @@ export interface BuildArchetypeSynthesisFactSetInput {
   windowDays: number;
   language: SynthesisLanguage;
   scope: ArchetypeSynthesisScope;
+  /** Spec 10 Slice E: opt-in personalisation, only effective for
+   *  scope: 'local' (see buildArchetypeSynthesisFactSet doc comment). */
+  usePersonalPrior?: boolean | undefined;
+  personalRecord?: PersonalRecord | undefined;
 }
 
 export interface ArchetypeSynthesisFactSet {
@@ -52,7 +59,17 @@ export interface ArchetypeSynthesisFactSet {
  *  field-reweighting for 'local' is Slice D's job (it needs a
  *  per-opponent-archetype breakdown per cluster, which Slice B does not
  *  carry today). Not a silent gap: documented here, in the shared package,
- *  and in the Slice C PR description. */
+ *  and in the Slice C PR description.
+ *
+ *  Spec 10 Slice E personalisation: when `scope === 'local'` and both
+ *  `usePersonalPrior` and `personalRecord` are given, the top-ranked
+ *  cluster's Wilson-conservative `winRateLowerBoundPct` (not the raw mean —
+ *  consistent with Slice B's guiding principle) is blended with the user's
+ *  own record via `blendWithPersonalPrior`, producing at most one extra
+ *  'personalPrior' fact (see factsFromPersonalPriorBlend). For
+ *  `scope === 'global'`, `usePersonalPrior`/`personalRecord` are silently
+ *  ignored — no validation error, simply no effect, deliberately kept this
+ *  simple rather than over-engineered. */
 export async function buildArchetypeSynthesisFactSet(
   db: Db,
   input: BuildArchetypeSynthesisFactSetInput,
@@ -94,6 +111,12 @@ export async function buildArchetypeSynthesisFactSet(
 
   const rankedClusters = rankClusters(clusterDecklists(clusterable));
   const facts = factsFromClusterRanking(rankedClusters);
+
+  const topCluster = rankedClusters[0];
+  if (scope === 'local' && input.usePersonalPrior && input.personalRecord && topCluster) {
+    const blend = blendWithPersonalPrior(topCluster.winRateLowerBoundPct, input.personalRecord);
+    facts.push(...factsFromPersonalPriorBlend(archetypeName, blend));
+  }
 
   const context: ArchetypeSynthesisContext = {
     archetypeId,
