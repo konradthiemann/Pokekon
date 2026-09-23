@@ -83,7 +83,9 @@ The app supports multiple decks. Each deck has an archetype (for Limitless match
 - **Delete deck**: Cascades to all related cards, snapshots, and logs
 - **Duplicate as new variant**: Creates a new deck row with the same archetype/archetypeName but a new variant label, optionally copying cards
 
-**Deck import format:** Standard PTCG list format with sections `Pokémon:`, `Trainer:`, `Energie:` (German) or `Energy:` (English). Each card line: `<count> <name> <set> <number>`. The importer infers card role automatically.
+**Deck import format:** Standard PTCG list format with sections `Pokémon:`, `Trainer:`, `Energie:` (German) or `Energy:` (English). Each card line: `<count> <name> <set> <number>`. The importer infers card role automatically, keeps the print (set + number) for export, and understands PTCGL's variants: a trailing `PH` marker, the pseudo set `Energy` (`11 Basic {W} Energy Energy 29`) and hyphenated promo codes (`PR-SV`).
+
+**Deck export ("Copy for TCG Live"):** `CopyDeckListButton` (`apps/web/src/components/shared/`) copies a list in PTCGL format via the shared `exportDeckList` — on the own deck (`DeckPanel` header), on every published tournament list (`DecklistCard`) and on the representative list of each ranked cluster (`ArchetypeRecommendationPanel`, `TournamentBestListPanel`). Section headers carry the summed copy count, the list ends with `Total Cards: N`. Basic Energy in any spelling (`Darkness Energy`, `Basis-Finsternis-Energie`, …) is written as `Basic {D} Energy SVE 7` when no print is known. Cards without a print (quick-added by name, or imported before prints were stored) are still exported but flagged below the button, because PTCGL resolves cards by set code + number. Headers are always English — the format PTCGL and Limitless emit by default.
 
 ---
 

@@ -12,5 +12,13 @@
   "optional": "optional",
   "error": "Fehler",
   "retry": "Erneut versuchen",
-  "language": "Sprache"
+  "language": "Sprache",
+  "copyDeck": {
+    "label": "Für TCG Live kopieren",
+    "short": "Kopieren",
+    "copied": "Kopiert",
+    "failed": "Kopieren fehlgeschlagen",
+    "missingPrints_one": "{{count}} Karte ohne Set-Angabe – TCG Live erkennt sie eventuell nicht.",
+    "missingPrints_other": "{{count}} Karten ohne Set-Angabe – TCG Live erkennt sie eventuell nicht."
+  }
 }

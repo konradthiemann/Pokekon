@@ -5,6 +5,7 @@ import { deleteDeckCard, updateDeckCard, upsertDeckCard } from '../../db/queries
 import { useDashboardStore } from '../../store/dashboardStore';
 import { Trash2, Plus, Minus, Upload, ChevronDown } from 'lucide-react';
 import { ImportDeckModal } from './ImportDeckModal';
+import { CopyDeckListButton } from '../shared/CopyDeckListButton';
 
 interface Props {
   deckCards: DeckCard[];
@@ -661,14 +662,17 @@ export function DeckPanel({ deckCards }: Props) {
             to adjust counts
           </p>
         </div>
-        <button
-          onClick={() => setShowImportModal(true)}
-          className="btn-ghost text-xs"
-          title="Import deck list"
-        >
-          <Upload className="w-3.5 h-3.5" aria-hidden="true" />
-          Import
-        </button>
+        <div className="flex items-start gap-1">
+          <CopyDeckListButton cards={deckCards} compact />
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="btn-ghost text-xs"
+            title="Import deck list"
+          >
+            <Upload className="w-3.5 h-3.5" aria-hidden="true" />
+            Import
+          </button>
+        </div>
       </div>
 
       {/* Progress bar */}

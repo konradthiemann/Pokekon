@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { ExternalLink, Medal } from 'lucide-react';
+import { exportCardsFromDecklist } from '@pokekon/shared';
+import { CopyDeckListButton } from '../shared/CopyDeckListButton';
 import type { DecklistCardEntry } from '@pokekon/shared';
 import type { ArchetypeListEntry } from '../../lib/api';
 
@@ -80,6 +82,8 @@ export function DecklistCard({ entry }: { entry: ArchetypeListEntry }) {
           <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
         </a>
       </div>
+
+      <CopyDeckListButton cards={exportCardsFromDecklist(entry.decklist)} />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100">
         <CardGroup title={t('archetypeDetail.lists.pokemon')} entries={entry.decklist.pokemon} />

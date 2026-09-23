@@ -318,6 +318,56 @@ describe('PUT /api/decks/:id/cards', () => {
     const list = await request(`/api/decks/${deckId}/cards`, { user: USER_A });
     expect((await list.json()) as unknown[]).toHaveLength(0);
   });
+
+  it('stores and returns the PTCGL print (set + number); a card without one reads back as null', async () => {
+    const deckId = await createDeck(USER_A);
+    const res = await request(`/api/decks/${deckId}/cards`, {
+      user: USER_A,
+      method: 'PUT',
+      body: [
+        {
+          name: "N's Zorua",
+          count: 4,
+          type: 'Pokemon',
+          role: 'attacker',
+          set: 'JTG',
+          number: '97',
+        },
+        {
+          name: 'Basic {W} Energy',
+          count: 8,
+          type: 'Energy',
+          role: 'energy',
+          set: 'Energy',
+          number: '29',
+        },
+        { name: 'Pecharunt', count: 1, type: 'Pokemon', role: 'tech', set: 'PR-SV', number: '149' },
+        { name: 'Judge', count: 1, type: 'Trainer', role: 'supporter' },
+      ],
+    });
+    expect(res.status).toBe(200);
+
+    const list = await request(`/api/decks/${deckId}/cards`, { user: USER_A });
+    const cards = (await list.json()) as {
+      name: string;
+      set: string | null;
+      number: string | null;
+    }[];
+    expect(cards.find((c) => c.name === "N's Zorua")).toMatchObject({ set: 'JTG', number: '97' });
+    expect(cards.find((c) => c.name === 'Basic {W} Energy')).toMatchObject({ set: 'Energy' });
+    expect(cards.find((c) => c.name === 'Pecharunt')).toMatchObject({ set: 'PR-SV' });
+    expect(cards.find((c) => c.name === 'Judge')).toMatchObject({ set: null, number: null });
+  });
+
+  it('rejects a malformed set code with 400', async () => {
+    const deckId = await createDeck(USER_A);
+    const res = await request(`/api/decks/${deckId}/cards`, {
+      user: USER_A,
+      method: 'PUT',
+      body: [{ name: 'X', count: 1, type: 'Trainer', role: 'item', set: 'jtg; drop', number: '1' }],
+    });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('snapshots', () => {

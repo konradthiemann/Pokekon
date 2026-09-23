@@ -47,6 +47,10 @@ export interface DeckCard {
   count: number;
   type: CardType;
   role: CardRole;
+  /** PTCGL set code of the print ("JTG"); absent/null = added by name only. */
+  set?: string | null;
+  /** Collector number of the print ("97"). */
+  number?: string | null;
 }
 
 /** Snapshot of the deck at a point in time — used to track deck versions */

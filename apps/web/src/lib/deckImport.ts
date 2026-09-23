@@ -1,6 +1,6 @@
 import type { CardRole, CardType, DeckCard } from '../types';
 import i18n from '../i18n';
-import { listDeckCards, replaceDeckCards } from './api';
+import { listDeckCards, replaceDeckCards, type WireDeckCard } from './api';
 
 // ─── Role inference ───────────────────────────────────────────────────────────
 
@@ -110,9 +110,21 @@ export interface ParsedCard {
   role: CardRole;
 }
 
+/** PTCGL appends a print-variant marker to some lines ("1 Switch SVI 194 PH"). */
+const PRINT_MARKERS = new Set(['PH']);
+
+/**
+ * Set code: 2–5 uppercase letters, optionally followed by digits (`SVI`,
+ * `SV3PT5`), an optional hyphenated suffix for promos (`PR-SV`), or PTCGL's
+ * pseudo set `Energy` used for some basic Energy prints ("11 Basic {W}
+ * Energy Energy 29").
+ */
+const SET_CODE = /^(?:[A-Z]{2,5}[A-Z0-9]*(?:-[A-Z0-9]+)?|Energy)$/;
+
 function parseCardLine(line: string, type: CardType): ParsedCard | null {
   // Split on whitespace; last two tokens = set code + collector number
   const parts = line.trim().split(/\s+/);
+  if (parts.length > 0 && PRINT_MARKERS.has(parts[parts.length - 1])) parts.pop();
   if (parts.length < 4) return null;
 
   const count = parseInt(parts[0], 10);
@@ -121,8 +133,7 @@ function parseCardLine(line: string, type: CardType): ParsedCard | null {
   const number = parts[parts.length - 1];
   const set = parts[parts.length - 2];
 
-  // Set code: 2–5 uppercase letters, optionally followed by digits
-  if (!/^[A-Z]{2,5}[A-Z0-9]*$/.test(set)) return null;
+  if (!SET_CODE.test(set)) return null;
 
   const name = parts.slice(1, parts.length - 2).join(' ');
   if (!name) return null;
@@ -203,6 +214,8 @@ export async function importCards(
     throw new Error(i18n.t('deck:import.noActiveDeck'));
   }
 
+  // set + number are kept so the deck can be exported back to PTCGL
+  // (packages/shared/src/deckExport.ts) with the exact prints it came with.
   const toDeckCard = (c: ParsedCard): Omit<DeckCard, 'id'> => ({
     deckId,
     cardId: 0,
@@ -210,16 +223,16 @@ export async function importCards(
     count: c.count,
     type: c.type,
     role: c.role,
+    set: c.set,
+    number: c.number,
   });
 
-  let next: Pick<DeckCard, 'name' | 'count' | 'type' | 'role'>[];
+  let next: WireDeckCard[];
   if (replaceExisting) {
     next = cards.map(toDeckCard);
   } else {
     const current = await listDeckCards(deckId);
-    const byName = new Map<string, Pick<DeckCard, 'name' | 'count' | 'type' | 'role'>>(
-      current.map((c) => [c.name, c]),
-    );
+    const byName = new Map<string, WireDeckCard>(current.map((c) => [c.name, c]));
     // Parsed cards win over existing entries with the same name (upsert).
     for (const c of cards) byName.set(c.name, toDeckCard(c));
     next = [...byName.values()];
