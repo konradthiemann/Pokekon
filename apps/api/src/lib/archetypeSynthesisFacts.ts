@@ -2,12 +2,15 @@ import { and, eq, gte } from 'drizzle-orm';
 import {
   blendWithPersonalPrior,
   clusterDecklists,
+  computeClusterFieldScores,
   DEFAULT_MIN_TOURNAMENT_PLAYERS,
   factsFromClusterRanking,
   factsFromPersonalPriorBlend,
   rankClusters,
+  reorderClustersByFieldScore,
   sanitizeFactLabel,
   selectFacts,
+  type ArchetypeShare,
   type ArchetypeSynthesisContext,
   type ArchetypeSynthesisScope,
   type ClusterableStanding,
@@ -21,6 +24,16 @@ import type { Db } from '../db/index.js';
 import { tournamentStandings, tournaments } from '../db/schema.js';
 import { windowConditions, type MetaWindow } from '../routes/meta.js';
 
+/** Structurally identical to apps/web's `LocalFieldEntry`
+ *  (apps/web/src/lib/preferences.ts) — deliberately re-declared here rather
+ *  than imported, since packages/shared (and by extension this API layer)
+ *  never depends on apps/web (no cross-layer import). */
+export interface LocalFieldEntry {
+  archetypeId: string;
+  name: string;
+  weight: number;
+}
+
 export interface BuildArchetypeSynthesisFactSetInput {
   archetypeId: string;
   archetypeName: string;
@@ -31,6 +44,12 @@ export interface BuildArchetypeSynthesisFactSetInput {
    *  scope: 'local' (see buildArchetypeSynthesisFactSet doc comment). */
   usePersonalPrior?: boolean | undefined;
   personalRecord?: PersonalRecord | undefined;
+  /** Spec 10 Slice D: the user's local meta field (same shape as the
+   *  Prediction panel's "lokales Feld", apps/web/src/lib/preferences.ts),
+   *  only effective for scope: 'local' (see buildArchetypeSynthesisFactSet
+   *  doc comment). Undefined/empty -> clusters keep the existing
+   *  Wilson-lower-bound ranking, unchanged from before this feature. */
+  localField?: LocalFieldEntry[] | undefined;
 }
 
 export interface ArchetypeSynthesisFactSet {
@@ -52,14 +71,18 @@ export interface ArchetypeSynthesisFactSet {
  *  with a fully populated context, same "honestly empty" contract as
  *  buildSynthesisFactSet.
  *
- *  KNOWN, DOCUMENTED LIMITATION (Spec 10 Slice C MVP, see
- *  ArchetypeSynthesisScope's doc comment in packages/shared): `scope` is
- *  threaded through to `context` for the prompt framing only. Both 'global'
- *  and 'local' currently read and rank the EXACT SAME standings — real
- *  field-reweighting for 'local' is Slice D's job (it needs a
- *  per-opponent-archetype breakdown per cluster, which Slice B does not
- *  carry today). Not a silent gap: documented here, in the shared package,
- *  and in the Slice C PR description.
+ *  Spec 10 Slice D: `scope` is threaded through to `context` for the prompt
+ *  framing, AND — since this slice — actually changes the ranking when
+ *  `scope === 'local'` and a non-empty `localField` is given: the clusters
+ *  are first ranked exactly as before (Wilson lower bound, scope-agnostic),
+ *  then re-ranked by their field-weighted score against `localField`
+ *  (`computeClusterFieldScores` + `reorderClustersByFieldScore`, reusing
+ *  `computeFieldScores` rather than re-deriving the weighted-Wilson math —
+ *  see clusterFieldScore.ts). `scope === 'global'`, or `scope === 'local'`
+ *  WITHOUT a `localField`, still read and rank the exact same standings as
+ *  before — no behaviour change for existing callers that don't pass
+ *  `localField` (former Slice C MVP limitation, now resolved for the case
+ *  that actually supplies a field).
  *
  *  Spec 10 Slice E personalisation: when `scope === 'local'` and both
  *  `usePersonalPrior` and `personalRecord` are given, the top-ranked
@@ -86,6 +109,7 @@ export async function buildArchetypeSynthesisFactSet(
       ties: tournamentStandings.ties,
       placing: tournamentStandings.placing,
       totalPlayers: tournaments.players,
+      matchResults: tournamentStandings.matchResults,
     })
     .from(tournamentStandings)
     .innerJoin(tournaments, eq(tournamentStandings.tournamentId, tournaments.id))
@@ -107,10 +131,25 @@ export async function buildArchetypeSynthesisFactSet(
       ties: r.ties,
       placing: r.placing,
       totalPlayers: r.totalPlayers,
+      matchResults: r.matchResults ?? [],
     }));
 
   const rankedClusters = rankClusters(clusterDecklists(clusterable));
-  const facts = factsFromClusterRanking(rankedClusters);
+
+  // Spec 10 Slice D: real field-reweighting, only for scope:'local' with a
+  // non-empty localField — everything else keeps the unconditional
+  // Wilson-lower-bound ranking from rankClusters() above unchanged.
+  let finalClusters = rankedClusters;
+  if (scope === 'local' && input.localField && input.localField.length > 0) {
+    const field: ArchetypeShare[] = input.localField.map((f) => ({
+      archetypeId: f.archetypeId,
+      archetypeName: f.name,
+      sharePct: f.weight,
+    }));
+    const fieldScores = computeClusterFieldScores(rankedClusters, field);
+    finalClusters = reorderClustersByFieldScore(rankedClusters, fieldScores);
+  }
+  const facts = factsFromClusterRanking(finalClusters);
 
   const topCluster = rankedClusters[0];
   if (scope === 'local' && input.usePersonalPrior && input.personalRecord && topCluster) {
@@ -126,5 +165,5 @@ export async function buildArchetypeSynthesisFactSet(
     scope,
   };
 
-  return { facts: selectFacts(facts), context, rankedClusters };
+  return { facts: selectFacts(facts), context, rankedClusters: finalClusters };
 }

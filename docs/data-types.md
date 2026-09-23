@@ -819,6 +819,7 @@ interface ClusterableStanding {
   wins: number; losses: number; ties: number;
   placing: number | null;
   totalPlayers: number | null;  // for placementPercentile() in Slice B
+  matchResults: StandingMatchResult[];  // this standing's own game-by-game log, Slice D
 }
 
 interface DecklistCluster {
@@ -826,6 +827,7 @@ interface DecklistCluster {
   memberStandingIds: number[];
   totalWins: number; totalLosses: number; totalTies: number;
   placements: { placing: number; totalPlayers: number }[];  // only members with BOTH values
+  matchResults: StandingMatchResult[];  // concatenated across every member, Slice D
 }
 ```
 
@@ -835,7 +837,10 @@ cluster whose representative overlaps it by at least `opts.minOverlapRatio` (def
 member is kept as its own cluster, never forced into another — protects rare-but-strong lists
 ("Nadel im Heuhaufen") from being diluted away by clustering. This is a greedy heuristic
 (O(n·clusters), not an exhaustive pairwise partition) — acceptable because clusters only need
-to be "close enough to pool as one data point", not perfectly optimal.
+to be "close enough to pool as one data point", not perfectly optimal. `matchResults` (Spec 10
+Slice D) is carried through/concatenated the same way `totalWins` etc. are accumulated — raw,
+un-aggregated per-game records; `clusterFieldScore.ts` (below) is what turns them into a
+per-opponent breakdown.
 
 ### `RankedCluster`
 ```typescript
@@ -844,6 +849,7 @@ interface RankedCluster extends DecklistCluster {
   winRateInterval: WilsonInterval | null; // null only when the cluster has 0 recorded games
   avgPlacementPercentile: number | null;  // SECONDARY/display signal, never a multiplier
   rank: number;                           // 1-based, descending winRateLowerBoundPct
+  fieldScore?: FieldScore | null;         // Slice D, only set when re-ranked against a localField
 }
 ```
 
@@ -856,6 +862,51 @@ than the raw rate: this is what stops a lucky 3-game 100 %-sample from outrankin
 display-only signal — it can show "this list won the event" even when the win-rate sample is
 too thin to rank it highly, but it never multiplies into the primary rank (that would let a
 single lucky top-8 with few games dominate, exactly the bias Spec 10 asks to avoid).
+`rankClusters()` itself never touches `fieldScore` — that field is filled in by a separate
+re-ranking step (`clusterFieldScore.ts`, below), only for `scope: 'local'` with a chosen field.
+
+### Field-weighted cluster scoring (Spec 10 Slice D — `@pokekon/shared/src/clusterFieldScore.ts`)
+
+Turns a Wilson-ranked cluster list into a ranking against a **specific chosen local field**
+instead of "every opponent weighted equally" — the real field-reweighting Slice C's MVP
+deliberately deferred (`ArchetypeSynthesisScope`'s doc comment, `deckSynthesis.ts`).
+
+```typescript
+function computeClusterFieldScores(
+  clusters: RankedCluster[],
+  field: ArchetypeShare[],
+): Map<number, FieldScore>;  // keyed by cluster.rank (pre-reorder); empty map when field is []
+
+function reorderClustersByFieldScore(
+  clusters: RankedCluster[],
+  fieldScores: Map<number, FieldScore>,
+): RankedCluster[];  // pure — never mutates the input; re-ranks 1..n; fieldScores.size === 0 -> input unchanged
+```
+
+`computeClusterFieldScores` reuses `computeFieldScores` (`fieldWinRate.ts`, Spec 3) rather than
+re-deriving the weighted-sum-of-Wilson-intervals math: each cluster's `matchResults` are turned
+into one `MatchupCell` per opponent archetype actually played (`tournamentWinRatePct` for the raw
+record), a synthetic zero-share subject (`archetypeId: "__cluster_<rank>__"`) is injected into
+the `shares` list per cluster so it can run through `computeFieldScores` as its own subject
+without ever counting towards `field`'s `totalShare`/`coveragePct`, and the resulting `FieldScore`
+rows for the real `field` entries are discarded (not consumed) — no correctness impact, just
+unused output. A cluster with zero `matchResults` vs `field` still gets a `FieldScore` object back
+(every input share gets one) but with `fieldWinRatePct`/`fieldWinRateLowPct: null` — check
+`fieldWinRateLowPct` for actual coverage, not a null-check on the `FieldScore` object itself.
+
+`reorderClustersByFieldScore` sorts descending by `fieldWinRateLowPct` (same "lower bound
+protects against a small sample" principle as `winRateLowerBoundPct`, just now against the chosen
+field instead of every opponent equally weighted); clusters with no coverage (`fieldWinRateLowPct:
+null`, or genuinely absent from `fieldScores`) sink to the end, ordered among themselves by their
+original Wilson rank — never dropped, just not artificially boosted. Sets `.fieldScore` on every
+cluster and reassigns `.rank`, 1-based, in the new order.
+
+`apps/api/src/lib/archetypeSynthesisFacts.ts` wires both functions in: for `scope: 'local'` with a
+non-empty `localField` request field, clusters are first ranked exactly as before (Wilson lower
+bound, scope-agnostic) and then re-ranked by their field-weighted score against `localField`
+before facts are derived from them. `scope: 'global'`, or `scope: 'local'` without a `localField`,
+skip this step entirely — same ranking as before this feature, no behaviour change for existing
+callers.
 
 ### Archetype-level synthesis (Spec 10 Slice C — `@pokekon/shared/src/deckSynthesis.ts`)
 

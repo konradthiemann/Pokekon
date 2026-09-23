@@ -367,6 +367,7 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
       personalWins,
       personalLosses,
       personalTies,
+      localField,
     } = parsed.data;
     // Spec 10 Slice E: only build a personalRecord once all three counts are
     // present — a partial record (e.g. only wins) is treated the same as
@@ -389,6 +390,7 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
         scope,
         usePersonalPrior,
         personalRecord,
+        localField,
       }),
       loadArchetypeSynthesis(db, archetypeId, scope, userId, windowDays, language),
       db.select().from(userAiSettings).where(eq(userAiSettings.userId, userId)).limit(1),
@@ -441,7 +443,7 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
       const userId = c.get('user').id;
 
       const windowDays = body.days ?? ARCHETYPE_SYNTHESIS_DEFAULT_DAYS;
-      const { language, scope, usePersonalPrior, personalRecord } = body;
+      const { language, scope, usePersonalPrior, personalRecord, localField } = body;
 
       const factSet = await buildArchetypeSynthesisFactSet(db, {
         archetypeId,
@@ -451,6 +453,7 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
         scope,
         usePersonalPrior,
         personalRecord,
+        localField,
       });
 
       // Never spend a token on an archetype with nothing to rank yet (same

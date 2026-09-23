@@ -20,4 +20,5 @@ export * from './deterministicRandom.js';
 export * from './deckSynthesis.js';
 export * from './decklistClustering.js';
 export * from './clusterRanking.js';
+export * from './clusterFieldScore.js';
 export * from './personalPriorBlend.js';

@@ -6,6 +6,7 @@
 // silently dropped ("Nadel im Heuhaufen").
 import { placementPercentile } from './cardPerformance.js';
 import type { DecklistCluster } from './decklistClustering.js';
+import type { FieldScore } from './fieldWinRate.js';
 import { wilsonInterval, type WilsonInterval } from './wilsonInterval.js';
 
 export interface RankedCluster extends DecklistCluster {
@@ -26,6 +27,20 @@ export interface RankedCluster extends DecklistCluster {
   avgPlacementPercentile: number | null;
   /** 1-based rank within the input list, by descending winRateLowerBoundPct. */
   rank: number;
+  /** Spec 10 Slice D: the cluster's field-weighted score against a chosen
+   *  local field, only computed and set for `scope: 'local'` with a
+   *  non-empty `localField` (see clusterFieldScore.ts). `undefined` when not
+   *  computed at all (global scope, or local scope without a field); `null`
+   *  when the cluster's rank has no entry in the computed field-scores map
+   *  at all. In practice every cluster gets a FieldScore object once a field
+   *  is set (computeFieldScores always returns one row per subject) — a
+   *  cluster with NO matchResults vs the field still gets an object here,
+   *  just with `fieldWinRatePct`/`fieldWinRateLowPct: null` inside (no
+   *  coverage). Read `fieldWinRateLowPct` to check for actual coverage, not
+   *  a `null` check on this field itself. rankClusters() itself never sets
+   *  this — it is filled in by the caller (apps/api's
+   *  archetypeSynthesisFacts.ts) as a separate re-ranking step. */
+  fieldScore?: FieldScore | null;
 }
 
 function average(values: number[]): number | null {

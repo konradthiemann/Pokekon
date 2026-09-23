@@ -27,6 +27,7 @@ import {
   type DeckSynthesis,
   type ListPerformanceEntry,
   type MatchupCell,
+  type StandingMatchResult,
   type SynthesisClaim,
   type SynthesisContext,
   type SynthesisFact,
@@ -4820,6 +4821,15 @@ describe('GET/POST /api/analysis/archetype/:archetypeId (Spec 10 Slice C)', () =
     energy: [{ name: 'Basic Psychic Energy', count: 9 }],
   };
 
+  /** Shares no cards at all with sampleDecklistA (overlapRatio 0, far below
+   *  the clustering threshold) -- used wherever a test needs TWO distinct
+   *  clusters (Spec 10 Slice D localField tests below). */
+  const sampleDecklistB: TournamentDecklist = {
+    pokemon: [{ name: 'Charizard ex', count: 2 }],
+    trainer: [{ name: "Professor's Research", count: 4 }],
+    energy: [{ name: 'Basic Fire Energy', count: 10 }],
+  };
+
   /** Two standings whose decklists overlap enough to cluster together
    *  (Slice A default threshold) plus one clearly different list, so a test
    *  can assert clustering actually ran rather than treating each standing
@@ -4959,6 +4969,149 @@ describe('GET/POST /api/analysis/archetype/:archetypeId (Spec 10 Slice C)', () =
       const getBody = (await getRes.json()) as { currentInputHash: string };
 
       expect(getBody.currentInputHash).toBe(postBody.synthesis.inputHash);
+    });
+
+    describe('localField / real field-reweighting (Spec 10 Slice D)', () => {
+      const shockmeisterField = [
+        { archetypeId: 'shockmeister-ex', name: 'Shockmeister ex', weight: 100 },
+      ];
+
+      /** Two DISTINCT clusters (sampleDecklistA vs sampleDecklistB, zero card
+       *  overlap -> never merge): A is the strongest cluster overall (Wilson
+       *  lower bound), but loses every recorded game vs 'shockmeister-ex'; B
+       *  is weaker overall but beats 'shockmeister-ex' every time. A
+       *  localField weighted entirely towards 'shockmeister-ex' must
+       *  therefore favour B, while the unweighted (global/no-field) ranking
+       *  must still favour A purely on the aggregate win/loss record. */
+      async function seedFieldWeightingStandings(archetypeId: string): Promise<void> {
+        const tournamentId = `${archetypeId}-t1`;
+        await db.insert(schema.tournaments).values({
+          id: tournamentId,
+          name: `${tournamentId} Event`,
+          date: new Date(),
+          players: 40,
+          isOnline: true,
+          swissMode: 'BO1',
+        });
+        const lossesVsField: StandingMatchResult[] = Array.from({ length: 5 }, (_, i) => ({
+          opponentArchetypeId: 'shockmeister-ex',
+          result: 'L' as const,
+          round: i + 1,
+        }));
+        const winsVsField: StandingMatchResult[] = Array.from({ length: 5 }, (_, i) => ({
+          opponentArchetypeId: 'shockmeister-ex',
+          result: 'W' as const,
+          round: i + 1,
+        }));
+        await db.insert(schema.tournamentStandings).values([
+          {
+            tournamentId,
+            archetypeId,
+            archetypeName: 'Strong Overall',
+            wins: 20,
+            losses: 2,
+            ties: 0,
+            decklist: sampleDecklistA,
+            matchResults: lossesVsField,
+          },
+          {
+            tournamentId,
+            archetypeId,
+            archetypeName: 'Weak Overall, Beats The Field',
+            wins: 5,
+            losses: 5,
+            ties: 0,
+            decklist: sampleDecklistB,
+            matchResults: winsVsField,
+          },
+        ]);
+      }
+
+      it("scope:'local' + localField reorders clusters by field-weighted score, favouring the cluster that actually beats the chosen field over the overall-strongest cluster", async () => {
+        await clearArchetypeSynthesisData();
+        const archetypeId = 'get-arch-local-field-reorder';
+        await seedFieldWeightingStandings(archetypeId);
+        const user = await freshUser();
+
+        const globalRes = await request(`/api/analysis/archetype/${archetypeId}?scope=global`, {
+          user,
+        });
+        expect(globalRes.status).toBe(200);
+        const globalBody = (await globalRes.json()) as {
+          clusters: { representative: TournamentDecklist }[];
+        };
+        // Global: purely Wilson lower bound -> the overall-strongest decklist (A) leads.
+        expect(globalBody.clusters[0]?.representative.pokemon[0]?.name).toBe('Dragapult ex');
+
+        const localFieldParam = encodeURIComponent(JSON.stringify(shockmeisterField));
+        const localRes = await request(
+          `/api/analysis/archetype/${archetypeId}?scope=local&localField=${localFieldParam}`,
+          { user },
+        );
+        expect(localRes.status).toBe(200);
+        const localBody = (await localRes.json()) as {
+          clusters: { representative: TournamentDecklist }[];
+        };
+        // Local + field: the decklist that actually beats the field (B) leads instead.
+        expect(localBody.clusters[0]?.representative.pokemon[0]?.name).toBe('Charizard ex');
+      });
+
+      it("scope:'local' WITHOUT a localField still ranks identically to scope:'global' (backward compatibility, no behaviour change for existing callers)", async () => {
+        await clearArchetypeSynthesisData();
+        const archetypeId = 'get-arch-local-no-field-unchanged';
+        await seedFieldWeightingStandings(archetypeId);
+        const user = await freshUser();
+
+        const globalRes = await request(`/api/analysis/archetype/${archetypeId}?scope=global`, {
+          user,
+        });
+        const localRes = await request(`/api/analysis/archetype/${archetypeId}?scope=local`, {
+          user,
+        });
+        expect(globalRes.status).toBe(200);
+        expect(localRes.status).toBe(200);
+
+        const globalBody = (await globalRes.json()) as {
+          clusters: { representative: TournamentDecklist; rank: number }[];
+        };
+        const localBody = (await localRes.json()) as {
+          clusters: { representative: TournamentDecklist; rank: number }[];
+        };
+        expect(localBody.clusters.map((c) => c.representative.pokemon[0]?.name)).toEqual(
+          globalBody.clusters.map((c) => c.representative.pokemon[0]?.name),
+        );
+      });
+
+      it('GET with the same localField query param as a prior POST yields an identical currentInputHash (prevents GET falsely reporting stale:true after a field-weighted POST)', async () => {
+        await clearArchetypeSynthesisData();
+        const archetypeId = 'get-arch-local-field-hash-consistency';
+        await seedFieldWeightingStandings(archetypeId);
+        const user = await freshUser();
+
+        vi.stubGlobal(
+          'fetch',
+          vi.fn().mockResolvedValue(modelResponse(JSON.stringify({ claims: [] }))),
+        );
+
+        const postRes = await request(`/api/analysis/archetype/${archetypeId}`, {
+          user,
+          method: 'POST',
+          body: {
+            scope: 'local',
+            localField: shockmeisterField,
+            apiKey: 'ghp_arch_local_field_hash',
+          },
+        });
+        expect(postRes.status).toBe(200);
+        const postBody = (await postRes.json()) as { synthesis: { inputHash: string } };
+
+        const query = `scope=local&localField=${encodeURIComponent(JSON.stringify(shockmeisterField))}`;
+        const getRes = await request(`/api/analysis/archetype/${archetypeId}?${query}`, { user });
+        expect(getRes.status).toBe(200);
+        const getBody = (await getRes.json()) as { currentInputHash: string };
+
+        expect(getBody.currentInputHash).toBe(postBody.synthesis.inputHash);
+      });
     });
   });
 

@@ -1940,6 +1940,7 @@ function buildRankedCluster(overrides: Partial<RankedCluster> = {}): RankedClust
     totalLosses: 10,
     totalTies: 0,
     placements: [],
+    matchResults: [],
     winRateInterval: {
       pct: 66.7,
       lowPct: 55.2,

@@ -512,7 +512,7 @@ Archetype-level counterpart to `deck_synthesis` above: caches an LLM-generated s
 
 **Check constraints:** `source IN ('llm','demo-seed')`; `scope IN ('global','local')`.
 
-**Known, documented MVP limitation (Slice C):** `scope` currently only changes the prompt's framing, not the ranking itself — a `'global'` and a `'local'` row for the same archetype/window/language rank the exact same clusters (they still get separate cache rows and separate LLM calls). Real field-reweighting for `'local'` is Slice D's job; see `ArchetypeSynthesisScope`'s doc comment (`packages/shared/src/deckSynthesis.ts`) and `specs/archetype-meta-analysis.md`.
+A `'global'` and a `'local'` row for the same archetype/window/language always get separate cache rows and separate LLM calls. Since Spec 10 Slice D, they can also rank genuinely different clusters: `'local'` re-ranks by a field-weighted score when the request includes a non-empty `localField` (`clusterFieldScore.ts`) — without one, `'local'` still ranks the exact same clusters as `'global'`, unconditionally (no behaviour change for callers that don't pass `localField`). See `ArchetypeSynthesisScope`'s doc comment (`packages/shared/src/deckSynthesis.ts`) and `docs/features.md` § "Archetype Synthesis".
 
 ### Tables: `meta_equilibrium_runs` and `meta_equilibrium_archetypes` (migration `0014`, Spec 6 Nash equilibrium)
 
