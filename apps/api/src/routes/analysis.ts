@@ -1,12 +1,26 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import {
   assembleArchetypeSynthesis,
   assembleSynthesis,
+  clusterDecklists,
+  computeClusterFieldScores,
+  rankClusters,
+  reorderClustersByFieldScore,
   SYNTHESIS_PROMPT_VERSION,
+  type ArchetypeShare,
+  type ClusterableStanding,
+  type TournamentDecklist,
 } from '@pokekon/shared';
 import { AnalysisError, getAnalysisProvider } from '../ai/index.js';
-import { decks, deckCards, userAiSettings, type AiProvider } from '../db/schema.js';
+import {
+  decks,
+  deckCards,
+  tournaments,
+  tournamentStandings,
+  userAiSettings,
+  type AiProvider,
+} from '../db/schema.js';
 import { decryptSecret, encryptSecret } from '../lib/crypto.js';
 import { buildArchetypeSynthesisFactSet } from '../lib/archetypeSynthesisFacts.js';
 import { loadArchetypeSynthesis, saveArchetypeSynthesis } from '../lib/archetypeSynthesisStore.js';
@@ -25,6 +39,7 @@ import {
   deckSynthesisQuerySchema,
   META_WINDOW_DEFAULT_DAYS,
   snapCardStatsWindow,
+  tournamentIdParamSchema,
 } from '../validation.js';
 import { parseId, readJson } from './shared.js';
 
@@ -510,6 +525,118 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
       }
     },
   );
+
+  // GET /api/analysis/tournament/:tournamentId/archetype/:archetypeId —
+  // read-only, never an LLM call: which (clustered) decklist of this archetype
+  // would have performed best against THIS ONE tournament's actual field
+  // (Spec 10 AC-G third bullet, HANDOVER_SPEC10.md "Was fehlt" point 4).
+  // Reuses the exact same clusterDecklists/rankClusters/
+  // computeClusterFieldScores/reorderClustersByFieldScore composition as
+  // buildArchetypeSynthesisFactSet (Slice C/D), just scoped to one
+  // tournament's own standings instead of a multi-tournament window — no new
+  // packages/shared functions needed. No ownership check (tournament/archetype
+  // data isn't user-owned, same "honestly empty" contract as
+  // GET /archetype/:archetypeId), but an unknown tournament id IS a 404
+  // (unlike an unknown archetype): a bad tournament id is a malformed
+  // parameter, not a legitimately empty result.
+  routes.get('/tournament/:tournamentId/archetype/:archetypeId', async (c) => {
+    const parsedTournamentId = tournamentIdParamSchema.safeParse(c.req.param('tournamentId'));
+    if (!parsedTournamentId.success) return c.json({ error: 'Not found' }, 404);
+    const parsedArchetypeId = archetypeIdParamSchema.safeParse(c.req.param('archetypeId'));
+    if (!parsedArchetypeId.success) return c.json({ error: 'Not found' }, 404);
+    const tournamentId = parsedTournamentId.data;
+    const archetypeId = parsedArchetypeId.data;
+
+    const db = c.get('db');
+
+    const [tournament] = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId))
+      .limit(1);
+    if (!tournament) return c.json({ error: 'Not found' }, 404);
+
+    const [allStandings, archetypeStandings] = await Promise.all([
+      db
+        .select({
+          archetypeId: tournamentStandings.archetypeId,
+          archetypeName: tournamentStandings.archetypeName,
+        })
+        .from(tournamentStandings)
+        .where(eq(tournamentStandings.tournamentId, tournamentId)),
+      db
+        .select({
+          id: tournamentStandings.id,
+          decklist: tournamentStandings.decklist,
+          wins: tournamentStandings.wins,
+          losses: tournamentStandings.losses,
+          ties: tournamentStandings.ties,
+          placing: tournamentStandings.placing,
+          matchResults: tournamentStandings.matchResults,
+          archetypeName: tournamentStandings.archetypeName,
+        })
+        .from(tournamentStandings)
+        .where(
+          and(
+            eq(tournamentStandings.tournamentId, tournamentId),
+            eq(tournamentStandings.archetypeId, archetypeId),
+            isNotNull(tournamentStandings.decklist),
+          ),
+        ),
+    ]);
+
+    // This tournament's OWN field (not a window aggregate): one share per
+    // archetype actually present here, count / total standings * 100.
+    const shareByArchetype = new Map<string, { archetypeName: string; count: number }>();
+    for (const row of allStandings) {
+      const entry = shareByArchetype.get(row.archetypeId) ?? {
+        archetypeName: row.archetypeName,
+        count: 0,
+      };
+      entry.count += 1;
+      shareByArchetype.set(row.archetypeId, entry);
+    }
+    const totalStandings = allStandings.length;
+    const tournamentField: ArchetypeShare[] = [...shareByArchetype.entries()].map(
+      ([id, { archetypeName, count }]) => ({
+        archetypeId: id,
+        archetypeName,
+        sharePct: totalStandings > 0 ? (count / totalStandings) * 100 : 0,
+      }),
+    );
+
+    // A single tournament has one player count for every standing — unlike
+    // the multi-tournament window in archetypeSynthesisFacts.ts, no per-row
+    // totalPlayers is needed.
+    const clusterable: ClusterableStanding[] = archetypeStandings.map((r) => ({
+      id: r.id,
+      decklist: r.decklist as TournamentDecklist,
+      wins: r.wins,
+      losses: r.losses,
+      ties: r.ties,
+      placing: r.placing,
+      totalPlayers: tournament.players,
+      matchResults: r.matchResults ?? [],
+    }));
+
+    const rankedClusters = rankClusters(clusterDecklists(clusterable));
+    const fieldScores = computeClusterFieldScores(rankedClusters, tournamentField);
+    const finalClusters = reorderClustersByFieldScore(rankedClusters, fieldScores);
+
+    return c.json({
+      tournamentId,
+      tournamentName: tournament.name,
+      tournamentDate: tournament.date.toISOString(),
+      totalPlayers: tournament.players,
+      archetypeId,
+      archetypeName: archetypeStandings[0]?.archetypeName ?? archetypeId,
+      clusters: finalClusters,
+      field: tournamentField.map(({ archetypeId: id, archetypeName }) => ({
+        archetypeId: id,
+        archetypeName,
+      })),
+    });
+  });
 
   return routes;
 }

@@ -167,6 +167,16 @@ export const archetypeIdParamSchema = z
   .string()
   .regex(ARCHETYPE_SLUG_PATTERN, 'Expected a Limitless deck slug');
 
+/** Limitless tournament ids have no single well-known slug pattern like
+ *  archetype ids do — a defensive, generic charset check (alnum/dash/
+ *  underscore) is enough to reject obviously malformed input before it ever
+ *  reaches the DB, without over-fitting to Limitless's current id format. */
+export const tournamentIdParamSchema = z
+  .string()
+  .min(1)
+  .max(100)
+  .regex(/^[a-zA-Z0-9_-]+$/, 'Expected a Limitless tournament id');
+
 /** Query for the paginated archetype decklists (meta window + load-more). */
 export const archetypeListsQuerySchema = metaWindowQuerySchema.extend({
   limit: z.coerce.number().int().min(1).max(20).default(4),
