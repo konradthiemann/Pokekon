@@ -6,6 +6,7 @@ import {
   type ClusterableStanding,
 } from './decklistClustering.js';
 import type { TournamentDecklist } from './meta.js';
+import type { StandingMatchResult } from './matchupPairings.js';
 
 // 60-card baseline (9 Pokémon + 35 Trainer + 16 Energy) — used as the "A" list
 // in every overlap test below, mutated per case via the spread overrides so
@@ -48,6 +49,7 @@ function standing(overrides: Partial<ClusterableStanding> = {}): ClusterableStan
     ties: 0,
     placing: null,
     totalPlayers: null,
+    matchResults: [],
     ...overrides,
   };
 }
@@ -207,5 +209,57 @@ describe('clusterDecklists', () => {
 
   it('exposes the default threshold as 55/60', () => {
     expect(DEFAULT_MIN_OVERLAP_RATIO).toBeCloseTo(55 / 60, 5);
+  });
+
+  it('concatenates matchResults across every clustered member (needed for Spec 10 Slice D field-weighting)', () => {
+    const matchResultsA: StandingMatchResult[] = [
+      { opponentArchetypeId: 'charizard-ex', result: 'W', round: 1 },
+      { opponentArchetypeId: 'gardevoir-ex', result: 'L', round: 2 },
+    ];
+    const matchResultsB: StandingMatchResult[] = [
+      { opponentArchetypeId: 'charizard-ex', result: 'W', round: 1 },
+    ];
+    const clusters = clusterDecklists([
+      standing({ id: 1, decklist: baseDecklist(), matchResults: matchResultsA }),
+      standing({ id: 2, decklist: baseDecklist(), matchResults: matchResultsB }),
+    ]);
+
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].matchResults).toEqual([...matchResultsA, ...matchResultsB]);
+  });
+
+  it('starts a new cluster with only its own standing matchResults (not leaked from an unrelated cluster)', () => {
+    const different = baseDecklist({
+      trainer: [
+        { name: 'Iono', count: 4 },
+        { name: 'Arven', count: 4 },
+        { name: 'Nest Ball', count: 4 },
+        { name: 'Ultra Ball', count: 4 },
+        { name: "Boss's Orders", count: 2 },
+        { name: 'Rare Candy', count: 4 },
+        { name: 'Buddy-Buddy Poffin', count: 4 },
+        { name: 'Counter Catcher', count: 2 },
+        { name: 'Super Rod', count: 1 },
+        { name: 'Lost Vacuum', count: 2 },
+        { name: 'Klawf', count: 2 },
+        { name: 'Field Blower', count: 2 },
+      ],
+    });
+    const matchResultsA: StandingMatchResult[] = [
+      { opponentArchetypeId: 'charizard-ex', result: 'W', round: 1 },
+    ];
+    const matchResultsB: StandingMatchResult[] = [
+      { opponentArchetypeId: 'gardevoir-ex', result: 'L', round: 1 },
+    ];
+    const clusters = clusterDecklists([
+      standing({ id: 1, decklist: baseDecklist(), matchResults: matchResultsA }),
+      standing({ id: 2, decklist: different, matchResults: matchResultsB }),
+    ]);
+
+    expect(clusters).toHaveLength(2);
+    const clusterA = clusters.find((c) => c.memberStandingIds.includes(1))!;
+    const clusterB = clusters.find((c) => c.memberStandingIds.includes(2))!;
+    expect(clusterA.matchResults).toEqual(matchResultsA);
+    expect(clusterB.matchResults).toEqual(matchResultsB);
   });
 });

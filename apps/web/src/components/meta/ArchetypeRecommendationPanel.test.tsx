@@ -102,6 +102,7 @@ function makeCluster(overrides: Partial<RankedCluster> = {}): RankedCluster {
     totalLosses: 3,
     totalTies: 0,
     placements: [{ placing: 1, totalPlayers: 128 }],
+    matchResults: [],
     winRateLowerBoundPct: 62.5,
     winRateInterval: {
       pct: 80,

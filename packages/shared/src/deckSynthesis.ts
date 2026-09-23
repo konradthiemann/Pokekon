@@ -52,12 +52,13 @@ export const SYNTHESIS_LANGUAGE_VALUES = ['de', 'en'] as const;
 export type SynthesisLanguage = (typeof SYNTHESIS_LANGUAGE_VALUES)[number];
 
 /** Spec 10 Slice C: whether an archetype synthesis run was computed against
- *  the global meta or the user's local-meta field. NOTE (Slice C MVP,
- *  deliberate, documented limitation): scope currently only changes the
- *  PROMPT FRAMING, not the ranking itself -- both scopes rank the exact same
- *  clusters until Slice D adds per-opponent-archetype field-reweighting
- *  (RankedCluster only carries an aggregate W/L/T today, not a
- *  per-matchup breakdown). See specs/archetype-meta-analysis.md Slice D. */
+ *  the global meta or the user's local-meta field. Since Slice D
+ *  (clusterFieldScore.ts), `scope: 'local'` with a non-empty `localField`
+ *  actually re-ranks the clusters by their field-weighted score against
+ *  that field, not just the prompt framing -- see
+ *  apps/api/src/lib/archetypeSynthesisFacts.ts's doc comment for the exact
+ *  contract. `scope: 'local'` WITHOUT a `localField` (or `scope: 'global'`)
+ *  still ranks the exact same clusters as before, unconditionally. */
 export const ARCHETYPE_SYNTHESIS_SCOPE_VALUES = ['global', 'local'] as const;
 export type ArchetypeSynthesisScope = (typeof ARCHETYPE_SYNTHESIS_SCOPE_VALUES)[number];
 

@@ -299,6 +299,43 @@ export const deckSynthesisPostSchema = z.object({
  *  without either route silently inheriting the other's tuning. */
 export const ARCHETYPE_SYNTHESIS_DEFAULT_DAYS = 90;
 
+/** One entry of the user's local meta field, as configured in the Prediction
+ *  panel (apps/web/src/lib/preferences.ts LocalFieldEntry) — see
+ *  archetypeLocalFieldSchema below for why POST takes this as a real array
+ *  but GET takes it as a JSON-encoded string. */
+const localFieldEntrySchema = z.object({
+  archetypeId: z.string().min(1).max(100),
+  name: z.string().min(1).max(100),
+  weight: z.number().min(0).max(1000),
+});
+
+export const archetypeLocalFieldSchema = z.array(localFieldEntrySchema).max(30);
+
+/** Query-string arrays don't have a native encoding, so `localField` travels
+ *  as a JSON-encoded string (`?localField=<encodeURIComponent(JSON.stringify(...))>`).
+ *  Spec 10 Slice D: GET needs this — like `usePersonalPrior` (Slice E) —
+ *  so `currentInputHash` (derived from the same facts a POST would use) can
+ *  match a prior field-weighted POST's inputHash exactly, otherwise GET
+ *  would wrongly report `stale: true` right after the user just generated a
+ *  field-weighted synthesis. Never throws on malformed input (untrusted
+ *  user input, CLAUDE.md/security-and-secrets.md) — invalid JSON or a
+ *  structure that fails `archetypeLocalFieldSchema` both resolve to
+ *  `undefined`, i.e. "no local field provided", same as omitting the param. */
+const localFieldQueryParam = z
+  .string()
+  .optional()
+  .transform((raw): z.infer<typeof archetypeLocalFieldSchema> | undefined => {
+    if (raw === undefined) return undefined;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return undefined;
+    }
+    const result = archetypeLocalFieldSchema.safeParse(parsed);
+    return result.success ? result.data : undefined;
+  });
+
 /** Query for GET /api/analysis/archetype/:archetypeId — unlike deck
  *  synthesis, `days` is NOT snapped (snapCardStatsWindow only applies to the
  *  card-stats precomputation windows, which this route does not read). */
@@ -320,6 +357,9 @@ export const archetypeSynthesisQuerySchema = z.object({
   personalWins: z.coerce.number().int().min(0).optional(),
   personalLosses: z.coerce.number().int().min(0).optional(),
   personalTies: z.coerce.number().int().min(0).optional(),
+  // Spec 10 Slice D — see localFieldQueryParam above for the encoding and
+  // the GET/POST hash-consistency reasoning.
+  localField: localFieldQueryParam,
 });
 
 /** Body for POST /api/analysis/archetype/:archetypeId. `days` defaults to
@@ -345,4 +385,9 @@ export const archetypeSynthesisPostSchema = z.object({
       ties: z.number().int().min(0),
     })
     .optional(),
+  // Spec 10 Slice D: the user's local meta field, only effective for
+  // scope:'local' (enforced in buildArchetypeSynthesisFactSet, not here) —
+  // same "harmless no-op on scope:'global'" contract as usePersonalPrior
+  // above.
+  localField: archetypeLocalFieldSchema.optional(),
 });

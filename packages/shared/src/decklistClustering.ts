@@ -5,6 +5,7 @@
 // one stronger one. Pure functions, no I/O, same shape as fieldWinRate.ts.
 import { normalizeCardName } from './cardPerformance.js';
 import type { TournamentDecklist } from './meta.js';
+import type { StandingMatchResult } from './matchupPairings.js';
 
 /** A cluster merges lists whose card-for-card overlap is at least this
  *  fraction of the larger list's card count. 55/60 ≈ 91.7 % — deliberately a
@@ -70,6 +71,11 @@ export interface ClusterableStanding {
   ties: number;
   placing: number | null;
   totalPlayers: number | null;
+  /** This standing's own game-by-game results vs each opponent archetype
+   *  (Spec 10 Slice D) — carried through per member so a cluster can build a
+   *  per-opponent breakdown across all its members, not just an aggregate
+   *  W/L/T. Empty when the tournament's pairings weren't processed. */
+  matchResults: StandingMatchResult[];
 }
 
 export interface DecklistCluster {
@@ -86,6 +92,10 @@ export interface DecklistCluster {
    *  window fallback where the tournament's player count wasn't queried,
    *  are excluded rather than treated as a false "0"). */
   placements: { placing: number; totalPlayers: number }[];
+  /** Concatenated matchResults of every member standing (Spec 10 Slice D) —
+   *  raw per-game records, not yet aggregated per opponent; consumers that
+   *  need a per-opponent breakdown (clusterFieldScore.ts) do that themselves. */
+  matchResults: StandingMatchResult[];
 }
 
 /**
@@ -120,6 +130,7 @@ export function clusterDecklists(
       match.totalLosses += s.losses;
       match.totalTies += s.ties;
       match.placements.push(...placement);
+      match.matchResults.push(...s.matchResults);
     } else {
       clusters.push({
         representative: s.decklist,
@@ -128,6 +139,7 @@ export function clusterDecklists(
         totalLosses: s.losses,
         totalTies: s.ties,
         placements: placement,
+        matchResults: [...s.matchResults],
       });
     }
   }

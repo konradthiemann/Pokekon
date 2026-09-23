@@ -14,6 +14,7 @@ function cluster(overrides: Partial<DecklistCluster> = {}): DecklistCluster {
     totalLosses: 0,
     totalTies: 0,
     placements: [],
+    matchResults: [],
     ...overrides,
   };
 }
