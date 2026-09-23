@@ -172,7 +172,8 @@
         "members_one": "{{count}} list",
         "members_other": "{{count}} lists",
         "placement": "Avg. placement: top {{pct}} %",
-        "fieldScore": "Local field score"
+        "fieldScore": "Local field score",
+        "viewDecklist": "View full list"
       }
     },
     "tournamentBestList": {
@@ -188,7 +189,8 @@
         "members_one": "{{count}} list",
         "members_other": "{{count}} lists",
         "placement": "Avg. placement: top {{pct}} %",
-        "fieldScore": "Score vs this tournament's field"
+        "fieldScore": "Score vs this tournament's field",
+        "viewDecklist": "View full list"
       }
     }
   },

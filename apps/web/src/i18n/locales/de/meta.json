@@ -172,7 +172,8 @@
         "members_one": "{{count}} Liste",
         "members_other": "{{count}} Listen",
         "placement": "Ø Platzierung: Top {{pct}} %",
-        "fieldScore": "Lokaler Feld-Score"
+        "fieldScore": "Lokaler Feld-Score",
+        "viewDecklist": "Vollständige Liste anzeigen"
       }
     },
     "tournamentBestList": {
@@ -188,7 +189,8 @@
         "members_one": "{{count}} Liste",
         "members_other": "{{count}} Listen",
         "placement": "Ø Platzierung: Top {{pct}} %",
-        "fieldScore": "Score gegen das Feld dieses Turniers"
+        "fieldScore": "Score gegen das Feld dieses Turniers",
+        "viewDecklist": "Vollständige Liste anzeigen"
       }
     }
   },

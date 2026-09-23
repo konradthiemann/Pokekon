@@ -5,6 +5,7 @@ import {
   getTournamentArchetypeBestList,
   type TournamentArchetypeBestListResponse,
 } from '../../lib/api';
+import { CardGroup } from './DecklistCard';
 import { ListFieldPerformance } from './ListFieldPerformance';
 import { WinRateBadge } from './WinRateBadge';
 
@@ -83,6 +84,34 @@ function TournamentClusterItem({ cluster }: { cluster: RankedCluster }) {
           {pokemonSummary}
         </p>
       )}
+      {/* Full decklist on demand, same fix as ArchetypeRecommendationPanel's
+          ClusterItem -- the truncated summary above never showed
+          Trainer/Energy and had no reachable way to see the rest. */}
+      <details className="text-xs">
+        <summary
+          data-testid="tournament-best-list-cluster-decklist-toggle"
+          className="cursor-pointer text-brand-700 font-semibold w-fit"
+        >
+          {t('archetypeDetail.tournamentBestList.cluster.viewDecklist')}
+        </summary>
+        <div
+          data-testid="tournament-best-list-cluster-decklist"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2 pt-2 border-t border-slate-100"
+        >
+          <CardGroup
+            title={t('archetypeDetail.lists.pokemon')}
+            entries={cluster.representative.pokemon}
+          />
+          <CardGroup
+            title={t('archetypeDetail.lists.trainer')}
+            entries={cluster.representative.trainer}
+          />
+          <CardGroup
+            title={t('archetypeDetail.lists.energy')}
+            entries={cluster.representative.energy}
+          />
+        </div>
+      </details>
     </div>
   );
 }
