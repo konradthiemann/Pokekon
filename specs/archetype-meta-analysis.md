@@ -178,7 +178,28 @@ filterbaren Turnier-Mindestgrößen.
   Rate-Limits, Nutzungsbedingungen, tatsächliche API-Stabilität sind offen. Klärung: eigener
   kurzer Recherche-Task (`ptcg-meta-researcher`) vor der Plan-Phase, falls diese Datenquelle
   gewünscht ist — sonst bleibt es bei Limitless + TrainerHill.
-  **Weiterhin offen** (bewusst out of scope, siehe oben) — keine Umsetzung in Spec 10.
+  **Entschieden (2026-09-23, Vertiefungsrecherche): keine Anbindung, weder RK9 direkt noch
+  PokeData.ovh.**
+  - ✅ **Belegt:** RK9s eigene Nutzungsbedingungen (`rk9.gg/terms`, Abschnitt 5.3) verbieten
+    automatisierten Datenzugriff explizit und ausdrücklich sowohl kommerziell als auch
+    nicht-kommerziell: *"use of any automated system or software to extract data from the
+    Services ('screen scraping'), for commercial or non-commercial purposes"* sowie *"use or
+    misappropriate the data on the Services for your own commercial gain"*. Das ist kein
+    "ungeprüft", sondern ein hartes Verbot — RK9 direkt scheidet damit aus.
+  - ✅ **Belegt:** `PokeData.ovh` bietet eine interaktive "Cards API"-Demo-Konsole
+    (`pokedata.ovh/decklist/demo`), aber keine auffindbare formale API-Dokumentation, keine
+    veröffentlichten Rate-Limits, keine Nutzungsbedingungen und keinen erkennbaren
+    Auth-Mechanismus — weder auf der Startseite noch auf der Demo-Seite selbst.
+  - ⚠️ **Vermutung:** `PokeData.ovh` bezieht seine Turnierdaten sehr wahrscheinlich aus RK9
+    (eigene Seitenbeschreibung erwähnt RK9 explizit, z. B. "PTCGL to RK9 Sanitizer"), der genaue
+    Beschaffungsweg (offizielle Absprache vs. eigenes Scraping) ist aus den öffentlich
+    zugänglichen Seiten nicht zu klären.
+  - **Konsequenz:** Selbst wenn `PokeData.ovh` als Zwischenschicht genutzt würde, bliebe das
+    zugrundeliegende Risiko (RK9-ToS-Verstoß eine Ebene entfernt) bestehen — plus die fehlende
+    formale Vertragsgrundlage (kein ToS, keine Rate-Limit-Zusage, keine Stabilitätsgarantie) für
+    eine Abhängigkeit, auf die eine öffentliche App sich verlassen müsste. Bewertung insgesamt zu
+    riskant/unzuverlässig für eine Anbindung. **Bleibt bei Limitless + TrainerHill**, wie im
+    Fallback dieser Spec vorgesehen — kein Folge-Task, keine spätere Spec zu diesem Thema nötig.
 - **Cluster-Schwellenwert (A):** Der Nutzer nannte "58 von 60 gleichen Karten" als Beispiel.
   Ob das exakt der Schwellenwert sein soll oder ob ein anderer (z. B. prozentual, oder
   kartenkategorie-gewichtet — ein getauschtes Tech-Tool wiegt anders als eine getauschte
