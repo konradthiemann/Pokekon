@@ -529,7 +529,7 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
   // GET /api/analysis/tournament/:tournamentId/archetype/:archetypeId —
   // read-only, never an LLM call: which (clustered) decklist of this archetype
   // would have performed best against THIS ONE tournament's actual field
-  // (Spec 10 AC-G third bullet, HANDOVER_SPEC10.md "Was fehlt" point 4).
+  // (Spec 10 AC-G third bullet, specs/archetype-meta-analysis.md).
   // Reuses the exact same clusterDecklists/rankClusters/
   // computeClusterFieldScores/reorderClustersByFieldScore composition as
   // buildArchetypeSynthesisFactSet (Slice C/D), just scoped to one

@@ -9,7 +9,7 @@ import { ListFieldPerformance } from './ListFieldPerformance';
 import type { RankedCluster } from '@pokekon/shared';
 
 /**
- * Spec 10 AC-G third bullet / HANDOVER_SPEC10.md "Was fehlt" point 4: per
+ * Spec 10 AC-G third bullet (specs/archetype-meta-analysis.md): per
  * tournament recommendation UI, mounted below the raw decklists in
  * ArchetypeDetail.tsx. Mirrors ArchetypeRecommendationPanel.test.tsx's
  * "mock the api module" approach; ListFieldPerformance is additionally

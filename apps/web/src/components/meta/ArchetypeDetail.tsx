@@ -69,7 +69,7 @@ interface ArchetypeDetailProps {
   archetypeStats: ArchetypeStats[];
   /** Current online meta (MetaPage's `fieldAnalysis.archetypes`), passed
    *  through to `ArchetypeRecommendationPanel`'s local-field derivation
-   *  (Spec 10 Slice D, HANDOVER_SPEC10.md "Was fehlt" 3). Same store-free
+   *  (Spec 10 Slice D, specs/archetype-meta-analysis.md). Same store-free
    *  pass-through precedent as `archetypeStats` above. */
   archetypes: FieldAnalysisArchetype[];
   /** The user's configured local-meta archetype NAMES (dashboardStore
@@ -161,7 +161,7 @@ export function ArchetypeDetail({
   const error = failure !== null && !failure.notInWindow ? failure.message : null;
 
   // DISTINCT tournaments the currently loaded lists were drawn from (Spec 10
-  // AC-G third bullet, HANDOVER_SPEC10.md "Was fehlt" point 4) — deduplicated
+  // AC-G third bullet, specs/archetype-meta-analysis.md) — deduplicated
   // by tournament id, for the TournamentBestListPanel's selector below.
   const tournaments = useMemo(() => {
     const byId = new Map<string, { id: string; name: string; date: string; players: number }>();
@@ -389,7 +389,7 @@ export function ArchetypeDetail({
           </div>
 
           {/* Per-tournament "best list for this field" (Spec 10 AC-G third
-              bullet, HANDOVER_SPEC10.md "Was fehlt" point 4) -- only once at
+              bullet, specs/archetype-meta-analysis.md) -- only once at
               least one tournament is known from the currently loaded lists. */}
           {tournaments.length > 0 && (
             <TournamentBestListPanel archetypeId={archetypeId} tournaments={tournaments} />

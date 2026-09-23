@@ -6,6 +6,6 @@
  *  Used by `PredictionPanel.tsx` (the user-facing weight editor) and
  *  `ArchetypeRecommendationPanel.tsx` (deriving the same default weight for
  *  the `localField` it sends to the archetype-synthesis endpoint, Spec 10
- *  Slice D, HANDOVER_SPEC10.md "Was fehlt" 3) so both stay in sync without
+ *  Slice D, specs/archetype-meta-analysis.md) so both stay in sync without
  *  duplicating the arithmetic. */
 export const seedWeight = (sharePct: number): number => Math.max(1, Math.round(sharePct));
