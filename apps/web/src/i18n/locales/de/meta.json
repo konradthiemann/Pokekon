@@ -158,6 +158,7 @@
       "disclosure": "Worauf beruht das?",
       "disclosureDropped": "{{count}} weitere Aussagen wurden von der Faktenprüfung verworfen und werden nicht angezeigt.",
       "clustersEmpty": "Noch keine geclusterten Decklisten in diesem Zeitfenster.",
+      "localFieldEmpty": "Noch kein lokales Feld konfiguriert — zeigt aktuell dieselbe Rangliste wie global. Füge im Meta-Überblick unter der Prognose Archetypen zu deinem lokalen Feld hinzu, um hier feld-gewichtete Ranglisten zu sehen.",
       "sections": {
         "headline": "Überblick",
         "strengths": "Stärken",
@@ -170,7 +171,8 @@
         "games": "Bilanz {{record}}",
         "members_one": "{{count}} Liste",
         "members_other": "{{count}} Listen",
-        "placement": "Ø Platzierung: Top {{pct}} %"
+        "placement": "Ø Platzierung: Top {{pct}} %",
+        "fieldScore": "Lokaler Feld-Score"
       }
     }
   },

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, RefreshCw, KeyRound, Info } from 'lucide-react';
 import { DEFAULT_MIN_OWN_GAMES } from '@pokekon/shared';
@@ -7,11 +7,14 @@ import {
   generateArchetypeSynthesis,
   getArchetypeSynthesis,
   type ArchetypeSynthesisReadResponse,
+  type FieldAnalysisArchetype,
   type PersonalRecordInput,
 } from '../../lib/api';
 import { authClient } from '../../lib/authClient';
 import { DEMO_AI_TOKEN_KEY, isAnonymousUser } from '../../lib/demo';
+import { getLocalMetaWeightOverrides, type LocalFieldEntry } from '../../lib/preferences';
 import type { ArchetypeStats } from '../../types';
+import { seedWeight } from './localFieldWeight';
 import { WinRateBadge } from './WinRateBadge';
 
 interface ArchetypeRecommendationPanelProps {
@@ -25,6 +28,19 @@ interface ArchetypeRecommendationPanelProps {
    *  find the entry matching `archetypeId` (same Limitless-slug identifier
    *  space, see `ArchetypeStats.archetype` / `Deck.archetype`). */
   archetypeStats?: ArchetypeStats[];
+  /** Current online meta (MetaPage's `fieldAnalysis.archetypes`) -- used only
+   *  to resolve `localMeta`'s archetype NAMES to their real
+   *  archetypeId/Limitless-slug and a default weight (`seedWeight`), the same
+   *  lookup `PredictionPanel.tsx` uses for the same purpose (Spec 10 Slice D,
+   *  HANDOVER_SPEC10.md "Was fehlt" 3). */
+  archetypes: FieldAnalysisArchetype[];
+  /** The user's configured local-meta archetype NAMES (dashboardStore slice,
+   *  Spec 10 Slice D), passed down from `MetaPage` like `archetypeStats`
+   *  above -- this panel stays store-free. Used in "Lokal"/"Mein Spielstil"
+   *  mode (both are `scope:'local'` server-side) to derive `localField`
+   *  below, reusing `PredictionPanel.tsx`'s own derivation logic instead of
+   *  duplicating it. */
+  localMeta: string[];
 }
 
 /** Three recommendation modes: "Mein Spielstil" is not a fourth backend
@@ -67,6 +83,26 @@ function ClusterItem({ cluster }: { cluster: RankedCluster }) {
       {cluster.winRateInterval && (
         <p className="text-[11px] text-slate-400 font-mono">
           {`${cluster.winRateInterval.lowPct.toFixed(1)}–${cluster.winRateInterval.highPct.toFixed(1)} %`}
+        </p>
+      )}
+      {/* Field-weighted re-ranking against the user's local meta (Spec 10
+          Slice D, HANDOVER_SPEC10.md "Was fehlt" 3) -- only present when the
+          server actually re-ranked this cluster (scope:'local' + a non-empty
+          localField), regardless of this panel's current `mode` prop drift. */}
+      {cluster.fieldScore?.fieldWinRatePct != null && (
+        <p
+          data-testid="archetype-recommendation-cluster-field-score"
+          className="text-xs text-slate-600"
+        >
+          {t('archetypeDetail.recommendation.cluster.fieldScore')}
+          {': '}
+          <WinRateBadge pct={cluster.fieldScore.fieldWinRatePct} />
+          {cluster.fieldScore.fieldWinRateLowPct != null &&
+            cluster.fieldScore.fieldWinRateHighPct != null && (
+              <span className="text-[11px] text-slate-400 font-mono ml-1">
+                {`(${cluster.fieldScore.fieldWinRateLowPct.toFixed(1)}–${cluster.fieldScore.fieldWinRateHighPct.toFixed(1)} %)`}
+              </span>
+            )}
         </p>
       )}
       <p className="text-xs text-slate-600">
@@ -114,6 +150,8 @@ export function ArchetypeRecommendationPanel({
   archetypeName,
   windowDays,
   archetypeStats,
+  archetypes,
+  localMeta,
 }: ArchetypeRecommendationPanelProps) {
   const { t } = useTranslation('meta');
   const [mode, setMode] = useState<RecommendationMode>('global');
@@ -137,6 +175,26 @@ export function ArchetypeRecommendationPanel({
   // "generate", not duplicated server logic.
   const personalDataInsufficient =
     usePersonalPrior && (!matchingStats || personalGames < DEFAULT_MIN_OWN_GAMES);
+
+  // The user's local meta field (Spec 10 Slice D, HANDOVER_SPEC10.md "Was
+  // fehlt" 3) -- same derivation as PredictionPanel.tsx's own `field`: one
+  // entry per `localMeta` archetype NAME, resolved to its real archetypeId
+  // via the current online meta (`archetypes`) and weighted by its stored
+  // override or (default) `seedWeight(sharePct)`. `weightOverrides` is read
+  // ONCE on mount (same `useState(() => ...)` pattern as `demoTokenPresent`
+  // below) -- deliberately not live-synced with PredictionPanel/LocalMetaPanel,
+  // which live on the overview page, not this drilldown (see prop docstring).
+  const [weightOverrides] = useState(() => getLocalMetaWeightOverrides());
+  const localField: LocalFieldEntry[] = useMemo(
+    () =>
+      localMeta.map((name) => {
+        const online = archetypes.find((a) => a.archetypeName === name);
+        const archetypeId = online?.archetypeId ?? name;
+        const defaultWeight = online ? seedWeight(online.sharePct) : 1;
+        return { archetypeId, name, weight: weightOverrides[archetypeId] ?? defaultWeight };
+      }),
+    [localMeta, archetypes, weightOverrides],
+  );
 
   const [loaded, setLoaded] = useState<LoadedSynthesis | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
@@ -167,7 +225,18 @@ export function ArchetypeRecommendationPanel({
               : {}),
           }
         : {};
-    getArchetypeSynthesis(archetypeId, { days: windowDays, scope, ...personalOptions })
+    // Only effective for 'local'/'personal' mode (both scope:'local'
+    // server-side) and only when the field isn't empty -- the server treats
+    // an omitted/empty localField as "no re-ranking", same no-op contract as
+    // scope:'global' + localField (harmless, server ignores it either way).
+    const localFieldOptions: { localField?: LocalFieldEntry[] } =
+      mode !== 'global' && localField.length > 0 ? { localField } : {};
+    getArchetypeSynthesis(archetypeId, {
+      days: windowDays,
+      scope,
+      ...personalOptions,
+      ...localFieldOptions,
+    })
       .then((data) => {
         if (cancelled) return;
         setLoaded({ key, data });
@@ -179,7 +248,7 @@ export function ArchetypeRecommendationPanel({
     return () => {
       cancelled = true;
     };
-  }, [archetypeId, windowDays, mode, scope, usePersonalPrior, matchingStats]);
+  }, [archetypeId, windowDays, mode, scope, usePersonalPrior, matchingStats, localField]);
 
   const current = loaded?.key === requestKey ? loaded.data : null;
 
@@ -202,6 +271,10 @@ export function ArchetypeRecommendationPanel({
           }
         : {};
 
+    // Same no-op contract as the GET effect above.
+    const localFieldOptions: { localField?: LocalFieldEntry[] } =
+      mode !== 'global' && localField.length > 0 ? { localField } : {};
+
     const run = (apiKey?: string) => {
       setIsSynthesizing(true);
       setSynthesisError(null);
@@ -210,6 +283,7 @@ export function ArchetypeRecommendationPanel({
         scope,
         apiKey,
         ...personalOptions,
+        ...localFieldOptions,
       })
         .then((response) => {
           setLoaded((prev) =>
@@ -253,6 +327,8 @@ export function ArchetypeRecommendationPanel({
     scope,
     usePersonalPrior,
     matchingStats,
+    mode,
+    localField,
     requestKey,
   ]);
 
@@ -335,6 +411,19 @@ export function ArchetypeRecommendationPanel({
             count: personalGames,
             min: DEFAULT_MIN_OWN_GAMES,
           })}
+        </p>
+      )}
+
+      {/* No local field configured yet: 'local'/'personal' mode currently
+          matches the global ranking 1:1 (no localField is sent, see
+          localFieldOptions above) -- tell the user instead of silently
+          showing identical numbers under a different chip. */}
+      {mode !== 'global' && localField.length === 0 && (
+        <p
+          data-testid="archetype-recommendation-local-field-empty"
+          className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded px-3 py-2"
+        >
+          {t('archetypeDetail.recommendation.localFieldEmpty')}
         </p>
       )}
 

@@ -27,6 +27,7 @@ import { formatWithInterval } from './confidence';
 import { DecklistCard } from './DecklistCard';
 import { FieldScorePanel } from './FieldScorePanel';
 import { ListFieldPerformance } from './ListFieldPerformance';
+import { seedWeight } from './localFieldWeight';
 import { ThreatsPanel } from './ThreatsPanel';
 
 interface PredictionPanelProps {
@@ -35,9 +36,6 @@ interface PredictionPanelProps {
   /** Active meta window — the matchup matrix and per-deck lists respect it. */
   window: MetaWindow;
 }
-
-/** Round a share to a readable seed weight (min 1 so nothing drops to zero). */
-const seedWeight = (sharePct: number): number => Math.max(1, Math.round(sharePct));
 
 /**
  * Local-meta prediction. `LocalMetaPanel` (rendered alongside this panel,
