@@ -11,6 +11,7 @@ import {
   type MetaWindow,
 } from '../../lib/api';
 import { PokemonIcon } from '../shared/PokemonIcon';
+import { ArchetypeRecommendationPanel } from './ArchetypeRecommendationPanel';
 import { DecklistCard } from './DecklistCard';
 import { FieldScorePanel } from './FieldScorePanel';
 import { MatchupTable } from './MatchupTable';
@@ -294,6 +295,14 @@ export function ArchetypeDetail({
           {/* Full head-to-head table: this archetype vs every deck in the field.
               iconsById is additive — default to {} so an older API can't crash it. */}
           <MatchupTable fieldScore={analysis.fieldScore} iconsById={analysis.iconsById ?? {}} />
+
+          {/* Ranked decklist clusters + optional KI-text recommendation
+              (Spec 10 Slice C, specs/archetype-meta-analysis.md). */}
+          <ArchetypeRecommendationPanel
+            archetypeId={archetypeId}
+            archetypeName={archetypeName}
+            windowDays={days}
+          />
 
           {/* Decklists */}
           <div className="space-y-3">
