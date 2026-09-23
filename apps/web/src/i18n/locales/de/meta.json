@@ -82,6 +82,12 @@
       "players": "Spieler",
       "fieldScore": "Feld-Score"
     },
+    "tabs": {
+      "matchups": "Matchups",
+      "recommendation": "Empfehlung",
+      "tournament": "Turnier-Liste",
+      "decklists": "Decklisten"
+    },
     "fieldScore": {
       "title": "Feld-Performance",
       "rank": "Rang {{rank}} von {{total}}",
@@ -104,7 +110,11 @@
       "winRateLabel": "{{pct}}% WR",
       "gamesLabel_one": "{{count}} Spiel",
       "gamesLabel_other": "{{count}} Spiele",
-      "unreliable": "unsicher — Intervall schließt 50 % ein"
+      "gamesShort": "n={{count}}",
+      "unreliable": "unsicher — Intervall schließt 50 % ein",
+      "showMore_one": "+{{count}} weitere",
+      "showMore_other": "+{{count}} weitere",
+      "showLess": "Weniger anzeigen"
     },
     "matchupTable": {
       "title": "Matchups gegen das Feld",
@@ -113,7 +123,9 @@
       "winRate": "Matchup-WR",
       "sample": "Spiele",
       "share": "Feld-Anteil",
-      "interval": "95-%-Intervall"
+      "interval": "95-%-Intervall",
+      "showFull": "Vollständige Liste ({{count}})",
+      "hideFull": "Liste einklappen"
     },
     "trend": {
       "title": "Verlauf",

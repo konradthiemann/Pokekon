@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { CircleHelp } from 'lucide-react';
 import type { FieldScore, WeightedMatchup } from '@pokekon/shared';
 import { PokemonIcon } from '../shared/PokemonIcon';
 import { WinRateBadge } from './WinRateBadge';
@@ -76,12 +77,22 @@ export function MatchupTable({
                   </div>
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono">
-                  <WinRateBadge pct={Math.round(m.winRatePct * 10) / 10} />
-                  {!m.significant && (
-                    <span className="ml-1.5 rounded bg-slate-100 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-500">
-                      {t('archetypeDetail.threats.unreliable')}
-                    </span>
-                  )}
+                  <span className="inline-flex items-center gap-1">
+                    <WinRateBadge pct={Math.round(m.winRatePct * 10) / 10} />
+                    {/* Icon + tooltip instead of a long inline text badge --
+                        see ThreatsPanel.tsx's WeightedMatchupRow for the same
+                        fix and its rationale (the old label wrapped and
+                        overlapped adjacent cells at moderate widths). */}
+                    {!m.significant && (
+                      <CircleHelp
+                        className="w-3 h-3 shrink-0 text-slate-400"
+                        aria-hidden="true"
+                        role="img"
+                      >
+                        <title>{t('archetypeDetail.threats.unreliable')}</title>
+                      </CircleHelp>
+                    )}
+                  </span>
                 </td>
                 <td className="px-3 py-1.5 text-right text-xs tabular-nums text-slate-500">
                   {m.lowPct.toFixed(0)}–{m.highPct.toFixed(0)}%

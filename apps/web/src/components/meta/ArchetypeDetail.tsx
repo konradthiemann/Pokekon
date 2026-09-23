@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Loader2, TrendingUp } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronDown,
+  Layers,
+  Loader2,
+  Sparkles,
+  Swords,
+  Trophy,
+  TrendingUp,
+} from 'lucide-react';
 import { wilsonInterval } from '@pokekon/shared';
 import {
   ApiError,
@@ -13,6 +22,7 @@ import {
 } from '../../lib/api';
 import type { ArchetypeStats } from '../../types';
 import { PokemonIcon } from '../shared/PokemonIcon';
+import { SegmentedTabs } from '../shared/SegmentedTabs';
 import { ArchetypeRecommendationPanel } from './ArchetypeRecommendationPanel';
 import { DecklistCard } from './DecklistCard';
 import { FieldScorePanel } from './FieldScorePanel';
@@ -24,6 +34,12 @@ import { WinRateBadge } from './WinRateBadge';
 import { winRateColorClass, winRatePct1 } from './winRateColor';
 
 const LISTS_PAGE_SIZE = 4;
+
+/** The drilldown's four tabs -- "tournament" is only ever offered once at
+ *  least one tournament is known from the currently loaded lists (see
+ *  `tabItems` below), same guard the old standalone `TournamentBestListPanel`
+ *  section used. */
+type ArchetypeSection = 'matchups' | 'recommendation' | 'tournament' | 'decklists';
 
 // ─── Weekly trend chips ───────────────────────────────────────────────────────
 
@@ -119,6 +135,11 @@ export function ArchetypeDetail({
   const [failed, setFailed] = useState<FailedDetail | null>(null);
   const [isLoadingLists, setIsLoadingLists] = useState(false);
   const [loadMoreFailed, setLoadMoreFailed] = useState(false);
+  // UI/UX redesign (2026-09-23): one tab visible at a time instead of seven
+  // full-width sections stacked vertically -- reuses the same segmented-tab
+  // pattern DeckPage.tsx already established for Deck/Analytics/Tips.
+  const [section, setSection] = useState<ArchetypeSection>('matchups');
+  const [showFullMatchupTable, setShowFullMatchupTable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -313,86 +334,144 @@ export function ArchetypeDetail({
 
           <TrendChips analysis={analysis} />
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <FieldScorePanel
-              fieldScore={analysis.fieldScore}
-              totalRanked={analysis.totalRanked}
-              matchupImportedAt={analysis.matchupImportedAt}
-            />
-            <ThreatsPanel fieldScore={analysis.fieldScore} />
-          </div>
-
-          {/* Full head-to-head table: this archetype vs every deck in the field.
-              iconsById is additive — default to {} so an older API can't crash it. */}
-          <MatchupTable fieldScore={analysis.fieldScore} iconsById={analysis.iconsById ?? {}} />
-
-          {/* Ranked decklist clusters + optional KI-text recommendation
-              (Spec 10 Slice C, specs/archetype-meta-analysis.md). */}
-          <ArchetypeRecommendationPanel
-            archetypeId={archetypeId}
-            archetypeName={archetypeName}
-            windowDays={days}
-            archetypeStats={archetypeStats}
-            archetypes={archetypes}
-            localMeta={localMeta}
+          {/* One tab visible at a time instead of five-to-seven full-width
+              sections stacked vertically (UI/UX redesign, 2026-09-23) --
+              same segmented-tab pattern as DeckPage.tsx's Deck/Analytics/Tips
+              switcher. "tournament" only appears once a tournament is known
+              from the currently loaded lists, same guard the previous
+              always-rendered TournamentBestListPanel section used. */}
+          <SegmentedTabs<ArchetypeSection>
+            items={[
+              { id: 'matchups', label: t('archetypeDetail.tabs.matchups'), Icon: Swords },
+              {
+                id: 'recommendation',
+                label: t('archetypeDetail.tabs.recommendation'),
+                Icon: Sparkles,
+              },
+              ...(tournaments.length > 0
+                ? [
+                    {
+                      id: 'tournament' as const,
+                      label: t('archetypeDetail.tabs.tournament'),
+                      Icon: Trophy,
+                    },
+                  ]
+                : []),
+              { id: 'decklists', label: t('archetypeDetail.tabs.decklists'), Icon: Layers },
+            ]}
+            active={section}
+            onChange={setSection}
           />
 
-          {/* Decklists */}
-          <div className="space-y-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <h3 className="text-sm font-bold text-slate-800">
-                {t('archetypeDetail.lists.title')}
-              </h3>
-              {listsTotal > 0 && (
-                <span className="text-xs text-slate-500">
-                  {t('archetypeDetail.lists.of', { shown: lists.length, total: listsTotal })}
-                </span>
+          {section === 'matchups' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <FieldScorePanel
+                  fieldScore={analysis.fieldScore}
+                  totalRanked={analysis.totalRanked}
+                  matchupImportedAt={analysis.matchupImportedAt}
+                />
+                <ThreatsPanel fieldScore={analysis.fieldScore} />
+              </div>
+
+              {/* Curated view above (heaviest-weighted threats/free-wins)
+                  already covers every opponent with a meaningful edge either
+                  way -- the full head-to-head table repeats the same
+                  underlying data as one long list, so it stays collapsed
+                  behind a counted toggle instead of always rendering all
+                  ~100 rows (research: Untapped.gg's "Curated List (100) |
+                  Full List (490)" pattern -- nothing is hidden permanently,
+                  it's one click away). */}
+              <button
+                type="button"
+                onClick={() => setShowFullMatchupTable((v) => !v)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800"
+              >
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform ${showFullMatchupTable ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+                {showFullMatchupTable
+                  ? t('archetypeDetail.matchupTable.hideFull')
+                  : t('archetypeDetail.matchupTable.showFull', {
+                      count:
+                        analysis.fieldScore.threats.length + analysis.fieldScore.freeWins.length,
+                    })}
+              </button>
+              {showFullMatchupTable && (
+                <MatchupTable
+                  fieldScore={analysis.fieldScore}
+                  iconsById={analysis.iconsById ?? {}}
+                />
               )}
             </div>
+          )}
 
-            {lists.length === 0 ? (
-              <div className="card p-6 text-center text-sm text-slate-500">
-                {t('archetypeDetail.lists.empty')}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                {lists.map((entry) => (
-                  <DecklistCard key={entry.id} entry={entry} />
-                ))}
-              </div>
-            )}
+          {section === 'recommendation' && (
+            <ArchetypeRecommendationPanel
+              archetypeId={archetypeId}
+              archetypeName={archetypeName}
+              windowDays={days}
+              archetypeStats={archetypeStats}
+              archetypes={archetypes}
+              localMeta={localMeta}
+            />
+          )}
 
-            {loadMoreFailed && (
-              <p className="text-center text-xs text-red-700">
-                {t('archetypeDetail.lists.loadMoreError')}
-              </p>
-            )}
-
-            {lists.length < listsTotal && (
-              <div className="flex justify-center">
-                <button
-                  onClick={loadMoreLists}
-                  disabled={isLoadingLists}
-                  className="btn-ghost text-xs disabled:opacity-50"
-                >
-                  {isLoadingLists ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
-                      {t('archetypeDetail.lists.loading')}
-                    </>
-                  ) : (
-                    t('archetypeDetail.lists.loadMore')
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Per-tournament "best list for this field" (Spec 10 AC-G third
-              bullet, specs/archetype-meta-analysis.md) -- only once at
-              least one tournament is known from the currently loaded lists. */}
-          {tournaments.length > 0 && (
+          {section === 'tournament' && tournaments.length > 0 && (
             <TournamentBestListPanel archetypeId={archetypeId} tournaments={tournaments} />
+          )}
+
+          {section === 'decklists' && (
+            <div className="space-y-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <h3 className="text-sm font-bold text-slate-800">
+                  {t('archetypeDetail.lists.title')}
+                </h3>
+                {listsTotal > 0 && (
+                  <span className="text-xs text-slate-500">
+                    {t('archetypeDetail.lists.of', { shown: lists.length, total: listsTotal })}
+                  </span>
+                )}
+              </div>
+
+              {lists.length === 0 ? (
+                <div className="card p-6 text-center text-sm text-slate-500">
+                  {t('archetypeDetail.lists.empty')}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {lists.map((entry) => (
+                    <DecklistCard key={entry.id} entry={entry} />
+                  ))}
+                </div>
+              )}
+
+              {loadMoreFailed && (
+                <p className="text-center text-xs text-red-700">
+                  {t('archetypeDetail.lists.loadMoreError')}
+                </p>
+              )}
+
+              {lists.length < listsTotal && (
+                <div className="flex justify-center">
+                  <button
+                    onClick={loadMoreLists}
+                    disabled={isLoadingLists}
+                    className="btn-ghost text-xs disabled:opacity-50"
+                  >
+                    {isLoadingLists ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                        {t('archetypeDetail.lists.loading')}
+                      </>
+                    ) : (
+                      t('archetypeDetail.lists.loadMore')
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </>
       )}

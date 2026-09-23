@@ -82,6 +82,12 @@
       "players": "Players",
       "fieldScore": "Field score"
     },
+    "tabs": {
+      "matchups": "Matchups",
+      "recommendation": "Recommendation",
+      "tournament": "Tournament list",
+      "decklists": "Decklists"
+    },
     "fieldScore": {
       "title": "Field performance",
       "rank": "Rank {{rank}} of {{total}}",
@@ -104,7 +110,11 @@
       "winRateLabel": "{{pct}}% WR",
       "gamesLabel_one": "{{count}} game",
       "gamesLabel_other": "{{count}} games",
-      "unreliable": "unreliable — interval includes 50 %"
+      "gamesShort": "n={{count}}",
+      "unreliable": "unreliable — interval includes 50 %",
+      "showMore_one": "+{{count}} more",
+      "showMore_other": "+{{count}} more",
+      "showLess": "Show less"
     },
     "matchupTable": {
       "title": "Matchups vs the field",
@@ -113,7 +123,9 @@
       "winRate": "Matchup WR",
       "sample": "Games",
       "share": "Field share",
-      "interval": "95 % interval"
+      "interval": "95 % interval",
+      "showFull": "Full list ({{count}})",
+      "hideFull": "Collapse list"
     },
     "trend": {
       "title": "Trend",

@@ -163,9 +163,9 @@ describe('DeckPage — information architecture (plan personal-data-role-rework 
     // content. The invariant that Spec 4 actually protects — the match log
     // is NOT a tab — is unchanged and still asserted below.
     render(<DeckPage />);
-    expect(screen.getByRole('button', { name: /deck list/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /analytics/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^tips$/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /deck list/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /analytics/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^tips$/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /match log/i })).not.toBeInTheDocument();
   });
 
@@ -173,7 +173,7 @@ describe('DeckPage — information architecture (plan personal-data-role-rework 
     render(<DeckPage />);
     expect(screen.getByRole('button', { name: /log match/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /analytics/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /analytics/i }));
     expect(screen.getByRole('button', { name: /log match/i })).toBeInTheDocument();
   });
 
@@ -185,7 +185,7 @@ describe('DeckPage — information architecture (plan personal-data-role-rework 
 
   it('shows the match log as an initially-collapsed section inside Analytics, with the log count in its title', () => {
     render(<DeckPage />);
-    fireEvent.click(screen.getByRole('button', { name: /analytics/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /analytics/i }));
 
     const sectionHeader = screen.getByRole('button', { name: /match.log.*2/i });
     expect(sectionHeader).toBeInTheDocument();
@@ -209,7 +209,7 @@ describe('DeckPage — information architecture (plan personal-data-role-rework 
 describe('DeckPage — "Tips" section (plan ui-ux-hub-rework.md §3.4)', () => {
   it('renders the deck comparison section when the "Tips" tab is clicked', () => {
     render(<DeckPage />);
-    fireEvent.click(screen.getByRole('button', { name: /^tips$/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /^tips$/i }));
 
     // recommendations:comparison.sectionTitle — "List Comparison vs. Tournament Results"
     expect(screen.getByText(/list comparison vs\. tournament results/i)).toBeInTheDocument();
@@ -217,7 +217,7 @@ describe('DeckPage — "Tips" section (plan ui-ux-hub-rework.md §3.4)', () => {
 
   it('keeps the "Log match" button visible in the Tips section', () => {
     render(<DeckPage />);
-    fireEvent.click(screen.getByRole('button', { name: /^tips$/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /^tips$/i }));
 
     expect(screen.getByRole('button', { name: /log match/i })).toBeInTheDocument();
   });
@@ -261,7 +261,7 @@ describe('DeckPage — "My Matchups" (moved from Overview, deck-list level)', ()
     render(<DeckPage />);
     expect(screen.getByText('My Matchups')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /analytics/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /analytics/i }));
     expect(screen.getByText('My Matchups')).toBeInTheDocument();
   });
 });
