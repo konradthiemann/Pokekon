@@ -15,6 +15,7 @@ import {
   ApiError,
   getArchetypeAnalysis,
   getArchetypeLists,
+  getArchetypeTournaments,
   type ArchetypeAnalysis,
   type ArchetypeListEntry,
   type FieldAnalysisArchetype,
@@ -101,6 +102,14 @@ interface LoadedDetail {
   listsTotal: number;
 }
 
+/** Every tournament this archetype appeared at in the window (Spec 10 AC-G
+ *  third bullet) — deliberately its own load/failure domain, see the effect
+ *  below that fetches it. */
+interface LoadedTournaments {
+  key: string;
+  tournaments: { id: string; name: string; date: string; players: number }[];
+}
+
 /** One failed load, tagged the same way (404 = archetype not in window). */
 interface FailedDetail {
   key: string;
@@ -132,6 +141,7 @@ export function ArchetypeDetail({
   const { days, online, bo1 } = window;
   const requestKey = `${archetypeId}|${days}|${online}|${bo1}`;
   const [loaded, setLoaded] = useState<LoadedDetail | null>(null);
+  const [loadedTournaments, setLoadedTournaments] = useState<LoadedTournaments | null>(null);
   const [failed, setFailed] = useState<FailedDetail | null>(null);
   const [isLoadingLists, setIsLoadingLists] = useState(false);
   const [loadMoreFailed, setLoadMoreFailed] = useState(false);
@@ -172,6 +182,29 @@ export function ArchetypeDetail({
     };
   }, [archetypeId, days, online, bo1]);
 
+  // Deliberately a SEPARATE effect/failure-domain from the analysis+lists
+  // load above: the tournament picker is only one of four tabs, a genuinely
+  // optional enhancement over the always-available Matchups/Empfehlung/
+  // Decklisten tabs -- its fetch failing (or being unavailable, e.g. an
+  // older deployed API) must not fail the whole drilldown the way bundling
+  // it into the main Promise.all would have.
+  useEffect(() => {
+    let cancelled = false;
+    const key = `${archetypeId}|${days}|${online}|${bo1}`;
+    getArchetypeTournaments(archetypeId, { days, online, bo1 })
+      .then((res) => {
+        if (cancelled) return;
+        setLoadedTournaments({ key, tournaments: res.tournaments });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn('[ArchetypeDetail] tournament list load failed:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [archetypeId, days, online, bo1]);
+
   const current = loaded?.key === requestKey ? loaded : null;
   const failure = failed?.key === requestKey ? failed : null;
   const isLoading = current === null && failure === null;
@@ -181,16 +214,7 @@ export function ArchetypeDetail({
   const notInWindow = failure?.notInWindow ?? false;
   const error = failure !== null && !failure.notInWindow ? failure.message : null;
 
-  // DISTINCT tournaments the currently loaded lists were drawn from (Spec 10
-  // AC-G third bullet, specs/archetype-meta-analysis.md) — deduplicated
-  // by tournament id, for the TournamentBestListPanel's selector below.
-  const tournaments = useMemo(() => {
-    const byId = new Map<string, { id: string; name: string; date: string; players: number }>();
-    for (const entry of lists) {
-      if (!byId.has(entry.tournament.id)) byId.set(entry.tournament.id, entry.tournament);
-    }
-    return [...byId.values()];
-  }, [lists]);
+  const tournaments = loadedTournaments?.key === requestKey ? loadedTournaments.tournaments : [];
 
   const loadMoreLists = useCallback(() => {
     if (current === null) return;

@@ -1771,6 +1771,41 @@ describe('tournament drilldown (field-analysis, archetype lists, matchups)', () 
     expect(body2.lists.map((l) => l.playerName)).toEqual(['Big30']);
   });
 
+  it('lists every distinct tournament an archetype appeared in, independent of decklist pagination', async () => {
+    // Regression: TournamentBestListPanel's tournament picker used to be
+    // derived from ArchetypeDetail's already-loaded (paginated, 4-per-page)
+    // decklist state, so it silently only ever offered the first page's
+    // tournaments instead of every tournament the archetype actually played
+    // at -- looked "stale"/incomplete rather than an obvious loading state.
+    // This dedicated, unpaginated endpoint is the fix.
+    await clearTournamentData();
+    // Two standings in the SAME tournament -> one tournament entry, not two.
+    await seedTournament('big', daysAgo(2), 64, [
+      standing('zoro', { placing: 2, playerName: 'Big2', decklist: sampleDecklist }),
+      standing('zoro', { placing: 30, playerName: 'Big30', decklist: sampleDecklist }),
+    ]);
+    await seedTournament('small', daysAgo(3), 8, [
+      standing('zoro', { placing: 1, playerName: 'Small1', decklist: sampleDecklist }),
+    ]);
+    await seedTournament('stale', daysAgo(35), 64, [
+      standing('zoro', { placing: 1, playerName: 'TooOld', decklist: sampleDecklist }),
+    ]);
+    await seedTournament('no-decklist', daysAgo(1), 20, [
+      standing('zoro', { placing: 1, playerName: 'NoList' }), // no decklist -> excluded
+    ]);
+
+    const res = await request('/api/meta/archetypes/zoro/tournaments?days=30', { user: USER_A });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      tournaments: { id: string; name: string; date: string; players: number }[];
+    };
+    // 'stale' outside the 30-day window, 'no-decklist' has no published list
+    // for this archetype -- both excluded, same filter as /lists. Sorted by
+    // date desc (most recent tournament first).
+    expect(body.tournaments.map((t) => t.id)).toEqual(['big', 'small']);
+    expect(body.tournaments[0]).toMatchObject({ id: 'big', players: 64 });
+  });
+
   it('computes meta-weighted field scores and ranks archetypes by them', async () => {
     await clearTournamentData();
     // 2 pilots each → 50 % share for both archetypes.

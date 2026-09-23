@@ -40,6 +40,11 @@ import {
   snapEquilibriumWindow,
 } from '../validation.js';
 
+/** Sane cap for GET .../tournaments — a dropdown with more than this many
+ *  entries would be unusable anyway; keeps the query cheap without needing
+ *  the offset/limit pagination the heavier /lists endpoint has. */
+const TOURNAMENTS_LIST_MAX = 50;
+
 export interface WindowAggregates {
   tournamentCount: number;
   totalPlayers: number;
@@ -476,6 +481,55 @@ export function createMetaRoutes(): Hono<ApiEnv> {
           date: r.tournamentDate.toISOString(),
           players: r.tournamentPlayers,
         },
+      })),
+    });
+  });
+
+  // GET /api/meta/archetypes/:archetypeId/tournaments?days&online&bo1 —
+  // every DISTINCT tournament this archetype had a published decklist at in
+  // the window, unpaginated (capped at TOURNAMENTS_LIST_MAX). Deliberately
+  // separate from GET .../lists: the drilldown UI used to derive its
+  // TournamentBestListPanel tournament picker from whatever page of
+  // decklists happened to already be loaded there (4 at a time) — correct
+  // for the first page, silently stale/incomplete once more exist. This
+  // endpoint answers "which tournaments" without paying for every decklist's
+  // full card payload.
+  routes.get('/archetypes/:archetypeId/tournaments', async (c) => {
+    const archetypeId = archetypeIdParamSchema.safeParse(c.req.param('archetypeId'));
+    if (!archetypeId.success) return c.json({ error: 'Invalid archetype id' }, 400);
+    const parsedQuery = metaWindowQuerySchema.safeParse(c.req.query());
+    if (!parsedQuery.success) {
+      return c.json({ error: 'Invalid query parameters', issues: parsedQuery.error.issues }, 400);
+    }
+    const { days, online, bo1 } = parsedQuery.data;
+    const db = c.get('db');
+
+    const rows = await db
+      .select({
+        id: tournaments.id,
+        name: tournaments.name,
+        date: tournaments.date,
+        players: tournaments.players,
+      })
+      .from(tournamentStandings)
+      .innerJoin(tournaments, eq(tournamentStandings.tournamentId, tournaments.id))
+      .where(
+        and(
+          eq(tournamentStandings.archetypeId, archetypeId.data),
+          isNotNull(tournamentStandings.decklist),
+          ...windowConditions({ days, online, bo1 }),
+        ),
+      )
+      .groupBy(tournaments.id, tournaments.name, tournaments.date, tournaments.players)
+      .orderBy(desc(tournaments.date))
+      .limit(TOURNAMENTS_LIST_MAX);
+
+    return c.json({
+      tournaments: rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        date: r.date.toISOString(),
+        players: r.players,
       })),
     });
   });
