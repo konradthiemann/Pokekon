@@ -17,6 +17,7 @@ import type {
   SynthesisClaim,
   SynthesisFact,
 } from '@pokekon/shared';
+import type { ArchetypeStats } from '../../types';
 
 /**
  * Spec 10 (specs/archetype-meta-analysis.md) + plan
@@ -206,6 +207,24 @@ function makeWriteResponse(
     synthesis: makeSynthesis(),
     stale: false,
     cached: false,
+    ...overrides,
+  };
+}
+
+function makeArchetypeStats(overrides: Partial<ArchetypeStats> = {}): ArchetypeStats {
+  return {
+    archetype: 'dragapult-ex',
+    encounters: 10,
+    wins: 6,
+    losses: 3,
+    ties: 1,
+    winRate: 65,
+    frequencyPct: 12,
+    metaWinRate: 50,
+    bo1EquivalentWinRate: 65,
+    bo1Games: 10,
+    bo3Games: 0,
+    unknownFormatGames: 0,
     ...overrides,
   };
 }
@@ -408,5 +427,100 @@ describe('ArchetypeRecommendationPanel — generation', () => {
     render(<ArchetypeRecommendationPanel {...defaultProps} />);
 
     expect(await screen.findByTestId('archetype-recommendation-empty')).toBeInTheDocument();
+  });
+});
+
+describe('ArchetypeRecommendationPanel — personal mode (Spec 10 Slice E UI)', () => {
+  it('switches to a new GET with usePersonalPrior + personalRecord when the "Mein Spielstil" chip is clicked', async () => {
+    getArchetypeSynthesisMock.mockResolvedValue(makeReadResponse());
+    const user = userEvent.setup();
+    const archetypeStats = [
+      makeArchetypeStats({ archetype: 'dragapult-ex', wins: 6, losses: 3, ties: 1 }),
+    ];
+
+    render(<ArchetypeRecommendationPanel {...defaultProps} archetypeStats={archetypeStats} />);
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByTestId('archetype-recommendation-scope-personal'));
+
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(2));
+    expect(getArchetypeSynthesisMock).toHaveBeenLastCalledWith('dragapult-ex', {
+      days: 90,
+      scope: 'local',
+      usePersonalPrior: true,
+      personalRecord: { wins: 6, losses: 3, ties: 1 },
+    });
+    // Scope switch only re-reads -- it must never trigger a generation.
+    expect(generateArchetypeSynthesisMock).not.toHaveBeenCalled();
+  });
+
+  it('shows an insufficient-data hint when archetypeStats has no matching entry', async () => {
+    getArchetypeSynthesisMock.mockResolvedValue(makeReadResponse());
+    const user = userEvent.setup();
+
+    render(<ArchetypeRecommendationPanel {...defaultProps} archetypeStats={[]} />);
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByTestId('archetype-recommendation-scope-personal'));
+
+    expect(
+      await screen.findByTestId('archetype-recommendation-personal-insufficient-data'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows an insufficient-data hint when the matching record has fewer than DEFAULT_MIN_OWN_GAMES games', async () => {
+    getArchetypeSynthesisMock.mockResolvedValue(makeReadResponse());
+    const user = userEvent.setup();
+    // 2 + 1 + 0 = 3 personal games, below the shared DEFAULT_MIN_OWN_GAMES (5) threshold.
+    const archetypeStats = [
+      makeArchetypeStats({ archetype: 'dragapult-ex', wins: 2, losses: 1, ties: 0 }),
+    ];
+
+    render(<ArchetypeRecommendationPanel {...defaultProps} archetypeStats={archetypeStats} />);
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByTestId('archetype-recommendation-scope-personal'));
+
+    expect(
+      await screen.findByTestId('archetype-recommendation-personal-insufficient-data'),
+    ).toBeInTheDocument();
+  });
+
+  it('does not show the insufficient-data hint in global/local mode even without enough personal data', async () => {
+    getArchetypeSynthesisMock.mockResolvedValue(makeReadResponse());
+
+    render(<ArchetypeRecommendationPanel {...defaultProps} archetypeStats={[]} />);
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(1));
+
+    expect(
+      screen.queryByTestId('archetype-recommendation-personal-insufficient-data'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('sends usePersonalPrior + personalRecord in the POST body when generating in personal mode', async () => {
+    getArchetypeSynthesisMock.mockResolvedValue(
+      makeReadResponse({ synthesis: null, hasApiKey: true, availableFactCount: 3 }),
+    );
+    generateArchetypeSynthesisMock.mockResolvedValue(makeWriteResponse());
+    const user = userEvent.setup();
+    const archetypeStats = [
+      makeArchetypeStats({ archetype: 'dragapult-ex', wins: 6, losses: 3, ties: 1 }),
+    ];
+
+    render(<ArchetypeRecommendationPanel {...defaultProps} archetypeStats={archetypeStats} />);
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByTestId('archetype-recommendation-scope-personal'));
+    await waitFor(() => expect(getArchetypeSynthesisMock).toHaveBeenCalledTimes(2));
+
+    await user.click(await screen.findByTestId('archetype-recommendation-generate-button'));
+
+    await waitFor(() => expect(generateArchetypeSynthesisMock).toHaveBeenCalledTimes(1));
+    expect(generateArchetypeSynthesisMock).toHaveBeenCalledWith('dragapult-ex', {
+      days: 90,
+      scope: 'local',
+      usePersonalPrior: true,
+      personalRecord: { wins: 6, losses: 3, ties: 1 },
+    });
   });
 });

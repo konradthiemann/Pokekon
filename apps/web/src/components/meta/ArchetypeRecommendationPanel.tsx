@@ -1,21 +1,36 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, RefreshCw, KeyRound, Info } from 'lucide-react';
+import { DEFAULT_MIN_OWN_GAMES } from '@pokekon/shared';
 import type { ArchetypeSynthesisScope, RankedCluster, SynthesisSection } from '@pokekon/shared';
 import {
   generateArchetypeSynthesis,
   getArchetypeSynthesis,
   type ArchetypeSynthesisReadResponse,
+  type PersonalRecordInput,
 } from '../../lib/api';
 import { authClient } from '../../lib/authClient';
 import { DEMO_AI_TOKEN_KEY, isAnonymousUser } from '../../lib/demo';
+import type { ArchetypeStats } from '../../types';
 import { WinRateBadge } from './WinRateBadge';
 
 interface ArchetypeRecommendationPanelProps {
   archetypeId: string;
   archetypeName: string;
   windowDays: number;
+  /** Own opponent-facing record against every archetype (Spec 10 Slice E),
+   *  passed down from `MetaPage` (which reads the store) -- this panel stays
+   *  store-free, same precedent as `ArchetypeDetail.tsx` (see this
+   *  component's docstring below). Used only in "Mein Spielstil" mode to
+   *  find the entry matching `archetypeId` (same Limitless-slug identifier
+   *  space, see `ArchetypeStats.archetype` / `Deck.archetype`). */
+  archetypeStats?: ArchetypeStats[];
 }
+
+/** Three recommendation modes: "Mein Spielstil" is not a fourth backend
+ *  `scope` value -- it reuses `scope: 'local'` and additionally sets
+ *  `usePersonalPrior: true` (Spec 10 Slice E). */
+type RecommendationMode = 'global' | 'local' | 'personal';
 
 /** One successful GET, tagged with the request key it answers (archetype +
  *  window + scope) — same "ignore stale responses" pattern as
@@ -82,20 +97,46 @@ function ClusterItem({ cluster }: { cluster: RankedCluster }) {
  * (Spec 10 Slice C, specs/archetype-meta-analysis.md). Mounted in
  * `ArchetypeDetail.tsx` between the matchup table and the raw decklists.
  *
+ * Three toggle-chip modes ("Global"/"Lokal"/"Mein Spielstil", Spec 10 Slice E
+ * UI): "Mein Spielstil" is `scope:'local'` plus `usePersonalPrior:true`, not
+ * a fourth backend scope -- see `RecommendationMode` above.
+ *
  * Deliberately local state (request-key pattern, mirrors `ArchetypeDetail`
  * itself) instead of the dashboardStore that `DeckSynthesisPanel` uses --
- * `ArchetypeDetail.tsx` does not read from that store either. Generation is
- * user-triggered only (same principle as DeckSynthesisPanel/Spec 8): a scope
+ * `ArchetypeDetail.tsx` does not read from that store either (its
+ * `archetypeStats` prop is passed down from `MetaPage`, which does read the
+ * store, purely to find one user's own matchup record). Generation is
+ * user-triggered only (same principle as DeckSynthesisPanel/Spec 8): a mode
  * switch re-reads (GET), it never re-generates on its own.
  */
 export function ArchetypeRecommendationPanel({
   archetypeId,
   archetypeName,
   windowDays,
+  archetypeStats,
 }: ArchetypeRecommendationPanelProps) {
   const { t } = useTranslation('meta');
-  const [scope, setScope] = useState<ArchetypeSynthesisScope>('global');
-  const requestKey = `${archetypeId}|${windowDays}|${scope}`;
+  const [mode, setMode] = useState<RecommendationMode>('global');
+  // "Mein Spielstil" reuses scope:'local' + usePersonalPrior:true -- there is
+  // no fourth backend scope value (Spec 10 Slice E). `mode` (not `scope`)
+  // must drive the request key, otherwise 'local' and 'personal' would
+  // collide in the cache despite being different requests.
+  const scope: ArchetypeSynthesisScope = mode === 'global' ? 'global' : 'local';
+  const usePersonalPrior = mode === 'personal';
+  const requestKey = `${archetypeId}|${windowDays}|${mode}`;
+
+  // Own opponent-facing record for this archetype, same Limitless-slug
+  // identifier space as `archetypeId` (see prop docstring above). Only
+  // used/sent in 'personal' mode.
+  const matchingStats = archetypeStats?.find((s) => s.archetype === archetypeId);
+  const personalGames = matchingStats
+    ? matchingStats.wins + matchingStats.losses + matchingStats.ties
+    : 0;
+  // Same threshold the server silently applies (buildArchetypeSynthesisFactSet)
+  // -- surfaced here only as a client-side UX hint before the user clicks
+  // "generate", not duplicated server logic.
+  const personalDataInsufficient =
+    usePersonalPrior && (!matchingStats || personalGames < DEFAULT_MIN_OWN_GAMES);
 
   const [loaded, setLoaded] = useState<LoadedSynthesis | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
@@ -110,8 +151,23 @@ export function ArchetypeRecommendationPanel({
 
   useEffect(() => {
     let cancelled = false;
-    const key = `${archetypeId}|${windowDays}|${scope}`;
-    getArchetypeSynthesis(archetypeId, { days: windowDays, scope })
+    const key = `${archetypeId}|${windowDays}|${mode}`;
+    const personalOptions: { usePersonalPrior?: true; personalRecord?: PersonalRecordInput } =
+      usePersonalPrior
+        ? {
+            usePersonalPrior: true,
+            ...(matchingStats
+              ? {
+                  personalRecord: {
+                    wins: matchingStats.wins,
+                    losses: matchingStats.losses,
+                    ties: matchingStats.ties,
+                  },
+                }
+              : {}),
+          }
+        : {};
+    getArchetypeSynthesis(archetypeId, { days: windowDays, scope, ...personalOptions })
       .then((data) => {
         if (cancelled) return;
         setLoaded({ key, data });
@@ -123,17 +179,38 @@ export function ArchetypeRecommendationPanel({
     return () => {
       cancelled = true;
     };
-  }, [archetypeId, windowDays, scope]);
+  }, [archetypeId, windowDays, mode, scope, usePersonalPrior, matchingStats]);
 
   const current = loaded?.key === requestKey ? loaded.data : null;
 
   const handleGenerate = useCallback(() => {
     if (!current) return;
 
+    const personalOptions: { usePersonalPrior?: true; personalRecord?: PersonalRecordInput } =
+      usePersonalPrior
+        ? {
+            usePersonalPrior: true,
+            ...(matchingStats
+              ? {
+                  personalRecord: {
+                    wins: matchingStats.wins,
+                    losses: matchingStats.losses,
+                    ties: matchingStats.ties,
+                  },
+                }
+              : {}),
+          }
+        : {};
+
     const run = (apiKey?: string) => {
       setIsSynthesizing(true);
       setSynthesisError(null);
-      generateArchetypeSynthesis(archetypeId, { days: windowDays, scope, apiKey })
+      generateArchetypeSynthesis(archetypeId, {
+        days: windowDays,
+        scope,
+        apiKey,
+        ...personalOptions,
+      })
         .then((response) => {
           setLoaded((prev) =>
             prev !== null && prev.key === requestKey
@@ -174,6 +251,8 @@ export function ArchetypeRecommendationPanel({
     archetypeId,
     windowDays,
     scope,
+    usePersonalPrior,
+    matchingStats,
     requestKey,
   ]);
 
@@ -206,10 +285,10 @@ export function ArchetypeRecommendationPanel({
           <button
             type="button"
             data-testid="archetype-recommendation-scope-global"
-            aria-pressed={scope === 'global'}
-            onClick={() => setScope('global')}
+            aria-pressed={mode === 'global'}
+            onClick={() => setMode('global')}
             className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
-              scope === 'global' ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-600'
+              mode === 'global' ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-600'
             }`}
           >
             {t('archetypeDetail.recommendation.scope.global')}
@@ -217,13 +296,24 @@ export function ArchetypeRecommendationPanel({
           <button
             type="button"
             data-testid="archetype-recommendation-scope-local"
-            aria-pressed={scope === 'local'}
-            onClick={() => setScope('local')}
+            aria-pressed={mode === 'local'}
+            onClick={() => setMode('local')}
             className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
-              scope === 'local' ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-600'
+              mode === 'local' ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-600'
             }`}
           >
             {t('archetypeDetail.recommendation.scope.local')}
+          </button>
+          <button
+            type="button"
+            data-testid="archetype-recommendation-scope-personal"
+            aria-pressed={mode === 'personal'}
+            onClick={() => setMode('personal')}
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+              mode === 'personal' ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {t('archetypeDetail.recommendation.scope.personal')}
           </button>
         </div>
         {stale && (
@@ -235,6 +325,18 @@ export function ArchetypeRecommendationPanel({
           </span>
         )}
       </div>
+
+      {personalDataInsufficient && (
+        <p
+          data-testid="archetype-recommendation-personal-insufficient-data"
+          className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2"
+        >
+          {t('archetypeDetail.recommendation.personalInsufficientData', {
+            count: personalGames,
+            min: DEFAULT_MIN_OWN_GAMES,
+          })}
+        </p>
+      )}
 
       {/* Gated on `current` (not just `clusters.length`): before the GET
           resolves, `clusters` is `[]` too, and that must not be confused

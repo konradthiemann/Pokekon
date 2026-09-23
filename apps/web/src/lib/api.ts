@@ -850,16 +850,42 @@ export interface ArchetypeSynthesisWriteResponse {
   cached: boolean;
 }
 
+/** Own opponent-facing win/loss/tie record against one archetype, sent along
+ *  when `usePersonalPrior` is set (Spec 10 Slice E). Field names match
+ *  `archetypeSynthesisPostSchema`'s `personalRecord` shape exactly
+ *  (`apps/api/src/validation.ts`). */
+export interface PersonalRecordInput {
+  wins: number;
+  losses: number;
+  ties: number;
+}
+
 /** Read-only: current ranked clusters + the cached synthesis, no token cost.
- *  Safe to call on mount / window / scope change. */
+ *  Safe to call on mount / window / scope change. `usePersonalPrior`/
+ *  `personalRecord` mirror the POST body fields as query params
+ *  (`personalWins`/`personalLosses`/`personalTies`, see
+ *  `archetypeSynthesisQuerySchema`) so a personalised GET can match the
+ *  `currentInputHash` a personalised POST just produced. */
 export async function getArchetypeSynthesis(
   archetypeId: string,
-  params?: { days?: number; language?: SynthesisLanguage; scope?: ArchetypeSynthesisScope },
+  params?: {
+    days?: number;
+    language?: SynthesisLanguage;
+    scope?: ArchetypeSynthesisScope;
+    usePersonalPrior?: boolean;
+    personalRecord?: PersonalRecordInput;
+  },
 ): Promise<ArchetypeSynthesisReadResponse> {
   const query = new URLSearchParams();
   if (params?.days !== undefined) query.set('days', String(params.days));
   if (params?.language !== undefined) query.set('language', params.language);
   if (params?.scope !== undefined) query.set('scope', params.scope);
+  if (params?.usePersonalPrior) query.set('usePersonalPrior', 'true');
+  if (params?.personalRecord) {
+    query.set('personalWins', String(params.personalRecord.wins));
+    query.set('personalLosses', String(params.personalRecord.losses));
+    query.set('personalTies', String(params.personalRecord.ties));
+  }
   const qs = query.toString();
   return request<ArchetypeSynthesisReadResponse>(
     `/api/analysis/archetype/${encodeURIComponent(archetypeId)}${qs ? `?${qs}` : ''}`,
@@ -867,7 +893,9 @@ export async function getArchetypeSynthesis(
 }
 
 /** Trigger a generation. `apiKey` is the demo-mode ephemeral token path —
- *  identical to `generateDeckSynthesis`'s BYOK contract. */
+ *  identical to `generateDeckSynthesis`'s BYOK contract. `usePersonalPrior`/
+ *  `personalRecord` match `archetypeSynthesisPostSchema` exactly and only
+ *  take effect for `scope: 'local'` (enforced server-side). */
 export async function generateArchetypeSynthesis(
   archetypeId: string,
   opts?: {
@@ -878,6 +906,8 @@ export async function generateArchetypeSynthesis(
     apiKey?: string;
     provider?: string;
     model?: string | null;
+    usePersonalPrior?: boolean;
+    personalRecord?: PersonalRecordInput;
   },
 ): Promise<ArchetypeSynthesisWriteResponse> {
   return request<ArchetypeSynthesisWriteResponse>(
@@ -892,6 +922,10 @@ export async function generateArchetypeSynthesis(
         ...(opts?.apiKey ? { apiKey: opts.apiKey } : {}),
         ...(opts?.provider ? { provider: opts.provider } : {}),
         ...(opts?.model !== undefined ? { model: opts.model } : {}),
+        ...(opts?.usePersonalPrior !== undefined
+          ? { usePersonalPrior: opts.usePersonalPrior }
+          : {}),
+        ...(opts?.personalRecord ? { personalRecord: opts.personalRecord } : {}),
       }),
     },
   );

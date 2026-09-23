@@ -141,8 +141,10 @@
       "title": "AI recommendation",
       "scope": {
         "global": "Global",
-        "local": "Local"
+        "local": "Local",
+        "personal": "My playstyle"
       },
+      "personalInsufficientData": "Not enough personal games against this archetype yet ({{count}} of {{min}}) — the recommendation currently matches the local mode.",
       "stale": "Numbers have changed",
       "noFacts": "Not enough clustered tournament data yet — available after the next \"Sync Live Meta\" or a wider window.",
       "noKey": "No AI key configured yet. Add one in the AI settings to generate a summary.",
