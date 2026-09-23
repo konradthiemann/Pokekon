@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import i18n from '../../i18n';
 import { TournamentBestListPanel } from './TournamentBestListPanel';
@@ -138,7 +138,28 @@ describe('TournamentBestListPanel', () => {
     await user.selectOptions(screen.getByTestId('tournament-best-list-select'), 't1');
 
     expect(await screen.findAllByTestId('tournament-best-list-cluster-item')).toHaveLength(1);
-    expect(screen.getByText(/Charizard ex/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Charizard ex/).length).toBeGreaterThan(0);
+  });
+
+  it("reveals the cluster's full decklist (all three card groups) behind a toggle", async () => {
+    getTournamentArchetypeBestListMock.mockResolvedValue(makeResponse());
+    const user = userEvent.setup();
+
+    render(
+      <TournamentBestListPanel archetypeId="best-list-arch" tournaments={defaultTournaments} />,
+    );
+    await user.selectOptions(screen.getByTestId('tournament-best-list-select'), 't1');
+    await screen.findAllByTestId('tournament-best-list-cluster-item');
+
+    expect(screen.getByText("Professor's Research")).not.toBeVisible();
+    expect(screen.getByText('Basic Fire Energy')).not.toBeVisible();
+
+    await user.click(screen.getByTestId('tournament-best-list-cluster-decklist-toggle'));
+
+    const decklist = screen.getByTestId('tournament-best-list-cluster-decklist');
+    expect(within(decklist).getByText('Charizard ex')).toBeVisible();
+    expect(within(decklist).getByText("Professor's Research")).toBeVisible();
+    expect(within(decklist).getByText('Basic Fire Energy')).toBeVisible();
   });
 
   it('shows an honest empty state when the archetype was not played at the selected tournament', async () => {

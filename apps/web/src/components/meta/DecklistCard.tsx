@@ -3,7 +3,9 @@ import { ExternalLink, Medal } from 'lucide-react';
 import type { DecklistCardEntry } from '@pokekon/shared';
 import type { ArchetypeListEntry } from '../../lib/api';
 
-function CardGroup({ title, entries }: { title: string; entries: DecklistCardEntry[] }) {
+/** Exported for `ArchetypeRecommendationPanel.tsx`'s cluster decklist
+ *  disclosure -- same card-group rendering, no duplicated list markup. */
+export function CardGroup({ title, entries }: { title: string; entries: DecklistCardEntry[] }) {
   const { t } = useTranslation('meta');
   if (entries.length === 0) return null;
   const cardCount = entries.reduce((sum, e) => sum + e.count, 0);

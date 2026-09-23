@@ -14,6 +14,7 @@ import { authClient } from '../../lib/authClient';
 import { DEMO_AI_TOKEN_KEY, isAnonymousUser } from '../../lib/demo';
 import { getLocalMetaWeightOverrides, type LocalFieldEntry } from '../../lib/preferences';
 import type { ArchetypeStats } from '../../types';
+import { CardGroup } from './DecklistCard';
 import { seedWeight } from './localFieldWeight';
 import { WinRateBadge } from './WinRateBadge';
 
@@ -124,6 +125,37 @@ function ClusterItem({ cluster }: { cluster: RankedCluster }) {
           {pokemonSummary}
         </p>
       )}
+      {/* Full decklist on demand -- the truncated summary above only ever
+          showed Pokémon, never Trainer/Energy, and had no way to see the
+          rest besides a hover tooltip (unusable on touch). Reuses
+          DecklistCard.tsx's CardGroup so the card-list markup isn't
+          duplicated a third time (ArchetypeDetail's raw lists, this panel,
+          TournamentBestListPanel all show the same TournamentDecklist shape). */}
+      <details className="text-xs">
+        <summary
+          data-testid="archetype-recommendation-cluster-decklist-toggle"
+          className="cursor-pointer text-brand-700 font-semibold w-fit"
+        >
+          {t('archetypeDetail.recommendation.cluster.viewDecklist')}
+        </summary>
+        <div
+          data-testid="archetype-recommendation-cluster-decklist"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2 pt-2 border-t border-slate-100"
+        >
+          <CardGroup
+            title={t('archetypeDetail.lists.pokemon')}
+            entries={cluster.representative.pokemon}
+          />
+          <CardGroup
+            title={t('archetypeDetail.lists.trainer')}
+            entries={cluster.representative.trainer}
+          />
+          <CardGroup
+            title={t('archetypeDetail.lists.energy')}
+            entries={cluster.representative.energy}
+          />
+        </div>
+      </details>
     </div>
   );
 }
