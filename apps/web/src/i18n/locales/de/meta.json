@@ -174,6 +174,14 @@
         "placement": "Ø Platzierung: Top {{pct}} %",
         "fieldScore": "Lokaler Feld-Score",
         "viewDecklist": "Vollständige Liste anzeigen"
+      },
+      "methodology": {
+        "toggle": "Wie wird das berechnet?",
+        "rank": "Rang: Turnier-Decklisten mit fast identischen Karten (ab 55 von 60 gleich) werden zu einem Cluster zusammengefasst und nach dem unteren Rand der geschätzten Gewinnrate sortiert (Wilson-Score), nicht nach der rohen Gewinnrate — eine Liste mit wenigen Spielen und viel Glück landet dadurch nicht automatisch ganz oben.",
+        "interval": "Prozentangabe und Spanne (z. B. 55.2–83.0 %) sind die geschätzte echte Gewinnrate mit 95 %-Konfidenzintervall — je mehr Spiele in diesem Cluster erfasst sind, desto schmaler die Spanne.",
+        "record": "Die Bilanz summiert Siege und Niederlagen über alle Listen dieses Clusters, nicht nur die angezeigte Beispiel-Liste.",
+        "placement": "Ø Platzierung ist das durchschnittliche Turnier-Perzentil aller Cluster-Mitglieder — „Top 1 %“ heißt: im Schnitt unter dem besten 1 % des Feldes platziert.",
+        "fieldScore": "Der Feld-Score (wenn angezeigt) ist dieselbe Gewinnrate, aber gegen dein konfiguriertes lokales Feld gewichtet statt gleichmäßig gegen alle Gegner."
       }
     },
     "tournamentBestList": {
@@ -191,6 +199,14 @@
         "placement": "Ø Platzierung: Top {{pct}} %",
         "fieldScore": "Score gegen das Feld dieses Turniers",
         "viewDecklist": "Vollständige Liste anzeigen"
+      },
+      "methodology": {
+        "toggle": "Wie wird das berechnet?",
+        "rank": "Rang: Decklisten dieses Archetyps bei diesem Turnier mit fast identischen Karten (ab 55 von 60 gleich) werden zu einem Cluster zusammengefasst und nach dem unteren Rand der geschätzten Gewinnrate sortiert (Wilson-Score), nicht nach der rohen Gewinnrate.",
+        "interval": "Prozentangabe und Spanne sind die geschätzte echte Gewinnrate mit 95 %-Konfidenzintervall — je mehr Spiele in diesem Cluster erfasst sind, desto schmaler die Spanne.",
+        "record": "Die Bilanz summiert Siege und Niederlagen über alle Listen dieses Clusters bei diesem Turnier, nicht nur die angezeigte Beispiel-Liste.",
+        "placement": "Ø Platzierung ist das durchschnittliche Turnier-Perzentil aller Cluster-Mitglieder — „Top 1 %“ heißt: im Schnitt unter dem besten 1 % des Feldes platziert.",
+        "fieldScore": "Der Feld-Score ist dieselbe Gewinnrate, aber gegen das tatsächliche Teilnehmerfeld genau dieses einen Turniers gewichtet, nicht gegen ein Zeitfenster über viele Turniere."
       }
     }
   },

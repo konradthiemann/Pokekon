@@ -434,6 +434,27 @@ export function ArchetypeRecommendationPanel({
         )}
       </div>
 
+      {/* Methodology, collapsed by default -- the cluster cards below show
+          numbers (rank, win-rate band, record, placement, field score) with
+          no explanation of how they were derived. Mirrors the disclosure
+          pattern already used for the synthesis facts further down. */}
+      <details data-testid="archetype-recommendation-methodology" className="text-xs">
+        <summary
+          data-testid="archetype-recommendation-methodology-toggle"
+          className="cursor-pointer flex items-center gap-1.5 w-fit text-slate-500"
+        >
+          <Info className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          {t('archetypeDetail.recommendation.methodology.toggle')}
+        </summary>
+        <ul className="mt-1.5 ml-5 list-disc space-y-1 text-slate-500">
+          <li>{t('archetypeDetail.recommendation.methodology.rank')}</li>
+          <li>{t('archetypeDetail.recommendation.methodology.interval')}</li>
+          <li>{t('archetypeDetail.recommendation.methodology.record')}</li>
+          <li>{t('archetypeDetail.recommendation.methodology.placement')}</li>
+          <li>{t('archetypeDetail.recommendation.methodology.fieldScore')}</li>
+        </ul>
+      </details>
+
       {personalDataInsufficient && (
         <p
           data-testid="archetype-recommendation-personal-insufficient-data"

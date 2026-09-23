@@ -162,6 +162,24 @@ describe('TournamentBestListPanel', () => {
     expect(within(decklist).getByText('Basic Fire Energy')).toBeVisible();
   });
 
+  it('explains the ranking methodology behind a toggle', async () => {
+    getTournamentArchetypeBestListMock.mockResolvedValue(makeResponse());
+    const user = userEvent.setup();
+
+    render(
+      <TournamentBestListPanel archetypeId="best-list-arch" tournaments={defaultTournaments} />,
+    );
+    await user.selectOptions(screen.getByTestId('tournament-best-list-select'), 't1');
+    await screen.findAllByTestId('tournament-best-list-cluster-item');
+
+    const methodology = screen.getByTestId('tournament-best-list-methodology');
+    expect(within(methodology).getByText(/Wilson/)).not.toBeVisible();
+
+    await user.click(screen.getByTestId('tournament-best-list-methodology-toggle'));
+
+    expect(within(methodology).getByText(/Wilson/)).toBeVisible();
+  });
+
   it('shows an honest empty state when the archetype was not played at the selected tournament', async () => {
     getTournamentArchetypeBestListMock.mockResolvedValue(makeResponse({ clusters: [] }));
     const user = userEvent.setup();
