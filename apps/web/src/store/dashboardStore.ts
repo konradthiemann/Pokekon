@@ -39,7 +39,8 @@ import type { ComparisonResult } from '../lib/deckComparison';
 import {
   getLocalMeta,
   setLocalMeta,
-  takeLegacyDeckArchSlug,
+  readLegacyDeckArchSlug,
+  clearLegacyDeckArchSlug,
   getActiveDeckId,
   setActiveDeckId,
 } from '../lib/preferences';
@@ -270,7 +271,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         remembered: activeDeckIdByArchetype,
         fallbackId: previousId,
       });
-      if (activeDeckId !== previousId) setActiveDeckId(activeDeckId);
+      // Only a real id is persisted — like before Spec 7, a vanished deck
+      // leaves the stored id untouched (the next refresh resolves it again).
+      if (activeDeckId !== null && activeDeckId !== previousId) setActiveDeckId(activeDeckId);
 
       const previousArchetype = get().activeDeck?.archetype;
       const activeDeck = decks.find((d) => d.id === activeDeckId) ?? null;
@@ -480,14 +483,16 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       // One-time migration (Spec 7 E5): existing accounts keep their archetype
       // instead of being sent through onboarding.
       activeArchetypeId = pickMigrationArchetype({
-        legacySlug: takeLegacyDeckArchSlug(),
+        legacySlug: readLegacyDeckArchSlug(),
         activeDeck: get().activeDeck,
       });
       if (activeArchetypeId !== null) {
         try {
           await saveUserPreferences({ activeArchetypeId });
+          clearLegacyDeckArchSlug();
         } catch (err) {
-          // Keep the migrated value for this session; the next load retries.
+          // Keep the migrated value for this session; the legacy key stays,
+          // so the next load retries the same migration.
           console.warn('[DashboardStore] persisting the migrated archetype failed:', err);
         }
       }

@@ -752,6 +752,16 @@ describe('dashboardStore preferences + coach navigation (Spec 7 §5.1, plan S4)'
     expect(useDashboardStore.getState().activeArchetypeId).toBeNull();
   });
 
+  it('keeps the legacy slug when persisting the migration fails, so the next load retries it', async () => {
+    localStorage.setItem(LEGACY_KEY, 'dragapult-ex');
+    useDashboardStore.setState({ activeDeck: DECK_B } as never);
+    mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
+    mockedSavePrefs.mockRejectedValue(new Error('offline'));
+    await useDashboardStore.getState().loadPreferences();
+    expect(localStorage.getItem(LEGACY_KEY)).toBe('dragapult-ex');
+    expect(useDashboardStore.getState().activeArchetypeId).toBe('dragapult-ex');
+  });
+
   it('keeps preferences "ready" with the migrated value even if persisting the migration fails', async () => {
     useDashboardStore.setState({ activeDeck: DECK_B } as never);
     mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
@@ -797,6 +807,15 @@ describe('dashboardStore preferences + coach navigation (Spec 7 §5.1, plan S4)'
     await useDashboardStore.getState().refresh();
     expect(useDashboardStore.getState().activeDeckId).toBeNull();
     expect(useDashboardStore.getState().activeDeck).toBeNull();
+  });
+
+  it('refresh with the flag off keeps a stale stored deck id when no deck is left (legacy behaviour)', async () => {
+    localStorage.setItem('tcg-active-deck-id-v3', '7');
+    mockedGetDecks.mockResolvedValue([]);
+    useDashboardStore.setState({ activeDeckId: 7 } as never);
+    await useDashboardStore.getState().refresh();
+    expect(useDashboardStore.getState().activeDeckId).toBeNull();
+    expect(localStorage.getItem('tcg-active-deck-id-v3')).toBe('7');
   });
 
   it('refresh with the flag off keeps the legacy active-deck rule', async () => {

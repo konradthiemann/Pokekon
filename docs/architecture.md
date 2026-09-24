@@ -203,9 +203,12 @@ session exists (`App.tsx`, and `WelcomeScreen` after seeding the demo): `refresh
 → `loadPreferences()` (`GET /api/preferences` → `activeArchetypeId`,
 `activeDeckIdByArchetype`, `preferencesStatus`) → with `archetypeCoachUi` on, a
 second `refresh()`. When the server has no archetype yet, `loadPreferences()`
-migrates **once**: a valid legacy localStorage slug (`takeLegacyDeckArchSlug()`
-reads and deletes `tcg-deck-arch-slug-v1`), else the active deck's archetype, else
-`null` (→ onboarding). Active-deck resolution lives in the pure
+migrates **once**: a valid legacy localStorage slug (`tcg-deck-arch-slug-v1`,
+deleted only after the migrated value was saved), else the active deck's
+archetype, else `null` (→ onboarding). This runs for **every** account, flag on or
+off — a single extra `GET` per load (plus at most one `PATCH` for the migration);
+nothing changes visibly with the flag off except that the deck comparison now
+knows the archetype. Active-deck resolution lives in the pure
 `lib/coach/activeDeck.ts`: flag off = legacy rule (current deck if it exists, else
 the first); flag on = remembered deck of the coached archetype → current deck if
 same archetype → newest deck of that archetype → none. `setActiveDeck()`

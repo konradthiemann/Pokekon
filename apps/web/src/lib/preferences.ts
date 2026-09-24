@@ -8,7 +8,7 @@ const KEYS = {
    *  written to again. */
   localMetaField: 'tcg-local-meta-field-v1',
   localMetaWeightOverrides: 'tcg-local-meta-weight-overrides-v1',
-  /** Legacy (Spec 7): only read once by `takeLegacyDeckArchSlug()`. */
+  /** Legacy (Spec 7): read by the one-time migration, then cleared. */
   deckArchSlug: 'tcg-deck-arch-slug-v1',
   activeDeckId: 'tcg-active-deck-id-v3',
   bestOfHint: 'tcg-bestof-hint-dismissed-v1',
@@ -95,16 +95,22 @@ export function migrateLocalMetaField(): MigratedLocalMetaField | null {
   }
 }
 
-/** Reads and deletes the legacy per-browser archetype slug. Since Spec 7 the
- *  active archetype lives server-side (`/api/preferences`); this runs at most
- *  once per browser, as the source of the one-time migration. */
-export function takeLegacyDeckArchSlug(): string | null {
+/** Legacy per-browser archetype slug. Since Spec 7 the active archetype lives
+ *  server-side (`/api/preferences`); this is only the source of the one-time
+ *  migration and is cleared once the migrated value is saved. */
+export function readLegacyDeckArchSlug(): string | null {
   try {
-    const value = localStorage.getItem(KEYS.deckArchSlug);
-    localStorage.removeItem(KEYS.deckArchSlug);
-    return value;
+    return localStorage.getItem(KEYS.deckArchSlug);
   } catch {
     return null;
+  }
+}
+
+export function clearLegacyDeckArchSlug(): void {
+  try {
+    localStorage.removeItem(KEYS.deckArchSlug);
+  } catch {
+    // blocked storage — nothing to clean up
   }
 }
 

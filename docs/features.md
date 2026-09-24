@@ -694,5 +694,7 @@ partial (at least one of `activeArchetypeId` / `activeDeck`, unknown keys → 40
 400); a remembered deck must belong to the user (404 otherwise, indistinguishable from a missing
 deck) and have exactly that archetype (400 otherwise); `deckId: null` forgets the entry. The new
 UI itself is gated by the client-side `archetypeCoachUi` flag ([architecture.md](./architecture.md)
-§Feature flags); with the flag off nothing visible changes.
+§Feature flags); with the flag off nothing visible changes, but every account
+already loads its preferences and is migrated once (legacy slug or the active deck's archetype),
+which also gives the old layout's deck comparison its archetype.
 
