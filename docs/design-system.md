@@ -17,7 +17,7 @@ UI, follow the tokens below — **do not reintroduce dark utilities** (`bg-gray-
 | File | Owns |
 |------|------|
 | [`apps/web/src/index.css`](../apps/web/src/index.css) | `:root` raw tokens, component classes (`.card`, `.btn*`, `.badge*`, `.input`), global focus ring, `prefers-reduced-motion` |
-| [`apps/web/tailwind.config.js`](../apps/web/tailwind.config.js) | system font stack (`sans` + `mono`), `brand` blue, `energy` yellow, `shadow-card` |
+| [`apps/web/tailwind.config.js`](../apps/web/tailwind.config.js) | system font stack (`sans` + `mono`), `brand` blue, `energy` yellow, `poke` red (brand only, Spec 7), `shadow-card` |
 | [`apps/web/src/components/DeckSpriteBackground.tsx`](../apps/web/src/components/DeckSpriteBackground.tsx) | the playmat background + per-archetype colour bloom |
 
 ## Palette (all text pairs measured on white)
@@ -36,6 +36,19 @@ UI, follow the tokens below — **do not reintroduce dark utilities** (`bg-gray-
 | Win | `emerald-700` text / `emerald-100` badge | wins | ✓ |
 | Loss | `red-700` text / `red-100` badge | losses | ✓ |
 | Tie | `amber-700` text / `amber-100` badge | ties | ✓ |
+| Brand red (coach UI) | `poke-600` `#d62828` | header band, onboarding strip, destructive **outline** — never a filled button | 5.0:1 (both ways with white) |
+| Positive win rate (coach UI) | `brand-700` `#1d4ed8` | `.wr-pos` inside `.coach-ui` | 6.7:1 |
+| Neutral band 45–50 % (coach UI) | `slate-700` | `.wr-mid` inside `.coach-ui` | ✓ |
+| Negative win rate (coach UI) | `orange-700` `#c2410c` | `.wr-neg` inside `.coach-ui` | 5.2:1 |
+
+**Colour roles in the archetype-first UI (Spec 7 §9a, behind `archetypeCoachUi`):** red is
+brand only (header band, onboarding strip), blue means *act* (every button, the ＋ FAB,
+active tab, links, selection), yellow is accent (header edge, FAB ring, "next step", flex
+cards). No red buttons: users read filled red as "warning/delete", which would make harmless
+actions like "paste log" look dangerous and real destructive actions stop standing out —
+those use the outline `.btn-destructive` plus a confirmation. Contrasts are asserted in
+`apps/web/src/theme/palette.test.ts`; `theme/noFilledRed.test.ts` scans the coach UI for
+filled red backgrounds.
 
 **Enforcement:** `slate-400` is monitored in code review. Examples of correct usage: the "—" separator in a matchup matrix, disabled form placeholder text. A visible number, label, or status indicator must never be `slate-400` alone (failing WCAG 1.4.3). The `MatchupMatrix` component correctly uses `slate-400` only for the decorative "—" cell dividers, keeping all win rates at `slate-600` (muted text) minimum.
 
@@ -46,6 +59,9 @@ Electric `#f59e0b`, Psychic `#d946ef` (deepen for chart bars so each clears ~3:1
 
 - `.card` — white, `slate-200` border, `rounded-md` (was `rounded-2xl`, then `rounded-lg`), `p-3`, flat neutral `shadow-card`.
 - `.btn` / `.btn-primary` (solid `bg-brand-600`, white text, no gradient) / `.btn-ghost` — ≥44px tall, flat, `rounded-md`.
+- `.btn-destructive` — white with `poke-600` outline and text (Spec 7); never filled.
+- `.wr-pos` / `.wr-mid` / `.wr-neg` — win-rate text colours returned by `winRateColorClass()` (thresholds 50 / 45). Emerald/amber/red by default; blue/slate/orange inside `.coach-ui`.
+- `.coach-ui` — scope class of the archetype-first layout; inside it `.card` is 94 % opaque so the archetype sprite shows through.
 - `.badge-win` / `.badge-loss` / `.badge-tie` / `.badge-lc` / `.badge-lcup` — squared pills (`rounded-md`), dark text, `py-0.5`.
 - `.input` — white field, `slate-300` border, brand focus ring.
 - `.stat-value` — applies `tabular-nums` so metric columns stay aligned on rerender.

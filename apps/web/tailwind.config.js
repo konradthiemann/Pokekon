@@ -35,6 +35,15 @@ export default {
           800: '#1e40af',
           900: '#1e3a8a',
         },
+        // Pokémon red — BRAND colour only (Spec 7 §9a): header band, onboarding
+        // strip, destructive OUTLINE. Never a filled button (red reads as
+        // "warning/delete"). 600 on white / white on 600 = 5.0:1 (AA).
+        poke: {
+          50: '#fdecec',
+          100: '#f9d4d4',
+          600: '#d62828',
+          700: '#b01f1f',
+        },
         // Pokémon electric-yellow — accent / highlight only, never text on white.
         energy: {
           400: '#ffd84d',
