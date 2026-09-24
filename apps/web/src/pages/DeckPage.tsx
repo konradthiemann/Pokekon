@@ -10,6 +10,7 @@ import { AddLogModal } from '../components/opponent/AddLogModal';
 import { CollapsibleSection } from '../components/layout/CollapsibleSection';
 import { SidePanel } from '../components/deck/SidePanel';
 import { MyMatchupsTable } from '../components/meta/MyMatchupsTable';
+import { SegmentedTabs } from '../components/shared/SegmentedTabs';
 import { Settings2, BarChart2, List, Lightbulb, Plus, Copy, AlertTriangle } from 'lucide-react';
 
 // ─── Deck Settings ────────────────────────────────────────────────────────────
@@ -224,23 +225,11 @@ export function DeckPage() {
               section below, but logging a match stays one tap away on both
               sections. */}
           <div className="flex items-center gap-2">
-            <div className="flex flex-1 rounded-2xl overflow-hidden backdrop-blur-md border border-slate-200 bg-white">
-              {SECTIONS.map(({ id, labelKey, Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => setDeckSection(id)}
-                  className={[
-                    'flex-1 flex items-center justify-center gap-2 py-3 text-xs font-medium transition-all',
-                    deckSection === id
-                      ? 'text-brand-800 bg-brand-50 shadow-[inset_0_-2px_0_0_rgba(96,165,250,0.6)]'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
-                  ].join(' ')}
-                >
-                  <Icon className="w-3.5 h-3.5" aria-hidden="true" />
-                  {t(labelKey)}
-                </button>
-              ))}
-            </div>
+            <SegmentedTabs
+              items={SECTIONS.map(({ id, labelKey, Icon }) => ({ id, label: t(labelKey), Icon }))}
+              active={deckSection}
+              onChange={setDeckSection}
+            />
             <button
               type="button"
               onClick={() => setShowAddLogModal(true)}

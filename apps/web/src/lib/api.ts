@@ -640,6 +640,24 @@ export async function getArchetypeLists(
   );
 }
 
+/** Every distinct tournament this archetype had a published decklist at in
+ *  the window — unpaginated (server-capped), independent of `getArchetypeLists`'
+ *  own pagination so a tournament picker built from this never silently
+ *  reflects only whichever decklist page happened to be loaded elsewhere. */
+export interface ArchetypeTournamentsResponse {
+  tournaments: { id: string; name: string; date: string; players: number }[];
+}
+
+export async function getArchetypeTournaments(
+  archetypeId: string,
+  window: MetaWindow,
+): Promise<ArchetypeTournamentsResponse> {
+  const params = metaWindowParams(window);
+  return request<ArchetypeTournamentsResponse>(
+    `/api/meta/archetypes/${encodeURIComponent(archetypeId)}/tournaments?${params}`,
+  );
+}
+
 /** One archetype's field position: score, rank, threats, free wins, trend. */
 export async function getArchetypeAnalysis(
   archetypeId: string,
