@@ -207,8 +207,21 @@ Building blocks shared by the coach layout (`specs/archetype-first-ui.md`, plan
   tagging (shared by `MetaPage` and the coach pages).
 - `lib/coach/archetypeName.ts` — display name for a slug: curated list → field
   analysis → own deck → slug.
-- `i18n/localeParity.test.ts` guards that DE and EN have identical keys in every
-  namespace.
+- DE/EN key parity for every namespace is guarded by `i18n/actionLabels.test.ts` (A5).
+- `components/coach/onboarding/OnboardingFlow` (Spec 7 §5.1, namespace `onboarding`):
+  1. **Archetype** — the 10 most-played archetypes of the last 7 days
+     (`useFieldAnalysis`) with share, plus a search over the field and
+     `KNOWN_ARCHETYPES` (name or slug); choosing calls `setActiveArchetype`.
+  2. **List** (skipped when a deck of that archetype exists) — *take the meta list*
+     (Spec 7 E7: until Spec 5 the medoid of the best cluster from
+     `GET /api/analysis/archetype/:id`, 90 days, global; disabled with a hint when
+     there are no clusters; `lib/coach/onboarding.ts#medoidToParsedCards` maps the
+     cards directly — the PTCGL text parser would drop cards without a print),
+     *paste my own list* (empty deck + `ImportDeckModal`) or *later*.
+  3. **TCG Live name** (first run only, skippable) → localStorage `tcg-player-name`
+     until Spec 8 moves it server-side.
+  Mode `switchArchetype` reuses steps 1–2 for the header's archetype switch and can
+  be cancelled. The red strip is the brand surface allowed by `theme/noFilledRed.test.ts`.
 
 ### State Management Pattern
 

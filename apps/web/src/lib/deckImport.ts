@@ -138,14 +138,16 @@ function parseCardLine(line: string, type: CardType): ParsedCard | null {
   const name = parts.slice(1, parts.length - 2).join(' ');
   if (!name) return null;
 
-  const role: CardRole =
-    type === 'Pokemon'
-      ? inferPokemonRole(name)
-      : type === 'Trainer'
-        ? inferTrainerRole(name)
-        : 'energy';
+  return { count, name, set, number, type, role: inferCardRole(name, type) };
+}
 
-  return { count, name, set, number, type, role };
+/** Deck role of a card by name and section (same heuristic as a pasted list). */
+export function inferCardRole(name: string, type: CardType): CardRole {
+  return type === 'Pokemon'
+    ? inferPokemonRole(name)
+    : type === 'Trainer'
+      ? inferTrainerRole(name)
+      : 'energy';
 }
 
 // ─── Section header detection ─────────────────────────────────────────────────

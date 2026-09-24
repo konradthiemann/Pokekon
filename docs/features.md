@@ -698,3 +698,8 @@ UI itself is gated by the client-side `archetypeCoachUi` flag ([architecture.md]
 already loads its preferences and is migrated once (legacy slug or the active deck's archetype),
 which also gives the old layout's deck comparison its archetype.
 
+**Onboarding (built, not yet mounted — the coach layout wires it in PR (c)):** archetype
+(most played last 7 days + search) → list (take the meta list = best cluster's medoid,
+paste own list, or later; skipped when a deck of the archetype exists) → TCG Live name
+(skippable). Details: [architecture.md](./architecture.md) §Archetype-first UI.
+

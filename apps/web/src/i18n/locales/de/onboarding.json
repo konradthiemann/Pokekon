@@ -1,0 +1,40 @@
+{
+  "strip": {
+    "title": "Willkommen bei Pokekon",
+    "switchTitle": "Archetyp wechseln",
+    "step": "Schritt {{current}} von {{total}}"
+  },
+  "archetype": {
+    "heading": "Welchen Archetyp spielst du?",
+    "intro": "Pokekon coacht dich für genau einen Archetyp. Du kannst ihn jederzeit oben wechseln.",
+    "search": "Archetyp suchen",
+    "mostPlayed": "Am meisten gespielt (letzte 7 Tage)",
+    "results": "Suchergebnisse",
+    "noResults": "Kein Archetyp gefunden.",
+    "loading": "Meta wird geladen …",
+    "unavailable": "Die Meta ist gerade nicht verfügbar – nutze die Suche.",
+    "share": "{{share}} %"
+  },
+  "list": {
+    "heading": "Womit willst du starten?",
+    "takeMeta": "Meta-Liste übernehmen",
+    "takeMetaHint": "Die typischste Liste des stärksten Clusters aus aktuellen Turnieren.",
+    "noClusters": "Für diesen Archetyp gibt es noch keine Turnierlisten.",
+    "loadingClusters": "Turnierlisten werden geladen …",
+    "pasteOwn": "Eigene Liste einfügen",
+    "pasteOwnHint": "Aus TCG Live kopieren und einfügen.",
+    "later": "Später",
+    "laterHint": "Du kannst jederzeit unter Deck eine Liste anlegen.",
+    "metaVariant": "Meta-Liste",
+    "ownVariant": "Meine Liste",
+    "failed": "Das hat nicht geklappt. Bitte versuch es noch einmal."
+  },
+  "playerName": {
+    "heading": "Dein Name in TCG Live",
+    "intro": "Damit Pokekon in deinen Logs erkennt, welche Züge deine sind.",
+    "label": "TCG Live Name",
+    "save": "Speichern und loslegen",
+    "skip": "Überspringen"
+  },
+  "cancel": "Abbrechen"
+}
