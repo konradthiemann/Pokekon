@@ -61,6 +61,7 @@ Electric `#f59e0b`, Psychic `#d946ef` (deepen for chart bars so each clears ~3:1
 - `.btn` / `.btn-primary` (solid `bg-brand-600`, white text, no gradient) / `.btn-ghost` — ≥44px tall, flat, `rounded-md`.
 - `.btn-destructive` — white with `poke-600` outline and text (Spec 7); never filled.
 - `.wr-pos` / `.wr-mid` / `.wr-neg` — win-rate text colours returned by `winRateColorClass()` (thresholds 50 / 45). Emerald/amber/red by default; blue/slate/orange inside `.coach-ui`.
+- `SegmentedTabs` (`components/shared/`) — one-panel-at-a-time segment bar, `role="tablist"`, every tab ≥44 px tall.
 - `.coach-ui` — scope class of the archetype-first layout; inside it `.card` is 94 % opaque so the archetype sprite shows through.
 - `.badge-win` / `.badge-loss` / `.badge-tie` / `.badge-lc` / `.badge-lcup` — squared pills (`rounded-md`), dark text, `py-0.5`.
 - `.input` — white field, `slate-300` border, brand focus ring.

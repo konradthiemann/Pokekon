@@ -189,6 +189,27 @@ service, so the per-browser override lets the new UI be tried in production
 without switching it on for everyone. A pure UI switch, not a security boundary —
 the API remains the authority for all data.
 
+### Archetype-first UI (Spec 7, in progress behind `archetypeCoachUi`)
+
+Building blocks shared by the coach layout (`specs/archetype-first-ui.md`, plan
+`.claude/plans/archetype-first-ui.md`):
+
+- `components/coach/ArchetypeSwitcherButton` — header control: icon + name of the
+  coached archetype (or "choose archetype"), opens the archetype switch.
+- `components/coach/ActiveListChip` — header chip with the active list and its newest
+  snapshot label; opens *Deck › My lists* (where "copy for TCG Live" lives).
+- `components/auth/AccountPanel` — account content (identity, AI settings, sync,
+  language, sign-out, legal links), extracted from `MobileAccountSheet` so the coach
+  header menu can reuse it. Sync stays available to everyone (no admin role, E16).
+- `components/shared/SegmentedTabs` — segment bar (≥44 px tabs), used by `DeckPage`,
+  `ArchetypeDetail` and the coach *Deck* page.
+- `hooks/useFieldAnalysis(window)` — field analysis per meta window with request-key
+  tagging (shared by `MetaPage` and the coach pages).
+- `lib/coach/archetypeName.ts` — display name for a slug: curated list → field
+  analysis → own deck → slug.
+- `i18n/localeParity.test.ts` guards that DE and EN have identical keys in every
+  namespace.
+
 ### State Management Pattern
 
 A single Zustand store (`useDashboardStore`) owns the data arrays
