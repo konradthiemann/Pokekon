@@ -1,8 +1,7 @@
+import { useMemo } from 'react';
+import { useFirstLoadableImage } from '../hooks/useFirstLoadableImage';
 import { useDashboardStore } from '../store/dashboardStore';
-import { resolveArchetypeSprites } from './shared/pokemonSprites';
-
-const SPRITE_BASE =
-  'https://raw.githubusercontent.com/bradley-erickson/pokesprite/master/pokemon/regular';
+import { spriteUrlCandidates } from './shared/pokemonSprites';
 
 // The light "playmat" surface every deck sits on. The per-archetype colour
 // comes through as a soft bloom on top (ARCHETYPE_TINT) rather than tinting
@@ -49,18 +48,23 @@ const ARCHETYPE_TINT: Record<string, string> = {
 const DEFAULT_TINT = 'rgba(96,165,250,0.22)';
 
 export function DeckSpriteBackground() {
-  const activeDeck = useDashboardStore((s) => s.activeDeck);
+  // Spec 7 §9a: the background follows the coached archetype (so it also works
+  // in onboarding and without an own list); the active deck is the fallback
+  // until an archetype is chosen. Same source cascade as PokemonIcon, so newer
+  // forms (e.g. megas) that only Limitless serves get a background too.
+  const chosenArchetype = useDashboardStore((s) => s.activeArchetypeId);
+  const deckArchetype = useDashboardStore((s) => s.activeDeck?.archetype ?? null);
+  const archetype = chosenArchetype ?? deckArchetype ?? '';
 
-  const pair = activeDeck ? resolveArchetypeSprites(activeDeck.archetype) : undefined;
-  const primarySlug = pair?.[0];
-  const archetype = activeDeck?.archetype ?? '';
-
-  const spriteUrl = primarySlug ? `${SPRITE_BASE}/${primarySlug}.png` : null;
+  const candidates = useMemo(() => spriteUrlCandidates(archetype), [archetype]);
+  const spriteUrl = useFirstLoadableImage(candidates);
   const tintColor = ARCHETYPE_TINT[archetype] ?? DEFAULT_TINT;
 
   return (
     <div
       aria-hidden="true"
+      data-archetype={archetype}
+      data-tint={tintColor}
       style={{
         position: 'fixed',
         inset: 0,

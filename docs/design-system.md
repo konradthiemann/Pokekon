@@ -18,7 +18,7 @@ UI, follow the tokens below — **do not reintroduce dark utilities** (`bg-gray-
 |------|------|
 | [`apps/web/src/index.css`](../apps/web/src/index.css) | `:root` raw tokens, component classes (`.card`, `.btn*`, `.badge*`, `.input`), global focus ring, `prefers-reduced-motion` |
 | [`apps/web/tailwind.config.js`](../apps/web/tailwind.config.js) | system font stack (`sans` + `mono`), `brand` blue, `energy` yellow, `poke` red (brand only, Spec 7), `shadow-card` |
-| [`apps/web/src/components/DeckSpriteBackground.tsx`](../apps/web/src/components/DeckSpriteBackground.tsx) | the playmat background + per-archetype colour bloom |
+| [`apps/web/src/components/DeckSpriteBackground.tsx`](../apps/web/src/components/DeckSpriteBackground.tsx) | the playmat background + per-archetype colour bloom. Follows the **coached archetype** (`activeArchetypeId`, Spec 7 §9a), falling back to the active deck's archetype; the sprite uses the same source cascade as `PokemonIcon` (Limitless CDN → pokesprite, `spriteUrlCandidates()` + `hooks/useFirstLoadableImage.ts`), so forms only Limitless serves (e.g. megas) get a background too |
 
 ## Palette (all text pairs measured on white)
 
