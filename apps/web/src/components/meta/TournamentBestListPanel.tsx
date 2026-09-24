@@ -8,6 +8,8 @@ import {
 import { CardGroup } from './DecklistCard';
 import { ListFieldPerformance } from './ListFieldPerformance';
 import { WinRateBadge } from './WinRateBadge';
+import { exportCardsFromDecklist } from '@pokekon/shared';
+import { CopyDeckListButton } from '../shared/CopyDeckListButton';
 
 export interface TournamentBestListPanelProps {
   archetypeId: string;
@@ -94,6 +96,10 @@ function TournamentClusterItem({ cluster }: { cluster: RankedCluster }) {
         >
           {t('archetypeDetail.tournamentBestList.cluster.viewDecklist')}
         </summary>
+        <CopyDeckListButton
+          cards={exportCardsFromDecklist(cluster.representative)}
+          className="mt-2"
+        />
         <div
           data-testid="tournament-best-list-cluster-decklist"
           className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2 pt-2 border-t border-slate-100"

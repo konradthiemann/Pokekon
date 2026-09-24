@@ -4,7 +4,7 @@ description: Documentation coverage status for the Pokemon TCG Meta Dashboard pr
 type: project
 ---
 
-Comprehensive /docs/ directory created at /Users/konrad.thiemann/tcg/docs/ on 2026-04-23.
+Comprehensive /docs/ directory created at ./docs/ on 2026-04-23.
 
 Files created on 2026-04-23:
 - docs/README.md — index with table of contents

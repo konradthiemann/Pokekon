@@ -4,7 +4,7 @@ description: Core tech stack decisions, project structure, and data flow for the
 type: project
 ---
 
-The app lives at /Users/konrad.thiemann/tcg/tcg-dashboard.
+The app lives at ./tcg-dashboard.
 
 ## Tech Stack (all decisions finalized)
 

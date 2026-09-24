@@ -17,6 +17,8 @@ import type { ArchetypeStats } from '../../types';
 import { CardGroup } from './DecklistCard';
 import { seedWeight } from './localFieldWeight';
 import { WinRateBadge } from './WinRateBadge';
+import { exportCardsFromDecklist } from '@pokekon/shared';
+import { CopyDeckListButton } from '../shared/CopyDeckListButton';
 
 interface ArchetypeRecommendationPanelProps {
   archetypeId: string;
@@ -138,6 +140,10 @@ function ClusterItem({ cluster }: { cluster: RankedCluster }) {
         >
           {t('archetypeDetail.recommendation.cluster.viewDecklist')}
         </summary>
+        <CopyDeckListButton
+          cards={exportCardsFromDecklist(cluster.representative)}
+          className="mt-2"
+        />
         <div
           data-testid="archetype-recommendation-cluster-decklist"
           className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2 pt-2 border-t border-slate-100"

@@ -165,3 +165,36 @@ describe('importCards (PUT /api/decks/:id/cards semantics)', () => {
     expect(mockedApi.replaceDeckCards).not.toHaveBeenCalled();
   });
 });
+
+describe('parseDeckList – real PTCGL line variants', () => {
+  it('drops the PH print marker instead of skipping the line', () => {
+    const { cards, skippedLines } = parseDeckList(`Trainer: 1\n1 Switch SVI 194 PH`);
+    expect(skippedLines).toEqual([]);
+    expect(cards[0]).toMatchObject({ name: 'Switch', set: 'SVI', number: '194' });
+  });
+
+  it("accepts PTCGL's pseudo set 'Energy' for basic Energy", () => {
+    const { cards, skippedLines } = parseDeckList(`Energy: 11\n11 Basic {W} Energy Energy 29`);
+    expect(skippedLines).toEqual([]);
+    expect(cards[0]).toMatchObject({ name: 'Basic {W} Energy', set: 'Energy', number: '29' });
+  });
+
+  it('accepts hyphenated promo set codes', () => {
+    const { cards } = parseDeckList(`Pokémon: 1\n1 Pecharunt PR-SV 149`);
+    expect(cards[0]).toMatchObject({ name: 'Pecharunt', set: 'PR-SV', number: '149' });
+  });
+});
+
+describe('importCards – keeps the print for export', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedApi.replaceDeckCards.mockResolvedValue([]);
+  });
+
+  it('sends set and number with every imported card', async () => {
+    const { cards } = parseDeckList(`Pokémon: 4\n4 N's Zorua JTG 97`);
+    await importCards(cards, true, 7);
+    const [, sent] = mockedApi.replaceDeckCards.mock.calls[0];
+    expect(sent[0]).toMatchObject({ name: "N's Zorua", set: 'JTG', number: '97' });
+  });
+});

@@ -1,5 +1,8 @@
 # Spec 7: Informationsarchitektur auf das Hub-Ziel ausrichten
 
+> **Hinweis (2026-09-23):** Navigation und Tab-Struktur dieser Spec werden durch
+> [`archetype-first-ui.md`](./archetype-first-ui.md) §2 teilweise ersetzt (Tabelle dort).
+
 > Teil 7 von 9 im Rework-Fluss aus [`deck-improvement-hub-vision.md`](./deck-improvement-hub-vision.md).
 > Bündelt die IA-Konsequenzen aus Spec 4 (Personal Tracker demoted), Spec 5 (Prognosen statt
 > reiner Empfehlungen) und optional Spec 6 (neue spieltheoretische Ansicht) zu einer

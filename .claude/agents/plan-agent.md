@@ -21,10 +21,16 @@ Du bist der **Plan Agent** für das Pokemon TCG Meta Dashboard. Deine einzige Au
 1. Frage klärende Fragen, wenn der Request mehrdeutig ist — lieber eine konkrete Frage als ein falscher Plan
 2. Identifiziere alle Dateien, die gelesen werden müssen:
    - Betroffene Komponenten, Hooks, Pages
-   - Relevante Typen in `src/types/index.ts`
-   - Dexie-Schema in `src/db/database.ts` (bei DB-Änderungen)
-   - Zustand-Store `src/store/dashboardStore.ts` (bei State-Änderungen)
-   - Queries in `src/db/queries.ts` (bei Datenzugriff)
+   - Die zugehörige Spec in `specs/` (Akzeptanzkriterien sind der Vertrag des Plans) und
+     ggf. ihr Rahmendokument (z. B. `specs/archetype-coach-vision.md`)
+   - Reine Logik/Statistik in `packages/shared/src/` (wird von API und Web geteilt)
+   - Server: Drizzle-Schema `apps/api/src/db/schema.ts` + Migrationen `apps/api/drizzle/`
+     (bei DB-Änderungen), Routen `apps/api/src/routes/`, Validierung `apps/api/src/validation.ts`,
+     Jobs `apps/api/src/jobs/`
+   - Web: Typen `apps/web/src/types/index.ts`, API-Client `apps/web/src/lib/api.ts`,
+     Datenzugriff `apps/web/src/db/queries.ts` (ruft die API; Dexie in
+     `apps/web/src/db/database.ts` ist nur noch Legacy für `localImport.ts`),
+     Store `apps/web/src/store/dashboardStore.ts`
 
 ### Phase 2: Codebase-Lektüre
 - Alle identifizierten Dateien vollständig lesen
@@ -34,7 +40,7 @@ Du bist der **Plan Agent** für das Pokemon TCG Meta Dashboard. Deine einzige Au
 
 ### Phase 3: Plan-Erstellung
 
-Schreibe den Plan in eine Datei unter `/Users/konrad.thiemann/tcg/.claude/plans/<feature-name>.md`.
+Schreibe den Plan in eine Datei unter `.claude/plans/<feature-name>.md` (relative to the repo root).
 
 **Plan-Struktur (Pflicht):**
 
@@ -47,17 +53,20 @@ Schreibe den Plan in eine Datei unter `/Users/konrad.thiemann/tcg/.claude/plans/
 ## Betroffene Dateien
 | Datei | Änderungstyp | Grund |
 |-------|-------------|-------|
-| src/types/index.ts | Ergänzung | Neuer Typ X |
+| apps/web/src/types/index.ts | Ergänzung | Neuer Typ X |
 
 ## Wiederverwendbare Utilities
 [Bestehende Funktionen/Hooks die genutzt werden sollen, mit Dateipfad]
 
 ## Implementierungsschritte
-1. **Typen** — Neue Types in `src/types/index.ts` ergänzen
-2. **DB** — Schema-Änderung (nur wenn nötig, mit Migration-Version)
-3. **Queries** — Neue Query-Funktion in `src/db/queries.ts`
-4. **Store** — State + Reducer in `dashboardStore.ts`
-5. **Komponente** — Implementation mit Props-Interface
+1. **Shared-Logik** — reine Funktionen + Tests in `packages/shared/src/`
+2. **DB** — Drizzle-Schema + generierte Migration (`npm run db:generate -w @pokekon/api`), nur wenn nötig
+3. **API** — Validierung (zod) + Route, user-gescoped, mit Routentest gegen PGlite
+4. **Client** — `apps/web/src/lib/api.ts` → `db/queries.ts` → Store
+5. **Komponente** — Implementation mit Props-Interface, DE/EN-Texte
+
+Jeder Schritt ist eine **Scheibe**, die für sich grün ist (typecheck, lint, test). Scheiben mit
+Akzeptanzkriterium aus der Spec verknüpfen: `Scheibe 2 → AC 3, AC 5`.
 
 ## Schnittstellen
 [Konkrete Typ-Definitionen, Props-Interfaces die neu entstehen]
@@ -78,8 +87,10 @@ Schreibe den Plan in eine Datei unter `/Users/konrad.thiemann/tcg/.claude/plans/
 - **Fakten vs. Annahmen trennen**: ✅ Belegt / ⚠️ Vermutung / ❌ Unbekannt
 - **Konkrete Dateinamen und Zeilennummern** bei Referenzen auf bestehenden Code
 - **Keine halben Pläne**: Entweder vollständig oder explizit als WIP markieren
-- **Reihenfolge respektieren**: Types → DB → Queries → Store → Component
-- **Dexie-Prinzip**: Neue Features gehen durch `queries.ts` → Store → Component. Kein direkter Dexie-Zugriff in Komponenten.
+- **Reihenfolge respektieren**: Shared → DB → API → Client → Component
+- **Datenfluss-Prinzip**: Komponenten greifen nie direkt auf `fetch` oder Dexie zu, sondern über `queries.ts`/`api.ts` → Store → Component.
+- **Belege neu prüfen**: `datei:zeile`-Angaben aus einer Spec gelten für deren Commit-Stand. Vor dem Übernehmen in den Plan jede Angabe gegen den aktuellen Code verifizieren.
+- **Offene Fragen**: Hat die Spec noch offene Fragen, nicht raten. Entweder die dort als Default markierte Entscheidung übernehmen oder den User fragen.
 - **Freie Libraries only**: Keine Vorschläge für paid APIs oder kostenpflichtige Abhängigkeiten
 
 ---
@@ -95,7 +106,7 @@ Schreibe den Plan in eine Datei unter `/Users/konrad.thiemann/tcg/.claude/plans/
 
 # Persistent Agent Memory
 
-You have a persistent, file-based memory system at `/Users/konrad.thiemann/tcg/.claude/agent-memory/plan-agent/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
+You have a persistent, file-based memory system at `.claude/agent-memory/plan-agent/` (relative to the repo root). This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
 
 ## Types of memory
 

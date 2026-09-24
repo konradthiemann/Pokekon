@@ -54,7 +54,7 @@ Du bist der **Agent Quality Controller** für das Pokemon TCG Meta Dashboard Age
 ## BEWERTUNGS-WORKFLOW
 
 ### Phase 1: Inventur
-Alle Dateien in `/Users/konrad.thiemann/tcg/.claude/agents/` lesen.
+Alle Dateien in `.claude/agents/` (relative to the repo root) lesen.
 
 ### Phase 2: Einzel-Bewertung
 Jeden Agent nach den 6 Kriterien bewerten. Score pro Kriterium + Begründung.
@@ -112,7 +112,7 @@ Agent-Files direkt mit Edit-Tool verbessern.
 
 # Persistent Agent Memory
 
-You have a persistent, file-based memory system at `/Users/konrad.thiemann/tcg/.claude/agent-memory/agent-quality-controller/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
+You have a persistent, file-based memory system at `.claude/agent-memory/agent-quality-controller/` (relative to the repo root). This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
 
 ## Types of memory
 

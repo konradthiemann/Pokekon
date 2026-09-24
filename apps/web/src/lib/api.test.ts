@@ -11,6 +11,7 @@ import {
   getMeta,
   getMetaEquilibrium,
   listDeckSnapshots,
+  replaceDeckCards,
   listAllLogs,
   syncMeta,
   updateAiSettings,
@@ -128,6 +129,42 @@ describe('api snapshot cards adapter', () => {
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(JSON.parse(init.body as string).cards).toEqual([]);
+  });
+});
+
+describe('deck card wire mapping (PTCGL print)', () => {
+  it('replaceDeckCards forwards set and number and maps them back', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse([
+        {
+          id: 1,
+          deckId: 3,
+          name: "N's Zorua",
+          count: 4,
+          type: 'Pokemon',
+          role: 'attacker',
+          set: 'JTG',
+          number: '97',
+        },
+      ]),
+    );
+
+    const saved = await replaceDeckCards(3, [
+      { name: "N's Zorua", count: 4, type: 'Pokemon', role: 'attacker', set: 'JTG', number: '97' },
+    ]);
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual([
+      { name: "N's Zorua", count: 4, type: 'Pokemon', role: 'attacker', set: 'JTG', number: '97' },
+    ]);
+    expect(saved[0]).toMatchObject({ set: 'JTG', number: '97' });
+  });
+
+  it('sends null for cards without a print (quick-add, old rows)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await replaceDeckCards(3, [{ name: 'Judge', count: 1, type: 'Trainer', role: 'supporter' }]);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)[0]).toMatchObject({ set: null, number: null });
   });
 });
 
