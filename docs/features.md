@@ -552,7 +552,9 @@ Combines three data sources into a closed set of structured **facts** (each with
 Archetype-level counterpart to Deck Synthesis (§19) — instead of one user's deck, it synthesizes
 over an archetype's **ranked decklist clusters** (Spec 10 Slice A: near-identical published
 tournament lists merged into one data point; Slice B: ranked by Wilson-score lower bound of the
-tie-weighted win rate, so a lucky small sample can't outrank a proven large one). Reuses the exact
+tie-weighted win rate, so a lucky small sample can't outrank a proven large one). Clustering is
+deterministic (Spec 1, `specs/archetype-list-foundation.md`): the same standings always yield the
+same clusters, independent of the order the database returns them in. Reuses the exact
 Spec 8 anti-hallucination gate (`validateSynthesis`) — a claim must reference a real fact id and
 declare a matching `direction`, same as Deck Synthesis.
 

@@ -831,7 +831,11 @@ interface DecklistCluster {
 }
 ```
 
-`clusterDecklists(standings, opts?)` greedily merges each standing into the first existing
+`clusterDecklists(standings, opts?)` first sorts its input into a **canonical order** (Spec 1
+§3.1, `specs/archetype-list-foundation.md`): best `placementPercentile(placing, totalPlayers)`
+first (standings without a usable placement last), then `wins − losses` desc, then `id` asc.
+The result therefore never depends on the order the caller (or PostgreSQL) returns rows in; the
+input array is not mutated. It then greedily merges each standing into the first existing
 cluster whose representative overlaps it by at least `opts.minOverlapRatio` (default
 `DEFAULT_MIN_OVERLAP_RATIO = 55/60 ≈ 91.7 %`), or starts a new cluster. A cluster with a single
 member is kept as its own cluster, never forced into another — protects rare-but-strong lists

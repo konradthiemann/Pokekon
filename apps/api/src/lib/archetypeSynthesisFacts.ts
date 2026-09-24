@@ -1,4 +1,4 @@
-import { and, eq, gte } from 'drizzle-orm';
+import { and, asc, eq, gte } from 'drizzle-orm';
 import {
   blendWithPersonalPrior,
   clusterDecklists,
@@ -119,7 +119,9 @@ export async function buildArchetypeSynthesisFactSet(
         gte(tournaments.players, DEFAULT_MIN_TOURNAMENT_PLAYERS),
         ...windowConditions(window),
       ),
-    );
+    )
+    // Stable row order for logs/debugging; clusterDecklists sorts canonically itself.
+    .orderBy(asc(tournamentStandings.id));
 
   const clusterable: ClusterableStanding[] = rows
     .filter((r): r is typeof r & { decklist: TournamentDecklist } => r.decklist !== null)

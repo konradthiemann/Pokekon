@@ -3,7 +3,7 @@
 // single tech swap, an energy count) are the SAME list for ranking purposes —
 // without this, they count as two independent, weaker data points instead of
 // one stronger one. Pure functions, no I/O, same shape as fieldWinRate.ts.
-import { normalizeCardName } from './cardPerformance.js';
+import { normalizeCardName, placementPercentile } from './cardPerformance.js';
 import type { TournamentDecklist } from './meta.js';
 import type { StandingMatchResult } from './matchupPairings.js';
 
@@ -98,6 +98,26 @@ export interface DecklistCluster {
   matchResults: StandingMatchResult[];
 }
 
+function standingPlacementPercentile(s: ClusterableStanding): number | null {
+  return s.totalPlayers == null ? null : placementPercentile(s.placing, s.totalPlayers);
+}
+
+/** Canonical processing order (Spec 1 §3.1): best placement percentile first
+ *  (standings without a usable placement last), then wins − losses desc, then
+ *  id asc. Makes clustering independent of the order the DB returns rows in. */
+function compareCanonical(a: ClusterableStanding, b: ClusterableStanding): number {
+  const pa = standingPlacementPercentile(a);
+  const pb = standingPlacementPercentile(b);
+  if (pa !== pb) {
+    if (pa == null) return 1;
+    if (pb == null) return -1;
+    return pb - pa;
+  }
+  const recordDiff = b.wins - b.losses - (a.wins - a.losses);
+  if (recordDiff !== 0) return recordDiff;
+  return a.id - b.id;
+}
+
 /**
  * Greedy single-pass clustering: each standing joins the first existing
  * cluster whose representative overlaps it by at least `minOverlapRatio`, or
@@ -107,6 +127,9 @@ export interface DecklistCluster {
  * and the greedy pass is O(n * clusters) instead of O(n^2) list comparisons.
  * A cluster with a single member is kept as-is (never forced into another
  * cluster) — see spec "Nadel im Heuhaufen" requirement.
+ *
+ * Standings are processed in a canonical order (see `compareCanonical`), not
+ * in caller order, so the same input set always yields the same clusters.
  */
 export function clusterDecklists(
   standings: ClusterableStanding[],
@@ -115,7 +138,9 @@ export function clusterDecklists(
   const minOverlapRatio = opts.minOverlapRatio ?? DEFAULT_MIN_OVERLAP_RATIO;
   const clusters: DecklistCluster[] = [];
 
-  for (const s of standings) {
+  const ordered = [...standings].sort(compareCanonical);
+
+  for (const s of ordered) {
     const match = clusters.find(
       (c) => computeDecklistOverlap(c.representative, s.decklist).overlapRatio >= minOverlapRatio,
     );
