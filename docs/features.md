@@ -556,7 +556,8 @@ tie-weighted win rate, so a lucky small sample can't outrank a proven large one)
 deterministic (Spec 1, `specs/archetype-list-foundation.md`): the same standings always yield the
 same clusters, independent of the order the database returns them in, and each cluster shows its
 most typical list (the medoid: largest summed card overlap with the other members) instead of an
-arbitrary first member. Reuses the exact
+arbitrary first member. Equal win-rate bounds are tie-broken by placement, cluster size and
+standing id. Reuses the exact
 Spec 8 anti-hallucination gate (`validateSynthesis`) — a claim must reference a real fact id and
 declare a matching `direction`, same as Deck Synthesis.
 

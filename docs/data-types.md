@@ -862,7 +862,7 @@ interface RankedCluster extends DecklistCluster {
   winRateLowerBoundPct: number;         // PRIMARY ranking signal
   winRateInterval: WilsonInterval | null; // null only when the cluster has 0 recorded games
   avgPlacementPercentile: number | null;  // SECONDARY/display signal, never a multiplier
-  rank: number;                           // 1-based, descending winRateLowerBoundPct
+  rank: number;                           // 1-based, descending winRateLowerBoundPct (+ tie-breaks)
   fieldScore?: FieldScore | null;         // Slice D, only set when re-ranked against a localField
 }
 ```
@@ -875,7 +875,10 @@ than the raw rate: this is what stops a lucky 3-game 100 %-sample from outrankin
 `placementPercentile()` across the cluster's member standings is carried as a secondary,
 display-only signal — it can show "this list won the event" even when the win-rate sample is
 too thin to rank it highly, but it never multiplies into the primary rank (that would let a
-single lucky top-8 with few games dominate, exactly the bias Spec 10 asks to avoid).
+single lucky top-8 with few games dominate, exactly the bias Spec 10 asks to avoid). Ties on the
+lower bound are broken deterministically (Spec 1 §3.3): higher `avgPlacementPercentile` first
+(`null` last), then more member standings, then the smallest member standing id, so the ranking
+never depends on input order.
 `rankClusters()` itself never touches `fieldScore` — that field is filled in by a separate
 re-ranking step (`clusterFieldScore.ts`, below), only for `scope: 'local'` with a chosen field.
 
