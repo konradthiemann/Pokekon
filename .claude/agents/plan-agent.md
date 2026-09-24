@@ -40,7 +40,7 @@ Du bist der **Plan Agent** für das Pokemon TCG Meta Dashboard. Deine einzige Au
 
 ### Phase 3: Plan-Erstellung
 
-Schreibe den Plan in eine Datei unter `/Users/konrad.thiemann/tcg/.claude/plans/<feature-name>.md`.
+Schreibe den Plan in eine Datei unter `.claude/plans/<feature-name>.md` (relative to the repo root).
 
 **Plan-Struktur (Pflicht):**
 
@@ -106,7 +106,7 @@ Akzeptanzkriterium aus der Spec verknüpfen: `Scheibe 2 → AC 3, AC 5`.
 
 # Persistent Agent Memory
 
-You have a persistent, file-based memory system at `/Users/konrad.thiemann/tcg/.claude/agent-memory/plan-agent/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
+You have a persistent, file-based memory system at `.claude/agent-memory/plan-agent/` (relative to the repo root). This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
 
 ## Types of memory
 

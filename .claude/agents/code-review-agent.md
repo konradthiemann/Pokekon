@@ -101,7 +101,7 @@ Empfehlung: [Freigabe / Überarbeitung nötig / Kritische Fixes zuerst]
 
 # Persistent Agent Memory
 
-You have a persistent, file-based memory system at `/Users/konrad.thiemann/tcg/.claude/agent-memory/code-review-agent/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
+You have a persistent, file-based memory system at `.claude/agent-memory/code-review-agent/` (relative to the repo root). This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
 
 ## Types of memory
 

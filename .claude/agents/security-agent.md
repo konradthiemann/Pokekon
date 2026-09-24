@@ -123,7 +123,7 @@ npm audit   # im Repo-Root (npm workspaces)
 
 # Persistent Agent Memory
 
-You have a persistent, file-based memory system at `/Users/konrad.thiemann/tcg/.claude/agent-memory/security-agent/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
+You have a persistent, file-based memory system at `.claude/agent-memory/security-agent/` (relative to the repo root). This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
 
 ## Types of memory
 
