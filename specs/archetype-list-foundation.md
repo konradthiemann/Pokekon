@@ -1,6 +1,6 @@
 # Spec 1: Fundament-Fixes am Cluster-Ranking
 
-> **Status:** Entwurf, wartet auf Freigabe durch Konrad.
+> **Status:** Freigegeben 2026-09-24, umgesetzt auf `feat/archetype-list-foundation` (Plan: `.claude/plans/archetype-list-foundation.md`).
 > Kontext: Teil 1 von 8 aus [`specs/archetype-coach-vision.md`](./archetype-coach-vision.md).
 > Belege: Stand `main` = `baebcc5`.
 > **Nachfolgend:** Plan in `.claude/plans/archetype-list-foundation.md` (plan-agent),

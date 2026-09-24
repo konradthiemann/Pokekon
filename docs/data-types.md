@@ -796,8 +796,9 @@ The output language for synthesis. Separate from the API's locale system; a user
 Two published tournament decklists that differ by only a tech swap or an energy count are the
 same list for ranking purposes — without merging them, they count as two independent, weaker
 data points instead of one stronger one. Pure functions, no I/O (same shape as
-`fieldWinRate.ts`). Not yet wired into any route or UI — this is the building block Slice B
-(ranking) and Slice C (best-list recommendation) compose on top of.
+`fieldWinRate.ts`). Composed with Slice B (ranking) in `buildArchetypeSynthesisFactSet`
+(`apps/api/src/lib/archetypeSynthesisFacts.ts`, archetype recommendation) and in the
+per-tournament best-list route (`GET /api/analysis/tournament/:tid/archetype/:aid`).
 
 ### `DecklistOverlap`
 ```typescript
@@ -836,7 +837,7 @@ interface DecklistCluster {
 first (standings without a usable placement last), then `wins − losses` desc, then `id` asc.
 The result therefore never depends on the order the caller (or PostgreSQL) returns rows in; the
 input array is not mutated. It then greedily merges each standing into the first existing
-cluster whose representative overlaps it by at least `opts.minOverlapRatio` (default
+cluster whose seed (founding member) overlaps it by at least `opts.minOverlapRatio` (default
 `DEFAULT_MIN_OVERLAP_RATIO = 55/60 ≈ 91.7 %`), or starts a new cluster. A cluster with a single
 member is kept as its own cluster, never forced into another — protects rare-but-strong lists
 ("Nadel im Heuhaufen") from being diluted away by clustering. This is a greedy heuristic
