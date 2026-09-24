@@ -22,6 +22,8 @@ import {
   updateDeck,
   deleteDeck as deleteDeckFromDb,
   copyDeckCards,
+  getUserPreferences,
+  saveUserPreferences,
 } from '../db/queries';
 import { fetchRecentTournaments } from '../lib/metaFetch';
 import {
@@ -30,18 +32,20 @@ import {
   generateDeckSynthesis,
   getDeckSynthesis,
 } from '../lib/api';
-import type { DeckSynthesisReadResponse } from '../lib/api';
+import type { DeckSynthesisReadResponse, MetaWindow } from '../lib/api';
 import type { ArchetypeCardStat, MetaSyncResult } from '@pokekon/shared';
 import { attachCardDeltas, fetchArchetypeComparison } from '../lib/deckComparison';
 import type { ComparisonResult } from '../lib/deckComparison';
 import {
   getLocalMeta,
   setLocalMeta,
-  getDeckArchSlug,
-  setDeckArchSlug,
+  takeLegacyDeckArchSlug,
   getActiveDeckId,
   setActiveDeckId,
 } from '../lib/preferences';
+import { isArchetypeCoachUiEnabled } from '../lib/featureFlags';
+import { pickMigrationArchetype, resolveActiveDeckId } from '../lib/coach/activeDeck';
+import { META_DEFAULT_DAYS } from '../components/meta/metaWindow';
 
 // `loadCardStats` can be in flight from two independent, network-timing-
 // dependent callers at once (`refresh()` on an archetype switch,
@@ -66,6 +70,16 @@ export type DashboardTab = 'overview' | 'meta' | 'deck';
 /** Sections within "My Deck" (plan ui-ux-hub-rework.md §3.1). */
 export type DeckSection = 'deck' | 'analytics' | 'tips';
 
+/** Navigation of the archetype-first UI (Spec 7 §4, behind `archetypeCoachUi`).
+ *  Separate from `DashboardTab` while both layouts live; merged when the flag
+ *  is switched for everyone. */
+export type CoachTab = 'start' | 'deck' | 'coaching' | 'opponents' | 'tools';
+
+/** Segments of the coach "Deck" page (Spec 7 §5.3). 'lab' arrives with Spec 6. */
+export type DeckView = 'metaList' | 'myLists';
+
+export type PreferencesStatus = 'idle' | 'loading' | 'ready' | 'error';
+
 interface DashboardState {
   // Data
   decks: Deck[];
@@ -82,7 +96,14 @@ interface DashboardState {
 
   // User preferences (localStorage-backed)
   localMeta: string[];
+  /** Derived: `activeArchetypeId ?? ''` (read by the old layout's deck
+   *  comparison). Since Spec 7 no longer a separately stored value. */
   deckArchSlug: string;
+
+  // Server-side preferences (Spec 7 §5.1, `/api/preferences`)
+  activeArchetypeId: string | null;
+  activeDeckIdByArchetype: Record<string, number>;
+  preferencesStatus: PreferencesStatus;
 
   // Deck comparison
   comparisonResult: ComparisonResult | null;
@@ -111,6 +132,10 @@ interface DashboardState {
   lastRefreshed: Date | null;
   activeTab: DashboardTab;
   deckSection: DeckSection;
+  coachTab: CoachTab;
+  deckView: DeckView;
+  /** Meta window shared by the coach pages (Spec 7 §6: "gilt global"). */
+  metaWindow: MetaWindow;
 
   // Live meta sync
   isSyncing: boolean;
@@ -124,6 +149,10 @@ interface DashboardState {
 
   // Actions
   refresh: () => Promise<void>;
+  /** Initial load once a session exists: refresh → loadPreferences (the
+   *  migration needs the active deck) → with `archetypeCoachUi` on, a second
+   *  refresh so the active deck belongs to the coached archetype. */
+  hydrate: () => Promise<void>;
   setActiveTab: (tab: DashboardTab) => void;
   setDeckSection: (section: DeckSection) => void;
   /** Jumps directly into the deck comparison: sets activeTab='deck' AND
@@ -139,7 +168,15 @@ interface DashboardState {
   }) => Promise<void>;
   saveCurrentDeckSnapshot: (label: string) => Promise<number>;
   setLocalMeta: (archetypes: string[]) => void;
-  setDeckArchSlug: (slug: string) => void;
+  /** GET /api/preferences; when the server has no archetype yet, migrates once
+   *  from the legacy localStorage slug or the active deck (Spec 7 E5). Never
+   *  throws — a failure sets `preferencesStatus: 'error'`. */
+  loadPreferences: () => Promise<void>;
+  /** Persists the coached archetype and switches to its remembered deck. */
+  setActiveArchetype: (archetypeId: string) => Promise<void>;
+  setCoachTab: (tab: CoachTab) => void;
+  setDeckView: (view: DeckView) => void;
+  setMetaWindow: (window: MetaWindow) => void;
   runDeckComparison: () => Promise<void>;
   /** Loads precomputed card deltas for one archetype. A failure never throws
    *  — it clears `cardStats`/`cardStatsSource` and leaves everything else
@@ -177,7 +214,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   recentTournaments: [],
   activeDeck: null,
   localMeta: getLocalMeta(),
-  deckArchSlug: getDeckArchSlug(),
+  deckArchSlug: '',
+  activeArchetypeId: null,
+  activeDeckIdByArchetype: {},
+  preferencesStatus: 'idle',
   comparisonResult: null,
   isComparing: false,
   compareProgress: '',
@@ -193,6 +233,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   lastRefreshed: null,
   activeTab: 'overview',
   deckSection: 'deck',
+  coachTab: 'start',
+  deckView: 'myLists',
+  metaWindow: { days: META_DEFAULT_DAYS, online: true, bo1: true },
   isSyncing: false,
   syncProgress: '',
   lastSynced: null,
@@ -216,13 +259,18 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       // Load decks first to determine active deck
       const decks = await getDecks();
 
-      let activeDeckId = get().activeDeckId;
-
-      // If no active deck ID or it doesn't exist, pick the first deck
-      if (!activeDeckId || !decks.find((d) => d.id === activeDeckId)) {
-        activeDeckId = decks[0]?.id ?? null;
-        if (activeDeckId) setActiveDeckId(activeDeckId);
-      }
+      // Old layout: keep the current deck, else the first one. Coach layout
+      // (Spec 7 §5.1): the active deck belongs to the coached archetype —
+      // remembered → current → newest of that archetype → none.
+      const { activeArchetypeId, activeDeckIdByArchetype } = get();
+      const previousId = get().activeDeckId;
+      const activeDeckId = resolveActiveDeckId({
+        decks,
+        archetypeId: isArchetypeCoachUiEnabled() ? activeArchetypeId : null,
+        remembered: activeDeckIdByArchetype,
+        fallbackId: previousId,
+      });
+      if (activeDeckId !== previousId) setActiveDeckId(activeDeckId);
 
       const previousArchetype = get().activeDeck?.archetype;
       const activeDeck = decks.find((d) => d.id === activeDeckId) ?? null;
@@ -279,6 +327,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
+  hydrate: async () => {
+    await get().refresh();
+    await get().loadPreferences();
+    if (isArchetypeCoachUiEnabled()) await get().refresh();
+  },
+
   setActiveTab: (tab) => set({ activeTab: tab }),
 
   setDeckSection: (section) => set({ deckSection: section }),
@@ -288,6 +342,19 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   setActiveDeck: async (id) => {
     setActiveDeckId(id);
     set({ activeDeckId: id });
+    const deck = get().decks.find((d) => d.id === id);
+    if (deck) {
+      // Remember the deck per archetype (Spec 7 §5.1). Best effort: a failed
+      // save must never block switching decks.
+      try {
+        const prefs = await saveUserPreferences({
+          activeDeck: { archetypeId: deck.archetype, deckId: id },
+        });
+        set({ activeDeckIdByArchetype: prefs.activeDeckIdByArchetype });
+      } catch (err) {
+        console.warn('[DashboardStore] saving the active deck failed:', err);
+      }
+    }
     await get().refresh();
   },
 
@@ -397,10 +464,58 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     set({ localMeta: archetypes });
   },
 
-  setDeckArchSlug: (slug) => {
-    setDeckArchSlug(slug);
-    set({ deckArchSlug: slug });
+  loadPreferences: async () => {
+    set({ preferencesStatus: 'loading' });
+    let prefs;
+    try {
+      prefs = await getUserPreferences();
+    } catch (err) {
+      console.warn('[DashboardStore] loadPreferences failed:', err);
+      set({ preferencesStatus: 'error' });
+      return;
+    }
+
+    let activeArchetypeId = prefs.activeArchetypeId;
+    if (activeArchetypeId === null) {
+      // One-time migration (Spec 7 E5): existing accounts keep their archetype
+      // instead of being sent through onboarding.
+      activeArchetypeId = pickMigrationArchetype({
+        legacySlug: takeLegacyDeckArchSlug(),
+        activeDeck: get().activeDeck,
+      });
+      if (activeArchetypeId !== null) {
+        try {
+          await saveUserPreferences({ activeArchetypeId });
+        } catch (err) {
+          // Keep the migrated value for this session; the next load retries.
+          console.warn('[DashboardStore] persisting the migrated archetype failed:', err);
+        }
+      }
+    }
+
+    set({
+      activeArchetypeId,
+      deckArchSlug: activeArchetypeId ?? '',
+      activeDeckIdByArchetype: prefs.activeDeckIdByArchetype,
+      preferencesStatus: 'ready',
+    });
   },
+
+  setActiveArchetype: async (archetypeId) => {
+    const prefs = await saveUserPreferences({ activeArchetypeId: archetypeId });
+    set({
+      activeArchetypeId: archetypeId,
+      deckArchSlug: archetypeId,
+      activeDeckIdByArchetype: prefs.activeDeckIdByArchetype,
+    });
+    await get().refresh();
+  },
+
+  setCoachTab: (tab) => set({ coachTab: tab }),
+
+  setDeckView: (view) => set({ deckView: view }),
+
+  setMetaWindow: (window) => set({ metaWindow: window }),
 
   runDeckComparison: async () => {
     const { activeDeck, deckCards } = get();

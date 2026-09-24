@@ -10,11 +10,13 @@ import {
   getDeckSynthesis,
   getMeta,
   getMetaEquilibrium,
+  getPreferences,
   listDeckSnapshots,
   replaceDeckCards,
   listAllLogs,
   syncMeta,
   updateAiSettings,
+  updatePreferences,
 } from './api';
 import type { ArchetypeCardStatsResponse, MetaEquilibriumResponse } from './api';
 import type { DeckCard } from '../types';
@@ -655,5 +657,38 @@ describe('listAllLogs pagination', () => {
     // null wire fields become undefined optionals on the client type
     expect(logs[0].deckId).toBeUndefined();
     expect(logs[0].deckSnapshotId).toBeUndefined();
+  });
+});
+
+describe('preferences client (Spec 7 §5.1)', () => {
+  it('getPreferences GETs /api/preferences', async () => {
+    const body = {
+      activeArchetypeId: 'dragapult-ex',
+      activeDeckIdByArchetype: { 'dragapult-ex': 3 },
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(body));
+    expect(await getPreferences()).toEqual(body);
+    expect(fetchMock).toHaveBeenCalledWith('/api/preferences', expect.anything());
+  });
+
+  it('updatePreferences PATCHes a JSON body and returns the parsed response', async () => {
+    const body = { activeArchetypeId: 'n-zoroark', activeDeckIdByArchetype: {} };
+    fetchMock.mockResolvedValueOnce(jsonResponse(body));
+    expect(await updatePreferences({ activeArchetypeId: 'n-zoroark' })).toEqual(body);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/preferences');
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body as string)).toEqual({ activeArchetypeId: 'n-zoroark' });
+  });
+
+  it('surfaces a 400 as ApiError', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Invalid request body' }, 400));
+    await expect(updatePreferences({ activeArchetypeId: 'n-zoroark' })).rejects.toMatchObject({
+      status: 400,
+    });
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'x' }, 400));
+    await expect(updatePreferences({ activeArchetypeId: 'n-zoroark' })).rejects.toBeInstanceOf(
+      ApiError,
+    );
   });
 });

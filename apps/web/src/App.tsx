@@ -29,16 +29,16 @@ const MetaPage = lazy(() => import('./pages/MetaPage').then((m) => ({ default: m
  * store must never refresh without a session (it would only collect 401s).
  */
 function Dashboard() {
-  const { activeTab, refresh, isLoading } = useDashboardStore();
+  const { activeTab, hydrate, isLoading } = useDashboardStore();
   const [showLocalImport, setShowLocalImport] = useState(false);
 
   useEffect(() => {
     void (async () => {
       // Meta + domain data are server-side; nothing to seed locally.
       if (await shouldOfferLocalImport()) setShowLocalImport(true);
-      await refresh();
+      await hydrate();
     })();
-  }, [refresh]);
+  }, [hydrate]);
 
   const PAGE: Record<DashboardTab, ReactNode> = {
     overview: <OverviewPage />,

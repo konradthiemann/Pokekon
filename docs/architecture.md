@@ -198,6 +198,25 @@ localStorage-backed preferences, async-operation flags, and UI state. The
 `refresh()` action is the single entry point to reload data; mutations end with
 `await get().refresh()` to keep the store consistent.
 
+**Server-side preferences (Spec 7 §5.1).** `hydrate()` is the initial load once a
+session exists (`App.tsx`, and `WelcomeScreen` after seeding the demo): `refresh()`
+→ `loadPreferences()` (`GET /api/preferences` → `activeArchetypeId`,
+`activeDeckIdByArchetype`, `preferencesStatus`) → with `archetypeCoachUi` on, a
+second `refresh()`. When the server has no archetype yet, `loadPreferences()`
+migrates **once**: a valid legacy localStorage slug (`takeLegacyDeckArchSlug()`
+reads and deletes `tcg-deck-arch-slug-v1`), else the active deck's archetype, else
+`null` (→ onboarding). Active-deck resolution lives in the pure
+`lib/coach/activeDeck.ts`: flag off = legacy rule (current deck if it exists, else
+the first); flag on = remembered deck of the coached archetype → current deck if
+same archetype → newest deck of that archetype → none. `setActiveDeck()`
+remembers the deck per archetype server-side (best effort, never blocks the
+switch); `setActiveArchetype()` persists and re-resolves. `deckArchSlug` is now a
+derived value (`activeArchetypeId ?? ''`) — which also fixes the deck comparison
+showing "not set up" for accounts that never had the legacy key. Coach-only UI
+state: `coachTab` (`start · deck · coaching · opponents · tools`), `deckView`
+(`metaList · myLists`), `metaWindow` (shared meta window, default 30 days,
+online, Bo1).
+
 ### Component Tree (frontend)
 
 ```mermaid
@@ -254,9 +273,9 @@ stores coexist:
 | Decks, cards, logs, snapshots, meta | IndexedDB via Dexie (`TCGMetaDashboard`) | local-first store, still authoritative for parts of the app |
 | LLM API key | PostgreSQL (`user_ai_settings`, AES-256-GCM encrypted) | BYOK, server-side only — never localStorage |
 | Active archetype, last active deck per archetype | PostgreSQL (`user_preferences`) | Spec 7; follows the user across devices |
-| Active deck ID | localStorage (`tcg-active-deck-id-v3`) | UI preference |
+| Active deck ID | localStorage (`tcg-active-deck-id-v3`) + per archetype in `user_preferences` | UI preference; the server map is used by the coach layout |
 | Local meta archetypes | localStorage (`tcg-local-meta-v1`) | UI preference |
-| Deck archetype slug | localStorage (`tcg-deck-arch-slug-v1`) | UI preference |
+| Active archetype | PostgreSQL (`user_preferences`) | Spec 7; the old localStorage key `tcg-deck-arch-slug-v1` is migrated once and deleted |
 | Player name (battle-log parsing) | localStorage (`tcg-player-name`) | parser input |
 
 The typed client [api.ts](../apps/web/src/lib/api.ts) talks to `apps/api` with

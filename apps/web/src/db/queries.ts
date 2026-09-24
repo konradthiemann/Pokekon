@@ -440,3 +440,15 @@ export async function getSnapshotStatsForArchetype(
     ...stat,
   }));
 }
+
+// ─── User preferences (Spec 7 §5.1) ───────────────────────────────────────────
+
+export async function getUserPreferences(): Promise<api.UserPreferences> {
+  return api.getPreferences();
+}
+
+export async function saveUserPreferences(
+  patch: api.UserPreferencesPatch,
+): Promise<api.UserPreferences> {
+  return api.updatePreferences(patch);
+}
