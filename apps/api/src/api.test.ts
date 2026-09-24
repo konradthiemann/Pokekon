@@ -5746,6 +5746,50 @@ describe('POST /api/demo/seed -> GET /api/analysis/deck/:deckId (plan §3.11, Sc
     },
   );
 
+  it('seeds a Dragapult ex deck as the active archetype and its remembered deck (Spec 7 E9)', async () => {
+    const user = await freshAnonymousUser();
+    await seedAndGetDeckIds(user);
+
+    const rows = await db
+      .select({ id: schema.decks.id, archetype: schema.decks.archetype })
+      .from(schema.decks)
+      .where(eq(schema.decks.userId, user));
+    const dragapult = rows.find((r) => r.archetype === 'dragapult-ex');
+    expect(dragapult).toBeDefined();
+    // Deck A stays the first (lowest id) deck, i.e. the old layout's default.
+    expect(Math.min(...rows.map((r) => r.id))).toBe(
+      rows.find((r) => r.archetype === 'mega-kangaskhan-ex')!.id,
+    );
+
+    const cards = await db
+      .select({ count: schema.deckCards.count })
+      .from(schema.deckCards)
+      .where(eq(schema.deckCards.deckId, dragapult!.id));
+    expect(cards.reduce((sum, c) => sum + c.count, 0)).toBe(60);
+
+    const prefs = await request('/api/preferences', { user });
+    expect(await prefs.json()).toEqual({
+      activeArchetypeId: 'dragapult-ex',
+      activeDeckIdByArchetype: { 'dragapult-ex': dragapult!.id },
+    });
+  });
+
+  it('does not touch preferences on the idempotent second seed call', async () => {
+    const user = await freshAnonymousUser();
+    await seedAndGetDeckIds(user);
+    await request('/api/preferences', {
+      user,
+      method: 'PATCH',
+      body: { activeArchetypeId: 'n-zoroark' },
+    });
+    const again = await request('/api/demo/seed', { user, method: 'POST' });
+    expect(((await again.json()) as { seeded: boolean }).seeded).toBe(false);
+    const prefs = (await (await request('/api/preferences', { user })).json()) as {
+      activeArchetypeId: string;
+    };
+    expect(prefs.activeArchetypeId).toBe('n-zoroark');
+  });
+
   it('Deck B intentionally has no pre-baked synthesis (visible cold-start/button state)', async () => {
     const user = await freshAnonymousUser();
     const { deckBId } = await seedAndGetDeckIds(user);

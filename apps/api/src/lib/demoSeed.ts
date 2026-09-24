@@ -32,7 +32,7 @@ import {
   type SynthesisLanguage,
 } from '@pokekon/shared';
 import type { Db } from '../db/index.js';
-import { decks, deckCards, deckSnapshots, opponentLogs } from '../db/schema.js';
+import { decks, deckCards, deckSnapshots, opponentLogs, userPreferences } from '../db/schema.js';
 import type { SnapshotCard } from '../db/schema.js';
 import { saveDeckSynthesis } from './deckSynthesisStore.js';
 import { syncParsedLog } from './matchLogPipeline.js';
@@ -147,6 +147,35 @@ const DECK_B_CARDS: SeedCard[] = [
   { name: 'Basic Darkness Energy', count: 8, type: 'Energy', role: 'energy' },
   { name: 'Basic Fire Energy', count: 3, type: 'Energy', role: 'energy' },
   { name: 'Basic Lightning Energy', count: 2, type: 'Energy', role: 'energy' },
+];
+
+// Deck C (Dragapult ex) — the demo's ACTIVE archetype in the archetype-first UI
+// (Spec 7, decision E9). A plausible Dragapult/Dusknoir shell for display, not a
+// validated tournament list (the rules validator arrives with Spec 2). Exported
+// so the content test can assert 60 cards / ≤4 copies.
+export const DECK_C_CARDS: SeedCard[] = [
+  { name: 'Dreepy', count: 4, type: 'Pokemon', role: 'attacker' },
+  { name: 'Drakloak', count: 4, type: 'Pokemon', role: 'attacker' },
+  { name: 'Dragapult ex', count: 3, type: 'Pokemon', role: 'attacker' },
+  { name: 'Duskull', count: 2, type: 'Pokemon', role: 'tech' },
+  { name: 'Dusclops', count: 1, type: 'Pokemon', role: 'tech' },
+  { name: 'Dusknoir', count: 1, type: 'Pokemon', role: 'tech' },
+  { name: 'Fezandipiti ex', count: 1, type: 'Pokemon', role: 'tech' },
+  { name: 'Budew', count: 1, type: 'Pokemon', role: 'tech' },
+  { name: "Lillie's Determination", count: 4, type: 'Trainer', role: 'supporter' },
+  { name: "Boss's Orders", count: 3, type: 'Trainer', role: 'supporter' },
+  { name: "Professor's Research", count: 2, type: 'Trainer', role: 'supporter' },
+  { name: 'Crispin', count: 2, type: 'Trainer', role: 'supporter' },
+  { name: 'Buddy-Buddy Poffin', count: 4, type: 'Trainer', role: 'item' },
+  { name: 'Ultra Ball', count: 4, type: 'Trainer', role: 'item' },
+  { name: 'Rare Candy', count: 4, type: 'Trainer', role: 'item' },
+  { name: 'Poké Pad', count: 4, type: 'Trainer', role: 'item' },
+  { name: 'Night Stretcher', count: 2, type: 'Trainer', role: 'item' },
+  { name: 'Counter Catcher', count: 2, type: 'Trainer', role: 'item' },
+  { name: 'Switch', count: 2, type: 'Trainer', role: 'item' },
+  { name: 'Secret Box', count: 1, type: 'Trainer', role: 'item' },
+  { name: 'Basic Psychic Energy', count: 5, type: 'Energy', role: 'energy' },
+  { name: 'Basic Fire Energy', count: 4, type: 'Energy', role: 'energy' },
 ];
 
 function totalCount(cards: SeedCard[]): number {
@@ -790,6 +819,60 @@ const DECK_B_MATCHES: SeedMatch[] = [
   },
 ];
 
+// Deck C (Dragapult ex) — result-only, opponents disjoint from Deck A's
+// recommendation triggers (Dragapult ex / N's Zoroark). Exported for the
+// content test.
+export const DECK_C_MATCHES: SeedMatch[] = [
+  {
+    archetype: 'Gholdengo ex',
+    result: 'W',
+    eventType: 'Online',
+    daysAgo: 6,
+    snapshot: null,
+    notes: 'Früh Druck gemacht.',
+  },
+  {
+    archetype: 'Gholdengo ex',
+    result: 'L',
+    eventType: 'Online',
+    daysAgo: 5,
+    snapshot: null,
+    notes: 'Zu langsam aufgebaut.',
+  },
+  {
+    archetype: 'Raging Bolt ex',
+    result: 'L',
+    eventType: 'Online',
+    daysAgo: 4,
+    snapshot: null,
+    notes: 'Zweimal one-geshottet.',
+  },
+  {
+    archetype: 'Gardevoir ex',
+    result: 'W',
+    eventType: 'Online',
+    daysAgo: 3,
+    snapshot: null,
+    notes: 'Phantomschwarm auf die Bank lohnt sich.',
+  },
+  {
+    archetype: 'Charizard ex',
+    result: 'W',
+    eventType: 'Online',
+    daysAgo: 2,
+    snapshot: null,
+    notes: 'Knapp, Preiskarten-Rennen gewonnen.',
+  },
+  {
+    archetype: 'Raging Bolt ex',
+    result: 'W',
+    eventType: 'Online',
+    daysAgo: 1,
+    snapshot: null,
+    notes: 'Mit Budew das Tempo gebremst.',
+  },
+];
+
 // ─── Pre-baked deck synthesis (Deck A only, plan §3.11, Scheibe J) ──────────────
 // Fixed fact snapshot + hand-written claims per language, so the "Tipps"-section
 // shows real, evidence-grounded prose in the demo without spending an LLM token.
@@ -1043,6 +1126,21 @@ export async function seedDemoData(db: Db, userId: string): Promise<{ seeded: bo
       .returning({ id: decks.id }),
   );
 
+  // ── Deck C (Dragapult ex, created last so Deck A stays the old layout's
+  // default; it is the ACTIVE archetype of the archetype-first UI, Spec 7 E9) ──
+  const deckCId = takeId(
+    await db
+      .insert(decks)
+      .values({
+        userId,
+        archetype: 'dragapult-ex',
+        archetypeName: 'Dragapult ex',
+        variant: 'Dusknoir',
+        createdAt: daysAgoDate(7),
+      })
+      .returning({ id: decks.id }),
+  );
+
   // ── Deck cards (current lists) ──────────────────────────────────────────────
   await db.insert(deckCards).values(
     DECK_A_CARDS_V2.map((c) => ({
@@ -1057,6 +1155,17 @@ export async function seedDemoData(db: Db, userId: string): Promise<{ seeded: bo
   await db.insert(deckCards).values(
     DECK_B_CARDS.map((c) => ({
       deckId: deckBId,
+      userId,
+      name: c.name,
+      count: c.count,
+      type: c.type,
+      role: c.role,
+    })),
+  );
+
+  await db.insert(deckCards).values(
+    DECK_C_CARDS.map((c) => ({
+      deckId: deckCId,
       userId,
       name: c.name,
       count: c.count,
@@ -1106,6 +1215,7 @@ export async function seedDemoData(db: Db, userId: string): Promise<{ seeded: bo
   const allMatches: { deckId: number; match: SeedMatch }[] = [
     ...DECK_A_MATCHES.map((m) => ({ deckId: deckAId, match: m })),
     ...DECK_B_MATCHES.map((m) => ({ deckId: deckBId, match: m })),
+    ...DECK_C_MATCHES.map((m) => ({ deckId: deckCId, match: m })),
   ];
 
   for (const { deckId, match } of allMatches) {
@@ -1172,6 +1282,15 @@ export async function seedDemoData(db: Db, userId: string): Promise<{ seeded: bo
 
     await saveDeckSynthesis(db, userId, synthesis);
   }
+
+  // ── Archetype-first UI (Spec 7 §8, decision E9): Dragapult ex is the coached
+  // archetype and Deck C its remembered active list, so the demo never shows
+  // onboarding. ─────────────────────────────────────────────────────────────
+  await db.insert(userPreferences).values({
+    userId,
+    activeArchetypeId: 'dragapult-ex',
+    activeDeckIdByArchetype: { 'dragapult-ex': deckCId },
+  });
 
   return { seeded: true };
 }
