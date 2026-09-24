@@ -13,7 +13,8 @@
     "noResults": "Kein Archetyp gefunden.",
     "loading": "Meta wird geladen …",
     "unavailable": "Die Meta ist gerade nicht verfügbar – nutze die Suche.",
-    "share": "{{share}} %"
+    "share": "{{share}} %",
+    "failed": "Das hat nicht geklappt. Bitte versuch es noch einmal."
   },
   "list": {
     "heading": "Womit willst du starten?",

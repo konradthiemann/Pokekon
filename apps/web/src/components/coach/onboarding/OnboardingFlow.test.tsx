@@ -191,6 +191,27 @@ describe('OnboardingFlow (Spec 7 §5.1)', () => {
     expect(screen.queryByLabelText(/TCG Live name/)).toBeNull();
   });
 
+  it('shows an error and stays on step 1 when saving the archetype fails', async () => {
+    store.setActiveArchetype.mockRejectedValue(new Error('offline'));
+    render(<OnboardingFlow mode="firstRun" onDone={() => {}} />);
+    await chooseArchetype(/Deck 11/);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/did not work/i);
+    expect(screen.queryByRole('button', { name: /Take the meta list/ })).toBeNull();
+    expect(screen.getByRole('searchbox')).toBeInTheDocument();
+  });
+
+  it('ignores a second choice while the first one is still being saved', async () => {
+    let release: () => void = () => {};
+    store.setActiveArchetype.mockReturnValue(new Promise<void>((r) => (release = r)));
+    render(<OnboardingFlow mode="firstRun" onDone={() => {}} />);
+    await chooseArchetype(/Deck 11/);
+    await chooseArchetype(/Deck 10/);
+    expect(store.setActiveArchetype).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: /Deck 10/ })).toBeDisabled();
+    release();
+    expect(await screen.findByRole('button', { name: /Take the meta list/ })).toBeInTheDocument();
+  });
+
   it('uses real buttons that are at least 44 px tall', () => {
     render(<OnboardingFlow mode="firstRun" onDone={() => {}} />);
     for (const b of screen.getAllByRole('button')) {

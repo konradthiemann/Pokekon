@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ClipboardPaste, Clock, Search, Sparkles } from 'lucide-react';
 import type { TournamentDecklist } from '@pokekon/shared';
@@ -50,6 +50,9 @@ export function OnboardingFlow({
   const { decks, setActiveArchetype, createNewDeck, refresh, setCoachTab } = useDashboardStore();
   const [step, setStep] = useState<OnboardingStep>('archetype');
   const [chosen, setChosen] = useState<ArchetypeOption | null>(null);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false); // guards taps that land before the re-render
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const totalSteps = mode === 'firstRun' ? 3 : 2;
   const stepNumber = step === 'archetype' ? 1 : step === 'list' ? 2 : 3;
@@ -65,8 +68,20 @@ export function OnboardingFlow({
   }
 
   async function choose(option: ArchetypeOption) {
+    if (savingRef.current) return; // a double tap must not save two archetypes
+    savingRef.current = true;
+    setSaving(true);
+    setSaveFailed(false);
+    try {
+      await setActiveArchetype(option.slug);
+    } catch {
+      setSaveFailed(true);
+      return;
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
     setChosen(option);
-    await setActiveArchetype(option.slug);
     if (decks.some((d) => d.archetype === option.slug)) afterList();
     else setStep('list');
   }
@@ -96,7 +111,13 @@ export function OnboardingFlow({
 
       <div className="p-4">
         {step === 'archetype' && (
-          <ArchetypeStep language={i18n.language} decks={decks} onChoose={(o) => void choose(o)} />
+          <ArchetypeStep
+            language={i18n.language}
+            decks={decks}
+            disabled={saving}
+            failed={saveFailed}
+            onChoose={(o) => void choose(o)}
+          />
         )}
         {step === 'list' && chosen && (
           <ListStep
@@ -115,10 +136,14 @@ export function OnboardingFlow({
 function ArchetypeStep({
   language,
   decks,
+  disabled,
+  failed,
   onChoose,
 }: {
   language: string;
   decks: { archetype: string; archetypeName: string }[];
+  disabled: boolean;
+  failed: boolean;
   onChoose: (option: ArchetypeOption) => void;
 }) {
   const { t } = useTranslation('onboarding');
@@ -202,6 +227,12 @@ function ArchetypeStep({
         <p className="mt-2 text-sm text-slate-600">{t('archetype.noResults')}</p>
       )}
 
+      {failed && (
+        <p role="alert" className="mt-2 text-sm text-slate-900">
+          {t('archetype.failed')}
+        </p>
+      )}
+
       <ul
         aria-label={searching ? t('archetype.results') : t('archetype.mostPlayed')}
         className="mt-2 space-y-2"
@@ -216,6 +247,7 @@ function ArchetypeStep({
                   ? `${o.name}, ${t('archetype.share', { share: shareFormat.format(o.sharePct) })}`
                   : o.name
               }
+              disabled={disabled}
               onClick={() => onChoose(o)}
             >
               <PokemonIcon archetype={o.slug} icons={o.icons} size="sm" />

@@ -13,7 +13,8 @@
     "noResults": "No archetype found.",
     "loading": "Loading the meta …",
     "unavailable": "The meta is unavailable right now — use the search.",
-    "share": "{{share}} %"
+    "share": "{{share}} %",
+    "failed": "That did not work. Please try again."
   },
   "list": {
     "heading": "How do you want to start?",
