@@ -132,6 +132,19 @@ One row per match played. This is the primary personal-data table. Key fields:
 (`apps/api/src/lib/matchLogPipeline.ts`), closing a gap where the web client
 accepted-but-never-sent the field the server already validated.
 
+### `UserPreferences` (Spec 7 §5.1)
+```typescript
+interface UserPreferences {
+  activeArchetypeId: string | null;                 // Limitless slug; null → onboarding
+  activeDeckIdByArchetype: Record<string, number>;  // last active deck per archetype slug
+}
+```
+Server table `user_preferences` ([database.md](./database.md)), exposed as
+`GET`/`PATCH /api/preferences` (response shape = this type, `PreferencesResponse` in
+`apps/api/src/routes/preferences.ts`). The PATCH body is partial:
+`{ activeArchetypeId?: string | null; activeDeck?: { archetypeId: string; deckId: number | null } }`
+— at least one field, unknown keys rejected, `deckId: null` forgets that archetype's entry.
+
 ---
 
 ## Deck Performance Types

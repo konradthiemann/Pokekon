@@ -681,3 +681,18 @@ To track whether the meta is favoring a deck, we compare the **week-over-week fi
 ### The "popularity paradox" framing
 
 Decks in equilibrium are not necessarily popular, and popular decks are not necessarily in equilibrium. When a deck has high observed meta share but zero equilibrium weight (or a very low weight), that's the "popularity paradox"—played by many pilots despite being suboptimal to play against the current distribution. This is flagged with an icon and label pair (not color alone, for accessibility) in the equilibrium composition display, and the exclusion robustness for such a deck reinforces the statement: "in X% of scenarios, this deck drops out entirely."
+
+## 21. Active Archetype (server-side, Spec 7 — in progress behind `archetypeCoachUi`)
+
+**Route:** `GET`/`PATCH /api/preferences` (`apps/api/src/routes/preferences.ts`)
+
+Foundation of the archetype-first UI (`specs/archetype-first-ui.md`): the archetype the app
+coaches (`activeArchetypeId`, a Limitless slug) and, per archetype, the last active deck
+(`activeDeckIdByArchetype`) live in PostgreSQL (`user_preferences`), so the choice follows the
+user to a second device. `GET` returns defaults (`null`, `{}`) without a stored row. `PATCH` is
+partial (at least one of `activeArchetypeId` / `activeDeck`, unknown keys → 400, invalid slug →
+400); a remembered deck must belong to the user (404 otherwise, indistinguishable from a missing
+deck) and have exactly that archetype (400 otherwise); `deckId: null` forgets the entry. The new
+UI itself is gated by the client-side `archetypeCoachUi` flag ([architecture.md](./architecture.md)
+§Feature flags); with the flag off nothing visible changes.
+

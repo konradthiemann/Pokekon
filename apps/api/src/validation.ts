@@ -181,6 +181,24 @@ export const archetypeIdParamSchema = z
   .string()
   .regex(ARCHETYPE_SLUG_PATTERN, 'Expected a Limitless deck slug');
 
+/** PATCH /api/preferences (Spec 7 §5.1). At least one field; unknown keys rejected.
+ *  `activeDeck.deckId: null` forgets the remembered deck of that archetype. */
+export const preferencesPatchSchema = z
+  .object({
+    activeArchetypeId: archetypeIdParamSchema.nullable().optional(),
+    activeDeck: z
+      .object({
+        archetypeId: archetypeIdParamSchema,
+        deckId: z.number().int().positive().nullable(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .refine((b) => b.activeArchetypeId !== undefined || b.activeDeck !== undefined, {
+    message: 'Empty patch',
+  });
+
 /** Limitless tournament ids have no single well-known slug pattern like
  *  archetype ids do — a defensive, generic charset check (alnum/dash/
  *  underscore) is enough to reject obviously malformed input before it ever

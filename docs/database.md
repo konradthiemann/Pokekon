@@ -474,6 +474,28 @@ is only decrypted server-side for the analysis call — never returned to client
 | `encrypted_api_key` | text (nullable) | `v1:iv:tag:ciphertext`; null → no key configured |
 | `created_at` / `updated_at` | timestamptz | |
 
+### Table: `user_preferences` (migration `0018`, Spec 7 archetype-first UI)
+
+Per-user app preferences, server-side so the chosen archetype follows the user
+to every device (`specs/archetype-first-ui.md` §5.1, AC 3). Read/written only via
+`GET`/`PATCH /api/preferences` (`apps/api/src/routes/preferences.ts`), always
+scoped to the session user. No row = defaults (`null`, `{}`).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `user_id` | text PK FK → `user.id` | one row per user, `onDelete: cascade` |
+| `active_archetype_id` | text (nullable) | Limitless deck slug of the coached archetype; null → onboarding |
+| `active_deck_id_by_archetype` | jsonb, default `{}` | `{ [archetypeSlug]: deckId }` — last active deck per archetype. On write the deck must belong to the user (404 otherwise) and have exactly that archetype (400 otherwise); size is thus bounded by the user's own decks |
+| `created_at` / `updated_at` | timestamptz | |
+
+`PATCH` writes only the fields it carries and merges the map **in SQL** within one
+`INSERT … ON CONFLICT DO UPDATE` (`||` to add, `- key` to remove), so concurrent PATCHes
+from two tabs/devices never drop each other's entries (security review finding, covered
+by tests). A remembered deck that is deleted later stays in the map until overwritten;
+clients treat an unknown id as "no remembered deck".
+
+Purely additive (new table) — safe to apply before the code deploy.
+
 ### Table: `deck_synthesis` (migration `0015`, Spec 8 KI-Synthese)
 
 Pre-computed deck synthesis — cached LLM-generated text over aggregated facts (Field-Score, matchups, card deltas, equilibrium signals). Cache key is a hash of the canonical facts list plus language and prompt version; when data changes, old text persists as historical snapshot.

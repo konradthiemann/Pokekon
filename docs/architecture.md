@@ -78,7 +78,7 @@ flowchart TD
     subgraph Server["Railway — apps/api (Hono)"]
         Health["/health (DB-free)"]
         AuthH["/api/auth/* (Better Auth)"]
-        ApiRoutes["/api/decks · /api/snapshots · /api/logs<br/>/api/analytics · /api/analysis<br/>/api/meta · /api/demo (session-guarded)"]
+        ApiRoutes["/api/decks · /api/snapshots · /api/logs<br/>/api/analytics · /api/analysis<br/>/api/meta · /api/demo · /api/preferences<br/>(session-guarded)"]
         AiLayer["ai/ provider abstraction<br/>(GitHub Models adapter)"]
         Static["Static serving of built SPA<br/>(single-origin)"]
         Drizzle["Drizzle ORM"]
@@ -132,7 +132,8 @@ Registration order matters:
 4. **Guarded `/api` sub-app** — a `sessionMiddleware` runs first, then `db` is
    injected into the context, then the domain routes mount:
    `/api/decks`, `/api/snapshots`, `/api/logs`, `/api/analytics`, `/api/analysis`,
-   `/api/meta` (server meta snapshots), `/api/demo` (guest/demo mode).
+   `/api/meta` (server meta snapshots), `/api/demo` (guest/demo mode),
+   `/api/preferences` (per-user app preferences: active archetype, last active deck per archetype).
 
 **Battle-log pipeline & analytics** — `POST /api/logs` parses the log server-side
 once on write into `match_log_parsed` (plan §4); `GET /api/analytics/deck/:id?weeks=`
@@ -252,6 +253,7 @@ stores coexist:
 | Parsed logs, meta snapshots, AI settings | PostgreSQL (`match_log_parsed`, `meta_snapshots`, `user_ai_settings`) | server-side; see [database.md](./database.md) |
 | Decks, cards, logs, snapshots, meta | IndexedDB via Dexie (`TCGMetaDashboard`) | local-first store, still authoritative for parts of the app |
 | LLM API key | PostgreSQL (`user_ai_settings`, AES-256-GCM encrypted) | BYOK, server-side only — never localStorage |
+| Active archetype, last active deck per archetype | PostgreSQL (`user_preferences`) | Spec 7; follows the user across devices |
 | Active deck ID | localStorage (`tcg-active-deck-id-v3`) | UI preference |
 | Local meta archetypes | localStorage (`tcg-local-meta-v1`) | UI preference |
 | Deck archetype slug | localStorage (`tcg-deck-arch-slug-v1`) | UI preference |

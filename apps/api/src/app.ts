@@ -11,6 +11,7 @@ import { createDemoRoutes } from './routes/demo.js';
 import { createLogsRoutes } from './routes/logs.js';
 import { createMatchupsRoutes } from './routes/matchups.js';
 import { createMetaRoutes } from './routes/meta.js';
+import { createPreferencesRoutes } from './routes/preferences.js';
 import { createSnapshotsRoutes } from './routes/snapshots.js';
 
 /** Injection points for tests: a pre-built database and/or session resolver. */
@@ -59,6 +60,7 @@ export function createApp(deps: AppDeps = {}): Hono {
   api.route('/meta', createMetaRoutes());
   api.route('/matchups', createMatchupsRoutes());
   api.route('/demo', createDemoRoutes());
+  api.route('/preferences', createPreferencesRoutes());
   app.route('/api', api);
 
   return app;
