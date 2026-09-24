@@ -175,6 +175,19 @@ initially-collapsed section at the end of Analytics (`OpponentLog` with
 `chrome="bare"`, nested in a `CollapsibleSection`) — demoting the area, not the
 logging action.
 
+### Feature flags
+
+`apps/web/src/lib/featureFlags.ts` — client-side runtime flags. Currently one flag,
+`archetypeCoachUi`, gating the archetype-first UI of `specs/archetype-first-ui.md`
+(Spec 7 Scheibe 1–2). Resolution order: `?ff=archetypeCoachUi` in the URL (turns
+it on and remembers it in localStorage `pokekon-ff-archetypeCoachUi`) or
+`?ff=-archetypeCoachUi` (turns it off and forgets it) > localStorage >
+build-time `VITE_FF_ARCHETYPE_COACH_UI` (exactly `"true"`) > off. Evaluated once per
+page load via `isArchetypeCoachUiEnabled()`. Web and API ship as one Railway
+service, so the per-browser override lets the new UI be tried in production
+without switching it on for everyone. A pure UI switch, not a security boundary —
+the API remains the authority for all data.
+
 ### State Management Pattern
 
 A single Zustand store (`useDashboardStore`) owns the data arrays
