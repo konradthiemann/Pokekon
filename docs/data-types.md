@@ -1018,7 +1018,8 @@ as `clusterPlacement`) with `neutralValue: 50`, `value: blend.blendedPct`.
 
 Wired into `buildArchetypeSynthesisFactSet` (`apps/api/src/lib/archetypeSynthesisFacts.ts`): when
 `scope === 'local'` **and** the caller passes both `usePersonalPrior: true` and a `personalRecord`,
-the top-ranked cluster's Wilson-conservative `winRateLowerBoundPct` (not the raw mean, consistent
+the Wilson-conservative `winRateLowerBoundPct` of the cluster shown first (after local-field
+re-ranking, if any — Spec 1 §3.4) (not the raw mean, consistent
 with Slice B) is blended via `blendWithPersonalPrior` and the resulting fact is appended. For
 `scope === 'global'`, `usePersonalPrior`/`personalRecord` are silently ignored — no validation
 error, simply no effect (deliberately simple, not over-engineered).

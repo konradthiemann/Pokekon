@@ -85,9 +85,10 @@ export interface ArchetypeSynthesisFactSet {
  *  that actually supplies a field).
  *
  *  Spec 10 Slice E personalisation: when `scope === 'local'` and both
- *  `usePersonalPrior` and `personalRecord` are given, the top-ranked
- *  cluster's Wilson-conservative `winRateLowerBoundPct` (not the raw mean —
- *  consistent with Slice B's guiding principle) is blended with the user's
+ *  `usePersonalPrior` and `personalRecord` are given, the Wilson-conservative
+ *  `winRateLowerBoundPct` (not the raw mean — consistent with Slice B's
+ *  guiding principle) of the cluster shown FIRST (i.e. after optional
+ *  local-field re-ranking, Spec 1 §3.4) is blended with the user's
  *  own record via `blendWithPersonalPrior`, producing at most one extra
  *  'personalPrior' fact (see factsFromPersonalPriorBlend). For
  *  `scope === 'global'`, `usePersonalPrior`/`personalRecord` are silently
@@ -153,7 +154,9 @@ export async function buildArchetypeSynthesisFactSet(
   }
   const facts = factsFromClusterRanking(finalClusters);
 
-  const topCluster = rankedClusters[0];
+  // The prior refers to the cluster the user actually sees first, i.e. after
+  // optional field re-ranking (Spec 1 §3.4).
+  const topCluster = finalClusters[0];
   if (scope === 'local' && input.usePersonalPrior && input.personalRecord && topCluster) {
     const blend = blendWithPersonalPrior(topCluster.winRateLowerBoundPct, input.personalRecord);
     facts.push(...factsFromPersonalPriorBlend(archetypeName, blend));

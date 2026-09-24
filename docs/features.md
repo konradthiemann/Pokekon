@@ -603,7 +603,8 @@ online-Bo1 window (same scope as every other meta read), and `players >= DEFAULT
 `personalTies` query params on GET, a `personalRecord: { wins, losses, ties }` object on POST).
 Only takes effect for `scope: 'local'` — on `scope: 'global'` it is silently ignored (no
 validation error). When active and the record has at least `DEFAULT_MIN_OWN_GAMES` (5) games, the
-top-ranked cluster's win rate is blended with the personal record
+win rate of the cluster shown first (after local-field re-ranking, if any) is blended with the
+personal record
 (`blendWithPersonalPrior`/`personalPriorBlend.ts`) and surfaces as one extra `personalPrior` fact
 that the LLM prompt can reference — a below-threshold record contributes nothing (no silent
 substitute for the global facts). GET accepts the same fields as POST so `currentInputHash` stays
