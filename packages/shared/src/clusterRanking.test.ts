@@ -115,3 +115,55 @@ describe('rankClusters', () => {
     expect(empty.rank).toBe(2); // ranks below the cluster with actual games
   });
 });
+
+describe('rankClusters tie-breaks (Spec 1 §3.3, AC 4)', () => {
+  // Same W/L/T everywhere ⇒ bit-identical winRateLowerBoundPct, so only the
+  // tie-break chain decides. Inputs are deliberately in the WRONG order.
+  const tied = (overrides: Partial<DecklistCluster>) =>
+    cluster({ totalWins: 10, totalLosses: 5, ...overrides });
+  const order = (clusters: DecklistCluster[]) =>
+    rankClusters(clusters).map((c) => c.memberStandingIds);
+
+  it('breaks a lower-bound tie by avgPlacementPercentile desc, null last', () => {
+    const ranked = rankClusters([
+      tied({ memberStandingIds: [1], placements: [] }),
+      tied({ memberStandingIds: [2], placements: [{ placing: 51, totalPlayers: 101 }] }),
+      tied({ memberStandingIds: [3], placements: [{ placing: 1, totalPlayers: 101 }] }),
+    ]);
+    expect(ranked.map((c) => c.memberStandingIds)).toEqual([[3], [2], [1]]);
+    expect(ranked.map((c) => c.rank)).toEqual([1, 2, 3]);
+  });
+
+  it('then by member count desc', () => {
+    expect(order([tied({ memberStandingIds: [1] }), tied({ memberStandingIds: [5, 6] })])).toEqual([
+      [5, 6],
+      [1],
+    ]);
+  });
+
+  it('then by smallest member id asc', () => {
+    expect(order([tied({ memberStandingIds: [9] }), tied({ memberStandingIds: [4] })])).toEqual([
+      [4],
+      [9],
+    ]);
+  });
+
+  it('produces the same ranking for every permutation of tied clusters', () => {
+    const clusters = [
+      tied({ memberStandingIds: [8] }),
+      tied({ memberStandingIds: [2] }),
+      tied({ memberStandingIds: [5, 7] }),
+      tied({ memberStandingIds: [6], placements: [{ placing: 3, totalPlayers: 40 }] }),
+    ];
+    const expected = [[6], [5, 7], [2], [8]];
+    const permute = (xs: DecklistCluster[]): DecklistCluster[][] =>
+      xs.length <= 1
+        ? [xs]
+        : xs.flatMap((x, i) =>
+            permute([...xs.slice(0, i), ...xs.slice(i + 1)]).map((rest) => [x, ...rest]),
+          );
+    const perms = permute(clusters);
+    expect(perms).toHaveLength(24);
+    for (const p of perms) expect(order(p)).toEqual(expected);
+  });
+});

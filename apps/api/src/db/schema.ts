@@ -160,6 +160,9 @@ export interface SnapshotCard {
   role: CardRole;
   /** Optional link to the client-side card catalogue (0 = quick-text entry). */
   cardId?: number | undefined;
+  /** PTCGL print, see deck_cards.set/number. */
+  set?: string | null | undefined;
+  number?: string | null | undefined;
 }
 
 export const decks = pgTable(
@@ -191,6 +194,11 @@ export const deckCards = pgTable(
     count: integer('count').notNull(),
     type: text('type', { enum: cardTypeValues }).notNull(),
     role: text('role', { enum: cardRoleValues }).notNull(),
+    // PTCGL print (set code + collector number), kept from the deck import so
+    // the list can be exported back to PTCGL (packages/shared/src/deckExport.ts).
+    // Nullable: cards added by name only, and rows written before this column.
+    set: text('set_code'),
+    number: text('set_number'),
   },
   (table) => [
     index('deck_cards_deckId_idx').on(table.deckId),

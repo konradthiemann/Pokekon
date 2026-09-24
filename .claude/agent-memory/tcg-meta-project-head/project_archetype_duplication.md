@@ -12,4 +12,4 @@ The lists are not subsets of each other — archetypes available at deck-creatio
 
 **Why:** This was likely an oversight — AddLogModal was written earlier with a smaller meta, CreateDeckModal added more archetypes later without updating AddLogModal.
 
-**How to apply:** Any time either modal is touched, check the other. The fix is a shared `src/constants/archetypes.ts` module. Refactor plan at: `/Users/konrad.thiemann/tcg/tcg-dashboard/docs/refactor-plans/deck-and-log-flow-overhaul.md` (P2-1).
+**How to apply:** Any time either modal is touched, check the other. The fix is a shared `src/constants/archetypes.ts` module. Refactor plan at: `./tcg-dashboard/docs/refactor-plans/deck-and-log-flow-overhaul.md` (P2-1).

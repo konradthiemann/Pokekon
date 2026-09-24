@@ -14,11 +14,14 @@ npm-Workspace-Monorepo:
 
 | App | Stack | Rolle |
 |-----|-------|-------|
-| `apps/web` | React 19 + Vite + Zustand + Dexie (IndexedDB) | local-first Frontend, hält heute noch die meiste Analyse-Logik |
-| `apps/api` | Hono + Drizzle ORM + PostgreSQL + better-auth | läuft auf Railway; wandert von „nur CRUD/Auth" zu Analytics-Backend |
+| `apps/web` | React 19 + Vite + Zustand | Frontend; Daten kommen über die API (`apps/web/src/lib/api.ts`), Dexie (IndexedDB) nur noch für den einmaligen Legacy-Import |
+| `apps/api` | Hono + Drizzle ORM + PostgreSQL + better-auth | läuft auf Railway; Auth, Daten, Meta-Sync, Statistik-Jobs, KI-Analyse |
+| `packages/shared` | TypeScript | reine Logik, von API und Web geteilt (Parser, Statistik, Clustering, Optimierung, Export) |
 | `apps/docs` *(geplant)* | Astro Starlight → GitHub Pages | lebende Dokumentation |
 
 Die Richtung steht in [`docs/backend-evolution-plan.md`](./docs/backend-evolution-plan.md). **Lies diesen Plan, bevor du Architektur-relevante Arbeit beginnst.**
+
+**Aktuelle Produktrichtung (ab 2026-09-23):** Pokekon wird zum Coach für einen gewählten Archetyp. Rahmen, Reihenfolge und Agenten-Leitfaden: [`specs/archetype-coach-vision.md`](./specs/archetype-coach-vision.md). Einzel-Specs liegen daneben in `specs/`.
 
 ---
 
@@ -29,7 +32,7 @@ Die Richtung steht in [`docs/backend-evolution-plan.md`](./docs/backend-evolutio
 3. **Secrets gehören serverseitig.** `DATABASE_URL`, Auth-Secrets und `ENCRYPTION_KEY` (verschlüsselt die per-User-LLM-Keys) sind Railway-Variablen — niemals im Browser-Bundle, niemals im Git. Die früher browser-seitige `analyzeBattleLog`-Analyse läuft inzwischen serverseitig (`POST /api/analysis/log`, provider-agnostisch, per-User-BYOK-Key AES-256-GCM-verschlüsselt at rest, Plan Abschnitt 6.3).
 4. **Eine Quelle der Wahrheit.** Die Migration IndexedDB → API ist im Gange. Keine neue Datendoppelung einführen; bei Konflikt die im Plan beschlossene Zielrichtung wählen.
 5. **Tests & Lint grün = „fertig".** Eine Aufgabe gilt erst als erledigt, wenn `npm run typecheck`, `npm run lint` und `npm run test` durchlaufen. Teilimplementierungen werden als solche markiert.
-6. **Anti-Halluzination bei KI-Analyse beibehalten.** Jede LLM-Aussage über ein Spiel braucht einen wörtlichen Evidence-Quote aus dem Log; `temperature=0`; keine Karten vorschlagen, die nicht im Log sichtbar waren. Diese Maßnahmen leben in der geteilten Engine (`@pokekon/shared`, serverseitig aufgerufen über `apps/api/src/ai/`) und dürfen nicht aufgeweicht werden.
+6. **Anti-Halluzination bei KI-Analyse beibehalten.** Jede LLM-Aussage über ein Spiel braucht einen wörtlichen Evidence-Quote aus dem Log; `temperature=0`; keine Karten vorschlagen, die nicht im Log sichtbar waren. Diese Maßnahmen leben in der geteilten Engine (`@pokekon/shared`, serverseitig aufgerufen über `apps/api/src/ai/`) und dürfen nicht aufgeweicht werden. **Abgrenzung:** Der LLM-Ideengeber im Lab-Modus (`specs/lab-mode.md` §6) ist ein eigener, getrennter Prompt-Pfad mit eigenem Validierungsvertrag (nur Katalog-Karten, Regel-Validator, als Hypothese markiert). Er ist kein Schlupfloch für die Battle-Log-Analyse; dort gilt diese Regel unverändert.
 7. **Doku folgt dem Code.** Strukturändernde Arbeit aktualisiert die betroffene Doku in `docs/` im selben Zug. Veraltete Doku ist schlechter als keine. Diese Regel wird durch `.claude/hooks/docs-gate.sh` technisch durchgesetzt (siehe Abschnitt 4: Docs-Gate).
 
 ---

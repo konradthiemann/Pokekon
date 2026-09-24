@@ -270,6 +270,24 @@ was added for this (the `parser_version` mechanism above exists and would make o
 possible, but it is deliberately out of scope here — a genuine re-parse would need
 a stored, verified `playerName` per historical row, which most rows never had).
 
+### Table: `deck_cards` (server) — PTCGL print columns
+
+Mirrors the client `deckCards` table above, plus two nullable columns (migration
+`0017_deck_card_print`) that keep the print a card was imported with, so the
+list can be copied back into Pokémon TCG Live (`exportDeckList`,
+`packages/shared/src/deckExport.ts`):
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `set_code` | text (nullable) | PTCGL set code: `JTG`, `SV3PT5`, promo `PR-SV`, or PTCGL's pseudo set `Energy`. Validated in `apps/api/src/validation.ts` (`deckCardSchema`) |
+| `set_number` | text (nullable) | Collector number (`97`, `TG05`, …) |
+
+`null` means the card was added by name only (quick-add) or predates the
+column. Every client-side card edit is a read–modify–replace of the whole list
+(`apps/web/src/db/queries.ts`), so the client wire mapping (`toWireCard` in
+`apps/web/src/lib/api.ts`) must forward both fields — otherwise an edit would
+erase them. Snapshot `cards` jsonb entries carry the same two optional fields.
+
 ### Table: `meta_snapshots` (server)
 
 The server-side counterpart of the IndexedDB `metaSnapshots` table — **global**

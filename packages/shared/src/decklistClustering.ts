@@ -3,7 +3,7 @@
 // single tech swap, an energy count) are the SAME list for ranking purposes —
 // without this, they count as two independent, weaker data points instead of
 // one stronger one. Pure functions, no I/O, same shape as fieldWinRate.ts.
-import { normalizeCardName } from './cardPerformance.js';
+import { normalizeCardName, placementPercentile } from './cardPerformance.js';
 import type { TournamentDecklist } from './meta.js';
 import type { StandingMatchResult } from './matchupPairings.js';
 
@@ -45,9 +45,10 @@ export function computeDecklistOverlap(
   a: TournamentDecklist,
   b: TournamentDecklist,
 ): DecklistOverlap {
-  const mapA = cardCountMap(a);
-  const mapB = cardCountMap(b);
+  return overlapFromCounts(cardCountMap(a), cardCountMap(b));
+}
 
+function overlapFromCounts(mapA: Map<string, number>, mapB: Map<string, number>): DecklistOverlap {
   let identicalCards = 0;
   for (const [card, countA] of mapA) {
     identicalCards += Math.min(countA, mapB.get(card) ?? 0);
@@ -79,9 +80,9 @@ export interface ClusterableStanding {
 }
 
 export interface DecklistCluster {
-  /** The first standing's decklist encountered for this cluster — a
-   *  reasonable "canonical" list to show the user, since every member is by
-   *  definition within `minOverlapRatio` of it. */
+  /** The cluster's medoid (Spec 1 §3.2): the member list with the largest
+   *  summed `identicalCards` to all other members, i.e. the most typical list.
+   *  Ties → higher placementPercentile (missing last), then smaller id. */
   representative: TournamentDecklist;
   memberStandingIds: number[];
   totalWins: number;
@@ -98,26 +99,107 @@ export interface DecklistCluster {
   matchResults: StandingMatchResult[];
 }
 
+function standingPlacementPercentile(s: ClusterableStanding): number | null {
+  return s.totalPlayers == null ? null : placementPercentile(s.placing, s.totalPlayers);
+}
+
+/** Canonical processing order (Spec 1 §3.1): best placement percentile first
+ *  (standings without a usable placement last), then wins − losses desc, then
+ *  id asc. Makes clustering independent of the order the DB returns rows in. */
+function compareCanonical(a: ClusterableStanding, b: ClusterableStanding): number {
+  const pa = standingPlacementPercentile(a);
+  const pb = standingPlacementPercentile(b);
+  if (pa !== pb) {
+    if (pa == null) return 1;
+    if (pb == null) return -1;
+    return pb - pa;
+  }
+  const recordDiff = b.wins - b.losses - (a.wins - a.losses);
+  if (recordDiff !== 0) return recordDiff;
+  return a.id - b.id;
+}
+
+// Module-internal working state — `seed`/`members` never leave this module
+// (Spec 1 §6.1: the seed stays internal and must not reach the API response).
+interface ClusterMember {
+  id: number;
+  decklist: TournamentDecklist;
+  counts: Map<string, number>;
+  placementPercentile: number | null;
+}
+
+interface WorkingCluster extends Omit<DecklistCluster, 'representative'> {
+  /** Founding member; membership is ALWAYS checked against it, never against
+   *  the medoid, so the partition stays exactly the greedy one. */
+  seed: ClusterMember;
+  members: ClusterMember[];
+}
+
+function isBetterMedoidCandidate(a: ClusterMember, b: ClusterMember): boolean {
+  const pa = a.placementPercentile;
+  const pb = b.placementPercentile;
+  if (pa !== pb) {
+    if (pa == null) return false;
+    if (pb == null) return true;
+    return pa > pb;
+  }
+  return a.id < b.id;
+}
+
+/** O(m²) over the cluster's members, with card maps precomputed once each. */
+function selectMedoid(members: ClusterMember[]): TournamentDecklist {
+  const sums = new Array<number>(members.length).fill(0);
+  for (let i = 0; i < members.length; i++) {
+    for (let j = i + 1; j < members.length; j++) {
+      const shared = overlapFromCounts(members[i]!.counts, members[j]!.counts).identicalCards;
+      sums[i]! += shared;
+      sums[j]! += shared;
+    }
+  }
+  let best = 0;
+  for (let i = 1; i < members.length; i++) {
+    if (
+      sums[i]! > sums[best]! ||
+      (sums[i] === sums[best] && isBetterMedoidCandidate(members[i]!, members[best]!))
+    ) {
+      best = i;
+    }
+  }
+  return members[best]!.decklist;
+}
+
 /**
  * Greedy single-pass clustering: each standing joins the first existing
- * cluster whose representative overlaps it by at least `minOverlapRatio`, or
+ * cluster whose seed (founding member) overlaps it by at least `minOverlapRatio`, or
  * starts a new cluster. This is a heuristic, not an optimal/exhaustive
  * pairwise clustering — acceptable here because clusters only ever need to
  * be "close enough to pool as one data point", not perfectly partitioned,
  * and the greedy pass is O(n * clusters) instead of O(n^2) list comparisons.
  * A cluster with a single member is kept as-is (never forced into another
  * cluster) — see spec "Nadel im Heuhaufen" requirement.
+ *
+ * Standings are processed in a canonical order (see `compareCanonical`), not
+ * in caller order, so the same input set always yields the same clusters.
+ * After the pass each cluster's `representative` is set to its medoid
+ * (O(m²) per cluster of m members).
  */
 export function clusterDecklists(
   standings: ClusterableStanding[],
   opts: { minOverlapRatio?: number } = {},
 ): DecklistCluster[] {
   const minOverlapRatio = opts.minOverlapRatio ?? DEFAULT_MIN_OVERLAP_RATIO;
-  const clusters: DecklistCluster[] = [];
+  const clusters: WorkingCluster[] = [];
+  const ordered = [...standings].sort(compareCanonical);
 
-  for (const s of standings) {
+  for (const s of ordered) {
+    const member: ClusterMember = {
+      id: s.id,
+      decklist: s.decklist,
+      counts: cardCountMap(s.decklist),
+      placementPercentile: standingPlacementPercentile(s),
+    };
     const match = clusters.find(
-      (c) => computeDecklistOverlap(c.representative, s.decklist).overlapRatio >= minOverlapRatio,
+      (c) => overlapFromCounts(c.seed.counts, member.counts).overlapRatio >= minOverlapRatio,
     );
     const placement =
       s.placing != null && s.totalPlayers != null
@@ -125,6 +207,7 @@ export function clusterDecklists(
         : [];
 
     if (match) {
+      match.members.push(member);
       match.memberStandingIds.push(s.id);
       match.totalWins += s.wins;
       match.totalLosses += s.losses;
@@ -133,7 +216,8 @@ export function clusterDecklists(
       match.matchResults.push(...s.matchResults);
     } else {
       clusters.push({
-        representative: s.decklist,
+        seed: member,
+        members: [member],
         memberStandingIds: [s.id],
         totalWins: s.wins,
         totalLosses: s.losses,
@@ -144,5 +228,8 @@ export function clusterDecklists(
     }
   }
 
-  return clusters;
+  return clusters.map(({ seed: _seed, members, ...rest }) => ({
+    representative: selectMedoid(members),
+    ...rest,
+  }));
 }

@@ -796,8 +796,9 @@ The output language for synthesis. Separate from the API's locale system; a user
 Two published tournament decklists that differ by only a tech swap or an energy count are the
 same list for ranking purposes — without merging them, they count as two independent, weaker
 data points instead of one stronger one. Pure functions, no I/O (same shape as
-`fieldWinRate.ts`). Not yet wired into any route or UI — this is the building block Slice B
-(ranking) and Slice C (best-list recommendation) compose on top of.
+`fieldWinRate.ts`). Composed with Slice B (ranking) in `buildArchetypeSynthesisFactSet`
+(`apps/api/src/lib/archetypeSynthesisFacts.ts`, archetype recommendation) and in the
+per-tournament best-list route (`GET /api/analysis/tournament/:tid/archetype/:aid`).
 
 ### `DecklistOverlap`
 ```typescript
@@ -823,7 +824,7 @@ interface ClusterableStanding {
 }
 
 interface DecklistCluster {
-  representative: TournamentDecklist;  // first member's list encountered
+  representative: TournamentDecklist;  // medoid of the cluster (Spec 1 §3.2)
   memberStandingIds: number[];
   totalWins: number; totalLosses: number; totalTies: number;
   placements: { placing: number; totalPlayers: number }[];  // only members with BOTH values
@@ -831,8 +832,12 @@ interface DecklistCluster {
 }
 ```
 
-`clusterDecklists(standings, opts?)` greedily merges each standing into the first existing
-cluster whose representative overlaps it by at least `opts.minOverlapRatio` (default
+`clusterDecklists(standings, opts?)` first sorts its input into a **canonical order** (Spec 1
+§3.1, `specs/archetype-list-foundation.md`): best `placementPercentile(placing, totalPlayers)`
+first (standings without a usable placement last), then `wins − losses` desc, then `id` asc.
+The result therefore never depends on the order the caller (or PostgreSQL) returns rows in; the
+input array is not mutated. It then greedily merges each standing into the first existing
+cluster whose seed (founding member) overlaps it by at least `opts.minOverlapRatio` (default
 `DEFAULT_MIN_OVERLAP_RATIO = 55/60 ≈ 91.7 %`), or starts a new cluster. A cluster with a single
 member is kept as its own cluster, never forced into another — protects rare-but-strong lists
 ("Nadel im Heuhaufen") from being diluted away by clustering. This is a greedy heuristic
@@ -842,13 +847,23 @@ Slice D) is carried through/concatenated the same way `totalWins` etc. are accum
 un-aggregated per-game records; `clusterFieldScore.ts` (below) is what turns them into a
 per-opponent breakdown.
 
+**Representative = medoid (Spec 1 §3.2).** Membership is always checked against the cluster's
+founding member (the *seed*, first in canonical order), never against the current
+representative, so the partition is exactly the greedy one. After the pass, `representative` is
+set to the **medoid**: the member list with the largest summed `identicalCards` to all other
+members, i.e. the most typical list rather than whichever one happened to come first. Ties go to
+the higher `placementPercentile` (missing last), then the smaller standing id. `seed` and the
+member lists are module-internal and never part of `DecklistCluster` or any API response. Cost:
+greedy pass O(n·clusters) plus O(m²) overlap comparisons per cluster of m members, with each
+member's card-count map built once.
+
 ### `RankedCluster`
 ```typescript
 interface RankedCluster extends DecklistCluster {
   winRateLowerBoundPct: number;         // PRIMARY ranking signal
   winRateInterval: WilsonInterval | null; // null only when the cluster has 0 recorded games
   avgPlacementPercentile: number | null;  // SECONDARY/display signal, never a multiplier
-  rank: number;                           // 1-based, descending winRateLowerBoundPct
+  rank: number;                           // 1-based, descending winRateLowerBoundPct (+ tie-breaks)
   fieldScore?: FieldScore | null;         // Slice D, only set when re-ranked against a localField
 }
 ```
@@ -861,7 +876,10 @@ than the raw rate: this is what stops a lucky 3-game 100 %-sample from outrankin
 `placementPercentile()` across the cluster's member standings is carried as a secondary,
 display-only signal — it can show "this list won the event" even when the win-rate sample is
 too thin to rank it highly, but it never multiplies into the primary rank (that would let a
-single lucky top-8 with few games dominate, exactly the bias Spec 10 asks to avoid).
+single lucky top-8 with few games dominate, exactly the bias Spec 10 asks to avoid). Ties on the
+lower bound are broken deterministically (Spec 1 §3.3): higher `avgPlacementPercentile` first
+(`null` last), then more member standings, then the smallest member standing id, so the ranking
+never depends on input order.
 `rankClusters()` itself never touches `fieldScore` — that field is filled in by a separate
 re-ranking step (`clusterFieldScore.ts`, below), only for `scope: 'local'` with a chosen field.
 
@@ -1001,7 +1019,8 @@ as `clusterPlacement`) with `neutralValue: 50`, `value: blend.blendedPct`.
 
 Wired into `buildArchetypeSynthesisFactSet` (`apps/api/src/lib/archetypeSynthesisFacts.ts`): when
 `scope === 'local'` **and** the caller passes both `usePersonalPrior: true` and a `personalRecord`,
-the top-ranked cluster's Wilson-conservative `winRateLowerBoundPct` (not the raw mean, consistent
+the Wilson-conservative `winRateLowerBoundPct` of the cluster shown first (after local-field
+re-ranking, if any — Spec 1 §3.4) (not the raw mean, consistent
 with Slice B) is blended via `blendWithPersonalPrior` and the resulting fact is appended. For
 `scope === 'global'`, `usePersonalPrior`/`personalRecord` are silently ignored — no validation
 error, simply no effect (deliberately simple, not over-engineered).

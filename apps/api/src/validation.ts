@@ -30,11 +30,25 @@ export const deckPatchSchema = z
 
 // ─── Deck cards ───────────────────────────────────────────────────────────────
 
+/** PTCGL set code ("JTG", "SV3PT5", "PR-SV") or its pseudo set "Energy". */
+const setCodeSchema = z
+  .string()
+  .max(12)
+  .regex(/^(?:[A-Z]{2,5}[A-Z0-9]*(?:-[A-Z0-9]+)?|Energy)$/);
+/** Collector number ("97", "TG05", "GG44", "SWSH001"). */
+const setNumberSchema = z
+  .string()
+  .max(12)
+  .regex(/^[A-Za-z0-9]{1,12}$/);
+
 export const deckCardSchema = z.object({
   name: z.string().min(1),
   count: z.number().int().min(1).max(60),
   type: z.enum(cardTypeValues),
   role: z.enum(cardRoleValues),
+  // Optional PTCGL print; absent and null both mean "added by name only".
+  set: setCodeSchema.nullish(),
+  number: setNumberSchema.nullish(),
 });
 
 /** PUT /api/decks/:id/cards — the full card list, replaced atomically. */

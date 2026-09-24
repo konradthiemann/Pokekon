@@ -10,6 +10,7 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { and, eq } from 'drizzle-orm';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  blendWithPersonalPrior,
   buildPayoffMatrix,
   canonicalizeFacts,
   computeArchetypeCardStats,
@@ -317,6 +318,56 @@ describe('PUT /api/decks/:id/cards', () => {
 
     const list = await request(`/api/decks/${deckId}/cards`, { user: USER_A });
     expect((await list.json()) as unknown[]).toHaveLength(0);
+  });
+
+  it('stores and returns the PTCGL print (set + number); a card without one reads back as null', async () => {
+    const deckId = await createDeck(USER_A);
+    const res = await request(`/api/decks/${deckId}/cards`, {
+      user: USER_A,
+      method: 'PUT',
+      body: [
+        {
+          name: "N's Zorua",
+          count: 4,
+          type: 'Pokemon',
+          role: 'attacker',
+          set: 'JTG',
+          number: '97',
+        },
+        {
+          name: 'Basic {W} Energy',
+          count: 8,
+          type: 'Energy',
+          role: 'energy',
+          set: 'Energy',
+          number: '29',
+        },
+        { name: 'Pecharunt', count: 1, type: 'Pokemon', role: 'tech', set: 'PR-SV', number: '149' },
+        { name: 'Judge', count: 1, type: 'Trainer', role: 'supporter' },
+      ],
+    });
+    expect(res.status).toBe(200);
+
+    const list = await request(`/api/decks/${deckId}/cards`, { user: USER_A });
+    const cards = (await list.json()) as {
+      name: string;
+      set: string | null;
+      number: string | null;
+    }[];
+    expect(cards.find((c) => c.name === "N's Zorua")).toMatchObject({ set: 'JTG', number: '97' });
+    expect(cards.find((c) => c.name === 'Basic {W} Energy')).toMatchObject({ set: 'Energy' });
+    expect(cards.find((c) => c.name === 'Pecharunt')).toMatchObject({ set: 'PR-SV' });
+    expect(cards.find((c) => c.name === 'Judge')).toMatchObject({ set: null, number: null });
+  });
+
+  it('rejects a malformed set code with 400', async () => {
+    const deckId = await createDeck(USER_A);
+    const res = await request(`/api/decks/${deckId}/cards`, {
+      user: USER_A,
+      method: 'PUT',
+      body: [{ name: 'X', count: 1, type: 'Trainer', role: 'item', set: 'jtg; drop', number: '1' }],
+    });
+    expect(res.status).toBe(400);
   });
 });
 
@@ -5146,6 +5197,42 @@ describe('GET/POST /api/analysis/archetype/:archetypeId (Spec 10 Slice C)', () =
         const getBody = (await getRes.json()) as { currentInputHash: string };
 
         expect(getBody.currentInputHash).toBe(postBody.synthesis.inputHash);
+      });
+
+      it('personalPrior is based on the cluster shown first after local-field re-ranking, not the Wilson-first cluster (Spec 1 AC 5)', async () => {
+        await clearArchetypeSynthesisData();
+        const archetypeId = 'arch-personal-prior-final-cluster';
+        await seedFieldWeightingStandings(archetypeId);
+        const record = { wins: 8, losses: 2, ties: 0 };
+
+        const factSet = await buildArchetypeSynthesisFactSet(db, {
+          archetypeId,
+          archetypeName: archetypeId,
+          windowDays: 90,
+          language: 'de',
+          scope: 'local',
+          usePersonalPrior: true,
+          personalRecord: record,
+          localField: shockmeisterField,
+        });
+
+        // Precondition: the field really flipped the order (B leads, not Wilson-first A).
+        const shownFirst = factSet.rankedClusters[0]!;
+        expect(shownFirst.representative.pokemon[0]?.name).toBe('Charizard ex');
+        const wilsonFirst = factSet.rankedClusters.find(
+          (c) => c.representative.pokemon[0]?.name === 'Dragapult ex',
+        )!;
+
+        const prior = factSet.facts.find((f) => f.kind === 'personalPrior');
+        expect(prior).toBeDefined();
+        expect(prior!.value).toBeCloseTo(
+          blendWithPersonalPrior(shownFirst.winRateLowerBoundPct, record).blendedPct,
+          6,
+        );
+        expect(prior!.value).not.toBeCloseTo(
+          blendWithPersonalPrior(wilsonFirst.winRateLowerBoundPct, record).blendedPct,
+          6,
+        );
       });
     });
   });

@@ -105,6 +105,9 @@ interface DeckCardRow {
   count: number;
   type: CardType;
   role: CardRole;
+  /** PTCGL print — null for cards added by name only (quick-add, old rows). */
+  set: string | null;
+  number: string | null;
 }
 
 /** Single card entry inside a snapshot's jsonb payload. */
@@ -114,6 +117,8 @@ interface SnapshotCardWire {
   type: CardType;
   role: CardRole;
   cardId?: number;
+  set?: string;
+  number?: string;
 }
 
 interface DeckSnapshotRow {
@@ -161,17 +166,33 @@ function toDeckCard(row: DeckCardRow): DeckCard {
     count: row.count,
     type: row.type,
     role: row.role,
+    set: row.set ?? null,
+    number: row.number ?? null,
   };
 }
 
-/** Strip client-only fields; the PUT body is exactly {name,count,type,role}. */
-function toWireCard(card: Pick<DeckCard, 'name' | 'count' | 'type' | 'role'>): {
+/** The fields a deck card carries over the wire (PUT body per card). */
+export type WireDeckCard = Pick<DeckCard, 'name' | 'count' | 'type' | 'role' | 'set' | 'number'>;
+
+/** Strip client-only fields; the PUT body is exactly {name,count,type,role,set,number}.
+ *  set/number MUST be forwarded: every card edit is a read–modify–replace of
+ *  the whole list (db/queries.ts), so dropping them here would erase the prints. */
+function toWireCard(card: WireDeckCard): {
   name: string;
   count: number;
   type: CardType;
   role: CardRole;
+  set: string | null;
+  number: string | null;
 } {
-  return { name: card.name, count: card.count, type: card.type, role: card.role };
+  return {
+    name: card.name,
+    count: card.count,
+    type: card.type,
+    role: card.role,
+    set: card.set ?? null,
+    number: card.number ?? null,
+  };
 }
 
 function toDeckSnapshot(row: DeckSnapshotRow): DeckSnapshot {
@@ -201,6 +222,7 @@ function toWireSnapshotCards(cardsJson: string): SnapshotCardWire[] {
     type: c.type,
     role: c.role,
     ...(typeof c.cardId === 'number' && c.cardId >= 0 && { cardId: c.cardId }),
+    ...(c.set && c.number && { set: c.set, number: c.number }),
   }));
 }
 
@@ -263,10 +285,7 @@ export async function listDeckCards(deckId: number): Promise<DeckCard[]> {
 }
 
 /** Replace the deck's full card list atomically (PUT semantics). */
-export async function replaceDeckCards(
-  deckId: number,
-  cards: Pick<DeckCard, 'name' | 'count' | 'type' | 'role'>[],
-): Promise<DeckCard[]> {
+export async function replaceDeckCards(deckId: number, cards: WireDeckCard[]): Promise<DeckCard[]> {
   const rows = await request<DeckCardRow[]>(`/api/decks/${deckId}/cards`, {
     method: 'PUT',
     body: JSON.stringify(cards.map(toWireCard)),

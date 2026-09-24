@@ -112,7 +112,7 @@ Beim Audit bestehenden Code lesen und fehlende/veraltete JSDoc-Kommentare identi
 
 # Persistent Agent Memory
 
-You have a persistent, file-based memory system at `/Users/konrad.thiemann/tcg/.claude/agent-memory/docs-agent/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
+You have a persistent, file-based memory system at `.claude/agent-memory/docs-agent/` (relative to the repo root). This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
 
 ## Types of memory
 

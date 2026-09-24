@@ -101,7 +101,7 @@ When implementing any new feature or component, follow this exact sequence:
 Nach jeder Implementierung explizit kommunizieren:
 
 > "Implementierung abgeschlossen. Empfehle als nächste Schritte:
-> - **`code-review-agent`**: Code auf TypeScript/React/Dexie-Standards prüfen
+> - **`code-review-agent`**: Code auf TypeScript/React/API-Standards prüfen
 > - **`docs-agent`**: `.md`-Dokumentation für [Dateiname] erstellen"
 
 ---
@@ -130,7 +130,7 @@ Examples of what to record:
 
 # Persistent Agent Memory
 
-You have a persistent, file-based memory system at `/Users/konrad.thiemann/tcg/.claude/agent-memory/react-dev-implementer/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
+You have a persistent, file-based memory system at `.claude/agent-memory/react-dev-implementer/` (relative to the repo root). This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
 
 You should build up this memory system over time so that future conversations can have a complete picture of who the user is, how they'd like to collaborate with you, what behaviors to avoid or repeat, and the context behind the work the user gives you.
 

@@ -83,7 +83,9 @@ The app supports multiple decks. Each deck has an archetype (for Limitless match
 - **Delete deck**: Cascades to all related cards, snapshots, and logs
 - **Duplicate as new variant**: Creates a new deck row with the same archetype/archetypeName but a new variant label, optionally copying cards
 
-**Deck import format:** Standard PTCG list format with sections `Pokémon:`, `Trainer:`, `Energie:` (German) or `Energy:` (English). Each card line: `<count> <name> <set> <number>`. The importer infers card role automatically.
+**Deck import format:** Standard PTCG list format with sections `Pokémon:`, `Trainer:`, `Energie:` (German) or `Energy:` (English). Each card line: `<count> <name> <set> <number>`. The importer infers card role automatically, keeps the print (set + number) for export, and understands PTCGL's variants: a trailing `PH` marker, the pseudo set `Energy` (`11 Basic {W} Energy Energy 29`) and hyphenated promo codes (`PR-SV`).
+
+**Deck export ("Copy for TCG Live"):** `CopyDeckListButton` (`apps/web/src/components/shared/`) copies a list in PTCGL format via the shared `exportDeckList` — on the own deck (`DeckPanel` header), on every published tournament list (`DecklistCard`) and on the representative list of each ranked cluster (`ArchetypeRecommendationPanel`, `TournamentBestListPanel`). Section headers carry the summed copy count, the list ends with `Total Cards: N`. Basic Energy in any spelling (`Darkness Energy`, `Basis-Finsternis-Energie`, …) is written as `Basic {D} Energy SVE 7` when no print is known. Cards without a print (quick-added by name, or imported before prints were stored) are still exported but flagged below the button, because PTCGL resolves cards by set code + number. Headers are always English — the format PTCGL and Limitless emit by default.
 
 ---
 
@@ -552,7 +554,12 @@ Combines three data sources into a closed set of structured **facts** (each with
 Archetype-level counterpart to Deck Synthesis (§19) — instead of one user's deck, it synthesizes
 over an archetype's **ranked decklist clusters** (Spec 10 Slice A: near-identical published
 tournament lists merged into one data point; Slice B: ranked by Wilson-score lower bound of the
-tie-weighted win rate, so a lucky small sample can't outrank a proven large one). Reuses the exact
+tie-weighted win rate, so a lucky small sample can't outrank a proven large one). Clustering is
+deterministic (Spec 1, `specs/archetype-list-foundation.md`): the same standings always yield the
+same clusters, independent of the order the database returns them in, and each cluster shows its
+most typical list (the medoid: largest summed card overlap with the other members) instead of an
+arbitrary first member. Equal win-rate bounds are tie-broken by placement, cluster size and
+standing id. Reuses the exact
 Spec 8 anti-hallucination gate (`validateSynthesis`) — a claim must reference a real fact id and
 declare a matching `direction`, same as Deck Synthesis.
 
@@ -598,7 +605,8 @@ online-Bo1 window (same scope as every other meta read), and `players >= DEFAULT
 `personalTies` query params on GET, a `personalRecord: { wins, losses, ties }` object on POST).
 Only takes effect for `scope: 'local'` — on `scope: 'global'` it is silently ignored (no
 validation error). When active and the record has at least `DEFAULT_MIN_OWN_GAMES` (5) games, the
-top-ranked cluster's win rate is blended with the personal record
+win rate of the cluster shown first (after local-field re-ranking, if any) is blended with the
+personal record
 (`blendWithPersonalPrior`/`personalPriorBlend.ts`) and surfaces as one extra `personalPrior` fact
 that the LLM prompt can reference — a below-threshold record contributes nothing (no silent
 substitute for the global facts). GET accepts the same fields as POST so `currentInputHash` stays
