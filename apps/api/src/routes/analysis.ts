@@ -1,4 +1,4 @@
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, asc, eq, isNotNull } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import {
   assembleArchetypeSynthesis,
@@ -563,7 +563,8 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
           archetypeName: tournamentStandings.archetypeName,
         })
         .from(tournamentStandings)
-        .where(eq(tournamentStandings.tournamentId, tournamentId)),
+        .where(eq(tournamentStandings.tournamentId, tournamentId))
+        .orderBy(asc(tournamentStandings.id)),
       db
         .select({
           id: tournamentStandings.id,
@@ -582,7 +583,8 @@ export function createAnalysisRoutes(): Hono<ApiEnv> {
             eq(tournamentStandings.archetypeId, archetypeId),
             isNotNull(tournamentStandings.decklist),
           ),
-        ),
+        )
+        .orderBy(asc(tournamentStandings.id)),
     ]);
 
     // This tournament's OWN field (not a window aggregate): one share per

@@ -25,7 +25,10 @@ export interface RankedCluster extends DecklistCluster {
    *  member has that data. Surfaces "this pilot actually won the event" even
    *  when the win-rate sample is too small to rank the cluster highly. */
   avgPlacementPercentile: number | null;
-  /** 1-based rank within the input list, by descending winRateLowerBoundPct. */
+  /** 1-based rank within the input list, by descending winRateLowerBoundPct.
+   *  Ties (Spec 1 §3.3) → avgPlacementPercentile desc (null last) → member
+   *  count desc → smallest member standing id asc, so equal inputs always
+   *  produce the same ranking regardless of input order. */
   rank: number;
   /** Spec 10 Slice D: the cluster's field-weighted score against a chosen
    *  local field, only computed and set for `scope: 'local'` with a
@@ -48,6 +51,31 @@ function average(values: number[]): number | null {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
+function smallestMemberId(c: DecklistCluster): number {
+  // Hand-built clusters may have no members; Math.min() would yield Infinity.
+  return c.memberStandingIds.length === 0
+    ? Number.MAX_SAFE_INTEGER
+    : Math.min(...c.memberStandingIds);
+}
+
+function compareRankedClusters(
+  a: Omit<RankedCluster, 'rank'>,
+  b: Omit<RankedCluster, 'rank'>,
+): number {
+  if (a.winRateLowerBoundPct !== b.winRateLowerBoundPct) {
+    return b.winRateLowerBoundPct - a.winRateLowerBoundPct;
+  }
+  if (a.avgPlacementPercentile !== b.avgPlacementPercentile) {
+    if (a.avgPlacementPercentile == null) return 1;
+    if (b.avgPlacementPercentile == null) return -1;
+    return b.avgPlacementPercentile - a.avgPlacementPercentile;
+  }
+  if (a.memberStandingIds.length !== b.memberStandingIds.length) {
+    return b.memberStandingIds.length - a.memberStandingIds.length;
+  }
+  return smallestMemberId(a) - smallestMemberId(b);
+}
+
 export function rankClusters(clusters: DecklistCluster[]): RankedCluster[] {
   const withStats = clusters.map((c) => {
     const winRateInterval = wilsonInterval(c.totalWins, c.totalLosses, c.totalTies);
@@ -60,7 +88,5 @@ export function rankClusters(clusters: DecklistCluster[]): RankedCluster[] {
     return { ...c, winRateInterval, winRateLowerBoundPct, avgPlacementPercentile };
   });
 
-  return withStats
-    .sort((a, b) => b.winRateLowerBoundPct - a.winRateLowerBoundPct)
-    .map((c, i) => ({ ...c, rank: i + 1 }));
+  return withStats.sort(compareRankedClusters).map((c, i) => ({ ...c, rank: i + 1 }));
 }

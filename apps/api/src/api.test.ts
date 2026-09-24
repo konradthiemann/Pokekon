@@ -10,6 +10,7 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { and, eq } from 'drizzle-orm';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  blendWithPersonalPrior,
   buildPayoffMatrix,
   canonicalizeFacts,
   computeArchetypeCardStats,
@@ -5161,6 +5162,42 @@ describe('GET/POST /api/analysis/archetype/:archetypeId (Spec 10 Slice C)', () =
         const getBody = (await getRes.json()) as { currentInputHash: string };
 
         expect(getBody.currentInputHash).toBe(postBody.synthesis.inputHash);
+      });
+
+      it('personalPrior is based on the cluster shown first after local-field re-ranking, not the Wilson-first cluster (Spec 1 AC 5)', async () => {
+        await clearArchetypeSynthesisData();
+        const archetypeId = 'arch-personal-prior-final-cluster';
+        await seedFieldWeightingStandings(archetypeId);
+        const record = { wins: 8, losses: 2, ties: 0 };
+
+        const factSet = await buildArchetypeSynthesisFactSet(db, {
+          archetypeId,
+          archetypeName: archetypeId,
+          windowDays: 90,
+          language: 'de',
+          scope: 'local',
+          usePersonalPrior: true,
+          personalRecord: record,
+          localField: shockmeisterField,
+        });
+
+        // Precondition: the field really flipped the order (B leads, not Wilson-first A).
+        const shownFirst = factSet.rankedClusters[0]!;
+        expect(shownFirst.representative.pokemon[0]?.name).toBe('Charizard ex');
+        const wilsonFirst = factSet.rankedClusters.find(
+          (c) => c.representative.pokemon[0]?.name === 'Dragapult ex',
+        )!;
+
+        const prior = factSet.facts.find((f) => f.kind === 'personalPrior');
+        expect(prior).toBeDefined();
+        expect(prior!.value).toBeCloseTo(
+          blendWithPersonalPrior(shownFirst.winRateLowerBoundPct, record).blendedPct,
+          6,
+        );
+        expect(prior!.value).not.toBeCloseTo(
+          blendWithPersonalPrior(wilsonFirst.winRateLowerBoundPct, record).blendedPct,
+          6,
+        );
       });
     });
   });
