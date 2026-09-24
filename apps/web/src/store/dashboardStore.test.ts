@@ -39,6 +39,10 @@ vi.mock('../lib/api', async (importOriginal) => {
 // module, which vitest/jsdom can't do for real.
 vi.mock('../db/queries');
 
+// The archetype-first UI flag is read once per page load in production; tests
+// flip it per case.
+vi.mock('../lib/featureFlags', () => ({ isArchetypeCoachUiEnabled: vi.fn(() => false) }));
+
 import { useDashboardStore } from './dashboardStore';
 import { fetchArchetypeComparison } from '../lib/deckComparison';
 import type { ComparisonResult } from '../lib/deckComparison';
@@ -50,7 +54,10 @@ import {
   getOpponentLogs,
   getLatestMetaSnapshots,
   getArchetypeStats,
+  getUserPreferences,
+  saveUserPreferences,
 } from '../db/queries';
+import { isArchetypeCoachUiEnabled } from '../lib/featureFlags';
 import type { Deck } from '../types';
 
 const mockedFetchComparison = vi.mocked(fetchArchetypeComparison);
@@ -665,5 +672,223 @@ describe('dashboardStore deck synthesis (plan ai-recommendation-synthesis.md §3
     // overwritten back to the stale deck-5 result.
     expect(useDashboardStore.getState().deckSynthesis?.deckId).toBe(6);
     expect(useDashboardStore.getState().deckSynthesis?.archetypeId).toBe('gardevoir-ex');
+  });
+});
+
+describe('dashboardStore preferences + coach navigation (Spec 7 §5.1, plan S4)', () => {
+  const mockedGetPrefs = vi.mocked(getUserPreferences);
+  const mockedSavePrefs = vi.mocked(saveUserPreferences);
+  const mockedFlag = vi.mocked(isArchetypeCoachUiEnabled);
+  const LEGACY_KEY = 'tcg-deck-arch-slug-v1';
+
+  beforeEach(() => {
+    localStorage.clear();
+    mockedGetPrefs.mockReset();
+    mockedSavePrefs.mockReset();
+    mockedFlag.mockReset().mockReturnValue(false);
+    useDashboardStore.setState({
+      decks: [],
+      activeArchetypeId: null,
+      activeDeckIdByArchetype: {},
+      preferencesStatus: 'idle',
+      deckArchSlug: '',
+      coachTab: 'start',
+      deckView: 'myLists',
+    } as never);
+  });
+
+  it('loadPreferences sets activeArchetypeId and the remembered decks from the server', async () => {
+    mockedGetPrefs.mockResolvedValue({
+      activeArchetypeId: 'n-zoroark',
+      activeDeckIdByArchetype: { 'n-zoroark': 3 },
+    });
+    await useDashboardStore.getState().loadPreferences();
+    const s = useDashboardStore.getState();
+    expect(s.activeArchetypeId).toBe('n-zoroark');
+    expect(s.activeDeckIdByArchetype).toEqual({ 'n-zoroark': 3 });
+    expect(s.preferencesStatus).toBe('ready');
+    expect(mockedSavePrefs).not.toHaveBeenCalled();
+  });
+
+  it('loadPreferences migrates the legacy slug once when the server has none', async () => {
+    localStorage.setItem(LEGACY_KEY, 'dragapult-ex');
+    useDashboardStore.setState({ activeDeck: DECK_B } as never);
+    mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
+    mockedSavePrefs.mockResolvedValue({
+      activeArchetypeId: 'dragapult-ex',
+      activeDeckIdByArchetype: {},
+    });
+    await useDashboardStore.getState().loadPreferences();
+    expect(mockedSavePrefs).toHaveBeenCalledWith({ activeArchetypeId: 'dragapult-ex' });
+    expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
+    expect(useDashboardStore.getState().activeArchetypeId).toBe('dragapult-ex');
+  });
+
+  it('loadPreferences falls back to the active deck archetype when no legacy slug exists', async () => {
+    useDashboardStore.setState({ activeDeck: DECK_B } as never);
+    mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
+    mockedSavePrefs.mockResolvedValue({
+      activeArchetypeId: 'gardevoir-ex',
+      activeDeckIdByArchetype: {},
+    });
+    await useDashboardStore.getState().loadPreferences();
+    expect(mockedSavePrefs).toHaveBeenCalledWith({ activeArchetypeId: 'gardevoir-ex' });
+    expect(useDashboardStore.getState().activeArchetypeId).toBe('gardevoir-ex');
+  });
+
+  it('loadPreferences leaves activeArchetypeId null (→ onboarding) without any source', async () => {
+    useDashboardStore.setState({ activeDeck: null } as never);
+    mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
+    await useDashboardStore.getState().loadPreferences();
+    expect(mockedSavePrefs).not.toHaveBeenCalled();
+    expect(useDashboardStore.getState().activeArchetypeId).toBeNull();
+    expect(useDashboardStore.getState().preferencesStatus).toBe('ready');
+  });
+
+  it('loadPreferences sets preferencesStatus "error" on a failed GET without throwing', async () => {
+    mockedGetPrefs.mockRejectedValue(new Error('offline'));
+    await expect(useDashboardStore.getState().loadPreferences()).resolves.toBeUndefined();
+    expect(useDashboardStore.getState().preferencesStatus).toBe('error');
+    expect(useDashboardStore.getState().activeArchetypeId).toBeNull();
+  });
+
+  it('keeps the legacy slug when persisting the migration fails, so the next load retries it', async () => {
+    localStorage.setItem(LEGACY_KEY, 'dragapult-ex');
+    useDashboardStore.setState({ activeDeck: DECK_B } as never);
+    mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
+    mockedSavePrefs.mockRejectedValue(new Error('offline'));
+    await useDashboardStore.getState().loadPreferences();
+    expect(localStorage.getItem(LEGACY_KEY)).toBe('dragapult-ex');
+    expect(useDashboardStore.getState().activeArchetypeId).toBe('dragapult-ex');
+  });
+
+  it('keeps preferences "ready" with the migrated value even if persisting the migration fails', async () => {
+    useDashboardStore.setState({ activeDeck: DECK_B } as never);
+    mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
+    mockedSavePrefs.mockRejectedValue(new Error('offline'));
+    await useDashboardStore.getState().loadPreferences();
+    expect(useDashboardStore.getState().activeArchetypeId).toBe('gardevoir-ex');
+    expect(useDashboardStore.getState().preferencesStatus).toBe('ready');
+  });
+
+  it('derives deckArchSlug from activeArchetypeId', async () => {
+    mockedGetPrefs.mockResolvedValue({
+      activeArchetypeId: 'n-zoroark',
+      activeDeckIdByArchetype: {},
+    });
+    await useDashboardStore.getState().loadPreferences();
+    expect(useDashboardStore.getState().deckArchSlug).toBe('n-zoroark');
+  });
+
+  it('setActiveArchetype persists and selects the remembered deck of that archetype', async () => {
+    mockedFlag.mockReturnValue(true);
+    mockedGetDecks.mockResolvedValue([DECK_A, DECK_B]);
+    useDashboardStore.setState({
+      activeDeckId: 1,
+      activeArchetypeId: 'dragapult-ex',
+      activeDeckIdByArchetype: { 'gardevoir-ex': 2 },
+    } as never);
+    mockedSavePrefs.mockResolvedValue({
+      activeArchetypeId: 'gardevoir-ex',
+      activeDeckIdByArchetype: { 'gardevoir-ex': 2 },
+    });
+    await useDashboardStore.getState().setActiveArchetype('gardevoir-ex');
+    expect(mockedSavePrefs).toHaveBeenCalledWith({ activeArchetypeId: 'gardevoir-ex' });
+    const s = useDashboardStore.getState();
+    expect(s.activeArchetypeId).toBe('gardevoir-ex');
+    expect(s.deckArchSlug).toBe('gardevoir-ex');
+    expect(s.activeDeckId).toBe(2);
+  });
+
+  it('refresh with the flag on leaves no active deck when the archetype has none', async () => {
+    mockedFlag.mockReturnValue(true);
+    mockedGetDecks.mockResolvedValue([DECK_A]);
+    useDashboardStore.setState({ activeDeckId: 1, activeArchetypeId: 'n-zoroark' } as never);
+    await useDashboardStore.getState().refresh();
+    expect(useDashboardStore.getState().activeDeckId).toBeNull();
+    expect(useDashboardStore.getState().activeDeck).toBeNull();
+  });
+
+  it('refresh with the flag off keeps a stale stored deck id when no deck is left (legacy behaviour)', async () => {
+    localStorage.setItem('tcg-active-deck-id-v3', '7');
+    mockedGetDecks.mockResolvedValue([]);
+    useDashboardStore.setState({ activeDeckId: 7 } as never);
+    await useDashboardStore.getState().refresh();
+    expect(useDashboardStore.getState().activeDeckId).toBeNull();
+    expect(localStorage.getItem('tcg-active-deck-id-v3')).toBe('7');
+  });
+
+  it('refresh with the flag off keeps the legacy active-deck rule', async () => {
+    mockedGetDecks.mockResolvedValue([DECK_A, DECK_B]);
+    useDashboardStore.setState({ activeDeckId: 2, activeArchetypeId: 'dragapult-ex' } as never);
+    await useDashboardStore.getState().refresh();
+    expect(useDashboardStore.getState().activeDeckId).toBe(2);
+  });
+
+  it('setActiveDeck persists the deck under its archetype', async () => {
+    mockedGetDecks.mockResolvedValue([DECK_A, DECK_B]);
+    useDashboardStore.setState({ decks: [DECK_A, DECK_B] } as never);
+    mockedSavePrefs.mockResolvedValue({
+      activeArchetypeId: null,
+      activeDeckIdByArchetype: { 'gardevoir-ex': 2 },
+    });
+    await useDashboardStore.getState().setActiveDeck(2);
+    expect(mockedSavePrefs).toHaveBeenCalledWith({
+      activeDeck: { archetypeId: 'gardevoir-ex', deckId: 2 },
+    });
+    expect(useDashboardStore.getState().activeDeckIdByArchetype).toEqual({ 'gardevoir-ex': 2 });
+  });
+
+  it('setActiveDeck still switches the deck when persisting fails', async () => {
+    mockedGetDecks.mockResolvedValue([DECK_A, DECK_B]);
+    useDashboardStore.setState({ decks: [DECK_A, DECK_B] } as never);
+    mockedSavePrefs.mockRejectedValue(new Error('offline'));
+    await expect(useDashboardStore.getState().setActiveDeck(2)).resolves.toBeUndefined();
+    expect(useDashboardStore.getState().activeDeckId).toBe(2);
+  });
+
+  it('hydrate loads data, then preferences, and (flag on) re-resolves the deck of the archetype', async () => {
+    mockedFlag.mockReturnValue(true);
+    mockedGetDecks.mockResolvedValue([DECK_A, DECK_B]);
+    mockedGetPrefs.mockResolvedValue({
+      activeArchetypeId: 'gardevoir-ex',
+      activeDeckIdByArchetype: {},
+    });
+    useDashboardStore.setState({ activeDeckId: 1 } as never);
+    await useDashboardStore.getState().hydrate();
+    const s = useDashboardStore.getState();
+    expect(s.activeArchetypeId).toBe('gardevoir-ex');
+    expect(s.activeDeckId).toBe(2);
+    expect(s.activeDeck?.archetype).toBe('gardevoir-ex');
+  });
+
+  it('hydrate with the flag off refreshes only once and keeps the legacy deck', async () => {
+    mockedGetDecks.mockResolvedValue([DECK_A, DECK_B]);
+    mockedGetPrefs.mockResolvedValue({
+      activeArchetypeId: 'gardevoir-ex',
+      activeDeckIdByArchetype: {},
+    });
+    useDashboardStore.setState({ activeDeckId: 1 } as never);
+    await useDashboardStore.getState().hydrate();
+    expect(mockedGetDecks).toHaveBeenCalledTimes(1);
+    expect(useDashboardStore.getState().activeDeckId).toBe(1);
+  });
+
+  it('coachTab defaults to "start" and setCoachTab switches it', () => {
+    expect(useDashboardStore.getState().coachTab).toBe('start');
+    useDashboardStore.getState().setCoachTab('opponents');
+    expect(useDashboardStore.getState().coachTab).toBe('opponents');
+  });
+
+  it('deckView defaults to "myLists" and setDeckView switches it', () => {
+    expect(useDashboardStore.getState().deckView).toBe('myLists');
+    useDashboardStore.getState().setDeckView('metaList');
+    expect(useDashboardStore.getState().deckView).toBe('metaList');
+  });
+
+  it('setMetaWindow replaces the whole window', () => {
+    expect(useDashboardStore.getState().metaWindow).toEqual({ days: 30, online: true, bo1: true });
+    useDashboardStore.getState().setMetaWindow({ days: 14, online: false, bo1: true });
+    expect(useDashboardStore.getState().metaWindow).toEqual({ days: 14, online: false, bo1: true });
   });
 });

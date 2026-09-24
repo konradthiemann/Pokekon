@@ -78,7 +78,7 @@ flowchart TD
     subgraph Server["Railway — apps/api (Hono)"]
         Health["/health (DB-free)"]
         AuthH["/api/auth/* (Better Auth)"]
-        ApiRoutes["/api/decks · /api/snapshots · /api/logs<br/>/api/analytics · /api/analysis<br/>/api/meta · /api/demo (session-guarded)"]
+        ApiRoutes["/api/decks · /api/snapshots · /api/logs<br/>/api/analytics · /api/analysis<br/>/api/meta · /api/demo · /api/preferences<br/>(session-guarded)"]
         AiLayer["ai/ provider abstraction<br/>(GitHub Models adapter)"]
         Static["Static serving of built SPA<br/>(single-origin)"]
         Drizzle["Drizzle ORM"]
@@ -132,7 +132,8 @@ Registration order matters:
 4. **Guarded `/api` sub-app** — a `sessionMiddleware` runs first, then `db` is
    injected into the context, then the domain routes mount:
    `/api/decks`, `/api/snapshots`, `/api/logs`, `/api/analytics`, `/api/analysis`,
-   `/api/meta` (server meta snapshots), `/api/demo` (guest/demo mode).
+   `/api/meta` (server meta snapshots), `/api/demo` (guest/demo mode),
+   `/api/preferences` (per-user app preferences: active archetype, last active deck per archetype).
 
 **Battle-log pipeline & analytics** — `POST /api/logs` parses the log server-side
 once on write into `match_log_parsed` (plan §4); `GET /api/analytics/deck/:id?weeks=`
@@ -175,6 +176,19 @@ initially-collapsed section at the end of Analytics (`OpponentLog` with
 `chrome="bare"`, nested in a `CollapsibleSection`) — demoting the area, not the
 logging action.
 
+### Feature flags
+
+`apps/web/src/lib/featureFlags.ts` — client-side runtime flags. Currently one flag,
+`archetypeCoachUi`, gating the archetype-first UI of `specs/archetype-first-ui.md`
+(Spec 7 Scheibe 1–2). Resolution order: `?ff=archetypeCoachUi` in the URL (turns
+it on and remembers it in localStorage `pokekon-ff-archetypeCoachUi`) or
+`?ff=-archetypeCoachUi` (turns it off and forgets it) > localStorage >
+build-time `VITE_FF_ARCHETYPE_COACH_UI` (exactly `"true"`) > off. Evaluated once per
+page load via `isArchetypeCoachUiEnabled()`. Web and API ship as one Railway
+service, so the per-browser override lets the new UI be tried in production
+without switching it on for everyone. A pure UI switch, not a security boundary —
+the API remains the authority for all data.
+
 ### State Management Pattern
 
 A single Zustand store (`useDashboardStore`) owns the data arrays
@@ -183,6 +197,28 @@ A single Zustand store (`useDashboardStore`) owns the data arrays
 localStorage-backed preferences, async-operation flags, and UI state. The
 `refresh()` action is the single entry point to reload data; mutations end with
 `await get().refresh()` to keep the store consistent.
+
+**Server-side preferences (Spec 7 §5.1).** `hydrate()` is the initial load once a
+session exists (`App.tsx`, and `WelcomeScreen` after seeding the demo): `refresh()`
+→ `loadPreferences()` (`GET /api/preferences` → `activeArchetypeId`,
+`activeDeckIdByArchetype`, `preferencesStatus`) → with `archetypeCoachUi` on, a
+second `refresh()`. When the server has no archetype yet, `loadPreferences()`
+migrates **once**: a valid legacy localStorage slug (`tcg-deck-arch-slug-v1`,
+deleted only after the migrated value was saved), else the active deck's
+archetype, else `null` (→ onboarding). This runs for **every** account, flag on or
+off — a single extra `GET` per load (plus at most one `PATCH` for the migration);
+nothing changes visibly with the flag off except that the deck comparison now
+knows the archetype. Active-deck resolution lives in the pure
+`lib/coach/activeDeck.ts`: flag off = legacy rule (current deck if it exists, else
+the first); flag on = remembered deck of the coached archetype → current deck if
+same archetype → newest deck of that archetype → none. `setActiveDeck()`
+remembers the deck per archetype server-side (best effort, never blocks the
+switch); `setActiveArchetype()` persists and re-resolves. `deckArchSlug` is now a
+derived value (`activeArchetypeId ?? ''`) — which also fixes the deck comparison
+showing "not set up" for accounts that never had the legacy key. Coach-only UI
+state: `coachTab` (`start · deck · coaching · opponents · tools`), `deckView`
+(`metaList · myLists`), `metaWindow` (shared meta window, default 30 days,
+online, Bo1).
 
 ### Component Tree (frontend)
 
@@ -239,9 +275,10 @@ stores coexist:
 | Parsed logs, meta snapshots, AI settings | PostgreSQL (`match_log_parsed`, `meta_snapshots`, `user_ai_settings`) | server-side; see [database.md](./database.md) |
 | Decks, cards, logs, snapshots, meta | IndexedDB via Dexie (`TCGMetaDashboard`) | local-first store, still authoritative for parts of the app |
 | LLM API key | PostgreSQL (`user_ai_settings`, AES-256-GCM encrypted) | BYOK, server-side only — never localStorage |
-| Active deck ID | localStorage (`tcg-active-deck-id-v3`) | UI preference |
+| Active archetype, last active deck per archetype | PostgreSQL (`user_preferences`) | Spec 7; follows the user across devices |
+| Active deck ID | localStorage (`tcg-active-deck-id-v3`) + per archetype in `user_preferences` | UI preference; the server map is used by the coach layout |
 | Local meta archetypes | localStorage (`tcg-local-meta-v1`) | UI preference |
-| Deck archetype slug | localStorage (`tcg-deck-arch-slug-v1`) | UI preference |
+| Active archetype | PostgreSQL (`user_preferences`) | Spec 7; the old localStorage key `tcg-deck-arch-slug-v1` is migrated once and deleted |
 | Player name (battle-log parsing) | localStorage (`tcg-player-name`) | parser input |
 
 The typed client [api.ts](../apps/web/src/lib/api.ts) talks to `apps/api` with

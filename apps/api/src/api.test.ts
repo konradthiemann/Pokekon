@@ -181,6 +181,8 @@ describe('authentication', () => {
       ['/api/decks/1/cards', 'PUT'],
       ['/api/logs', 'GET'],
       ['/api/snapshots/1', 'DELETE'],
+      ['/api/preferences', 'GET'],
+      ['/api/preferences', 'PATCH'],
     ] as const) {
       const res = await request(path, { method });
       expect(res.status, `${method} ${path}`).toBe(401);
@@ -5744,6 +5746,50 @@ describe('POST /api/demo/seed -> GET /api/analysis/deck/:deckId (plan §3.11, Sc
     },
   );
 
+  it('seeds a Dragapult ex deck as the active archetype and its remembered deck (Spec 7 E9)', async () => {
+    const user = await freshAnonymousUser();
+    await seedAndGetDeckIds(user);
+
+    const rows = await db
+      .select({ id: schema.decks.id, archetype: schema.decks.archetype })
+      .from(schema.decks)
+      .where(eq(schema.decks.userId, user));
+    const dragapult = rows.find((r) => r.archetype === 'dragapult-ex');
+    expect(dragapult).toBeDefined();
+    // Deck A stays the first (lowest id) deck, i.e. the old layout's default.
+    expect(Math.min(...rows.map((r) => r.id))).toBe(
+      rows.find((r) => r.archetype === 'mega-kangaskhan-ex')!.id,
+    );
+
+    const cards = await db
+      .select({ count: schema.deckCards.count })
+      .from(schema.deckCards)
+      .where(eq(schema.deckCards.deckId, dragapult!.id));
+    expect(cards.reduce((sum, c) => sum + c.count, 0)).toBe(60);
+
+    const prefs = await request('/api/preferences', { user });
+    expect(await prefs.json()).toEqual({
+      activeArchetypeId: 'dragapult-ex',
+      activeDeckIdByArchetype: { 'dragapult-ex': dragapult!.id },
+    });
+  });
+
+  it('does not touch preferences on the idempotent second seed call', async () => {
+    const user = await freshAnonymousUser();
+    await seedAndGetDeckIds(user);
+    await request('/api/preferences', {
+      user,
+      method: 'PATCH',
+      body: { activeArchetypeId: 'n-zoroark' },
+    });
+    const again = await request('/api/demo/seed', { user, method: 'POST' });
+    expect(((await again.json()) as { seeded: boolean }).seeded).toBe(false);
+    const prefs = (await (await request('/api/preferences', { user })).json()) as {
+      activeArchetypeId: string;
+    };
+    expect(prefs.activeArchetypeId).toBe('n-zoroark');
+  });
+
   it('Deck B intentionally has no pre-baked synthesis (visible cold-start/button state)', async () => {
     const user = await freshAnonymousUser();
     const { deckBId } = await seedAndGetDeckIds(user);
@@ -5752,5 +5798,180 @@ describe('POST /api/demo/seed -> GET /api/analysis/deck/:deckId (plan §3.11, Sc
     expect(res.status).toBe(200);
     const body = (await res.json()) as { synthesis: unknown };
     expect(body.synthesis).toBeNull();
+  });
+});
+
+describe('user preferences (/api/preferences, Spec 7 §5.1)', () => {
+  interface Prefs {
+    activeArchetypeId: string | null;
+    activeDeckIdByArchetype: Record<string, number>;
+  }
+  let counter = 0;
+  async function freshPrefsUser(): Promise<string> {
+    const id = `prefs-user-${++counter}`;
+    await createUser(id);
+    return id;
+  }
+  async function getPrefs(user: string): Promise<Prefs> {
+    const res = await request('/api/preferences', { user });
+    expect(res.status).toBe(200);
+    return (await res.json()) as Prefs;
+  }
+  function patch(user: string, body: unknown): Promise<Response> {
+    return request('/api/preferences', { user, method: 'PATCH', body });
+  }
+
+  it('returns null/{} defaults when the user has no row', async () => {
+    const user = await freshPrefsUser();
+    expect(await getPrefs(user)).toEqual({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
+  });
+
+  it('stores activeArchetypeId and returns it on a later GET', async () => {
+    const user = await freshPrefsUser();
+    const res = await patch(user, { activeArchetypeId: 'n-zoroark' });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as Prefs).activeArchetypeId).toBe('n-zoroark');
+    expect((await getPrefs(user)).activeArchetypeId).toBe('n-zoroark');
+  });
+
+  it("is user-scoped: another user does not see the first user's archetype", async () => {
+    const a = await freshPrefsUser();
+    const b = await freshPrefsUser();
+    await patch(a, { activeArchetypeId: 'dragapult-ex' });
+    expect((await getPrefs(b)).activeArchetypeId).toBeNull();
+  });
+
+  it('clears the archetype with null', async () => {
+    const user = await freshPrefsUser();
+    await patch(user, { activeArchetypeId: 'n-zoroark' });
+    const res = await patch(user, { activeArchetypeId: null });
+    expect(res.status).toBe(200);
+    expect((await getPrefs(user)).activeArchetypeId).toBeNull();
+  });
+
+  it.each(['N Zoroark', '-lead', 'a'.repeat(81), '../x', ''])(
+    'rejects invalid slug %j with 400',
+    async (slug) => {
+      const user = await freshPrefsUser();
+      const res = await patch(user, { activeArchetypeId: slug });
+      expect(res.status).toBe(400);
+      expect((await getPrefs(user)).activeArchetypeId).toBeNull();
+    },
+  );
+
+  it('rejects an empty patch, unknown keys and malformed JSON with 400', async () => {
+    const user = await freshPrefsUser();
+    expect((await patch(user, {})).status).toBe(400);
+    expect((await patch(user, { foo: 1 })).status).toBe(400);
+    expect((await patch(user, { activeArchetypeId: 'n-zoroark', foo: 1 })).status).toBe(400);
+    const malformed = await app.request('/api/preferences', {
+      method: 'PATCH',
+      headers: { 'x-test-user': user, 'Content-Type': 'application/json' },
+      body: '{not json',
+    });
+    expect(malformed.status).toBe(400);
+  });
+
+  it('remembers the active deck per archetype', async () => {
+    const user = await freshPrefsUser();
+    const deckId = await createDeck(user, { archetype: 'n-zoroark' });
+    const res = await patch(user, { activeDeck: { archetypeId: 'n-zoroark', deckId } });
+    expect(res.status).toBe(200);
+    expect((await getPrefs(user)).activeDeckIdByArchetype).toEqual({ 'n-zoroark': deckId });
+  });
+
+  it("404s for another user's deck and leaves the map unchanged", async () => {
+    const owner = await freshPrefsUser();
+    const other = await freshPrefsUser();
+    const deckId = await createDeck(owner, { archetype: 'n-zoroark' });
+    const res = await patch(other, { activeDeck: { archetypeId: 'n-zoroark', deckId } });
+    expect(res.status).toBe(404);
+    expect((await getPrefs(other)).activeDeckIdByArchetype).toEqual({});
+  });
+
+  it('404s for a non-existent deck', async () => {
+    const user = await freshPrefsUser();
+    const res = await patch(user, { activeDeck: { archetypeId: 'n-zoroark', deckId: 999_999 } });
+    expect(res.status).toBe(404);
+  });
+
+  it('400s when the deck belongs to a different archetype', async () => {
+    const user = await freshPrefsUser();
+    const deckId = await createDeck(user, { archetype: 'n-zoroark' });
+    const res = await patch(user, { activeDeck: { archetypeId: 'dragapult-ex', deckId } });
+    expect(res.status).toBe(400);
+    expect((await getPrefs(user)).activeDeckIdByArchetype).toEqual({});
+  });
+
+  it('removes the map entry with deckId null and keeps other entries', async () => {
+    const user = await freshPrefsUser();
+    const zoroark = await createDeck(user, { archetype: 'n-zoroark' });
+    const dragapult = await createDeck(user, { archetype: 'dragapult-ex' });
+    await patch(user, { activeDeck: { archetypeId: 'n-zoroark', deckId: zoroark } });
+    await patch(user, { activeDeck: { archetypeId: 'dragapult-ex', deckId: dragapult } });
+    const res = await patch(user, { activeDeck: { archetypeId: 'n-zoroark', deckId: null } });
+    expect(res.status).toBe(200);
+    expect((await getPrefs(user)).activeDeckIdByArchetype).toEqual({ 'dragapult-ex': dragapult });
+  });
+
+  it('applies activeArchetypeId and activeDeck in one request without dropping either', async () => {
+    const user = await freshPrefsUser();
+    const deckId = await createDeck(user, { archetype: 'dragapult-ex' });
+    const res = await patch(user, {
+      activeArchetypeId: 'dragapult-ex',
+      activeDeck: { archetypeId: 'dragapult-ex', deckId },
+    });
+    expect(res.status).toBe(200);
+    expect(await getPrefs(user)).toEqual({
+      activeArchetypeId: 'dragapult-ex',
+      activeDeckIdByArchetype: { 'dragapult-ex': deckId },
+    });
+  });
+
+  it('a later activeDeck-only patch keeps the active archetype', async () => {
+    const user = await freshPrefsUser();
+    const deckId = await createDeck(user, { archetype: 'n-zoroark' });
+    await patch(user, { activeArchetypeId: 'dragapult-ex' });
+    await patch(user, { activeDeck: { archetypeId: 'n-zoroark', deckId } });
+    expect((await getPrefs(user)).activeArchetypeId).toBe('dragapult-ex');
+  });
+
+  it('does not lose map entries when two PATCHes for different archetypes run concurrently', async () => {
+    const user = await freshPrefsUser();
+    const zoroark = await createDeck(user, { archetype: 'n-zoroark' });
+    const dragapult = await createDeck(user, { archetype: 'dragapult-ex' });
+    const [a, b] = await Promise.all([
+      patch(user, { activeDeck: { archetypeId: 'n-zoroark', deckId: zoroark } }),
+      patch(user, { activeDeck: { archetypeId: 'dragapult-ex', deckId: dragapult } }),
+    ]);
+    expect(a.status).toBe(200);
+    expect(b.status).toBe(200);
+    expect((await getPrefs(user)).activeDeckIdByArchetype).toEqual({
+      'n-zoroark': zoroark,
+      'dragapult-ex': dragapult,
+    });
+  });
+
+  it('does not reset the archetype when an activeDeck-only PATCH races an archetype PATCH', async () => {
+    const user = await freshPrefsUser();
+    const deckId = await createDeck(user, { archetype: 'n-zoroark' });
+    await Promise.all([
+      patch(user, { activeArchetypeId: 'dragapult-ex' }),
+      patch(user, { activeDeck: { archetypeId: 'n-zoroark', deckId } }),
+    ]);
+    const prefs = await getPrefs(user);
+    expect(prefs.activeArchetypeId).toBe('dragapult-ex');
+    expect(prefs.activeDeckIdByArchetype).toEqual({ 'n-zoroark': deckId });
+  });
+
+  it('cascades on user delete', async () => {
+    const user = await freshPrefsUser();
+    await patch(user, { activeArchetypeId: 'n-zoroark' });
+    await db.delete(schema.user).where(eq(schema.user.id, user));
+    const rows = await db
+      .select()
+      .from(schema.userPreferences)
+      .where(eq(schema.userPreferences.userId, user));
+    expect(rows).toHaveLength(0);
   });
 });

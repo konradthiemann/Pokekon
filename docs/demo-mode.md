@@ -26,12 +26,20 @@ WelcomeScreen "Ohne Anmeldung testen"
 
 ## What gets seeded
 
-Two decks for player **Gtmap** (from the user's real example log):
+Three decks for player **Gtmap** (from the user's real example log):
 
 | Deck | Role | Data |
 |------|------|------|
 | **Mega Kangaskhan ex** (Ogerpon Toolbox) | primary, default-active | 2 snapshots (League Cup → Regional), 14 matches, 5 with full German battle logs + pre-baked analyses |
 | **N's Zoroark ex** | secondary | 6 result-only matches |
+| **Dragapult ex** (Dusknoir) | active archetype of the archetype-first UI (Spec 7, decision E9) | 60-card display list (not rules-validated until Spec 2), 6 result-only matches vs opponents outside Deck A's triggers |
+
+**Preferences:** the seed also writes `user_preferences` (`activeArchetypeId: 'dragapult-ex'`,
+remembered active deck = the Dragapult deck), so the archetype-first UI
+(`archetypeCoachUi` flag) opens on Dragapult ex without onboarding. The old layout
+still defaults to Deck A (lowest id). Battle logs and pre-baked analyses stay on
+Deck A for now, so Coaching in the new UI is thin in the demo until Spec 7 Scheibe 7
+re-seeds them.
 
 The matchup distribution is engineered to fire the heuristics in
 `apps/web/src/hooks/useRecommendations.ts`:

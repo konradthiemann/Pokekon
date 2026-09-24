@@ -42,7 +42,9 @@ export function WelcomeScreen() {
       if (error) throw new Error(error.message ?? 'anonymous sign-in failed');
       localStorage.setItem(PLAYER_NAME_KEY, DEMO_PLAYER_NAME);
       await seedDemo();
-      await useDashboardStore.getState().refresh();
+      // hydrate (not just refresh): the seed also wrote the demo's active
+      // archetype (Spec 7 E9), which the dashboard must pick up.
+      await useDashboardStore.getState().hydrate();
       // On success the component unmounts (session → dashboard); no state reset.
     } catch {
       setDemoFailed(true);

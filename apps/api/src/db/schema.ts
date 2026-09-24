@@ -666,6 +666,28 @@ export const userAiSettings = pgTable('user_ai_settings', {
     .notNull(),
 });
 
+// ─── Per-user app preferences (Spec 7 §5.1, archetype-first UI) ─────────────
+// Server-side so the chosen archetype follows the user to every device
+// (Spec 7 AC 3). One row per user; no row = defaults (null, {}).
+
+export const userPreferences = pgTable('user_preferences', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  /** Limitless deck slug of the archetype the app coaches; null = onboarding. */
+  activeArchetypeId: text('active_archetype_id'),
+  /** Last active deck per archetype slug. Ownership + archetype checked on write. */
+  activeDeckIdByArchetype: jsonb('active_deck_id_by_archetype')
+    .$type<Record<string, number>>()
+    .default({})
+    .notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
 // ─── Legacy Dexie import, one-time-use flag (security review, plan §3.6 addendum) ──
 // POST /api/logs/import is the ONLY place a client may write `bestOf: null` —
 // otherwise the hard-required-on-create guarantee would be a dead letter for

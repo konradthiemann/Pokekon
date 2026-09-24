@@ -3,6 +3,8 @@ import {
   getLocalMetaWeightOverrides,
   setLocalMetaWeightOverrides,
   migrateLocalMetaField,
+  readLegacyDeckArchSlug,
+  clearLegacyDeckArchSlug,
 } from './preferences';
 
 const LEGACY_KEY = 'tcg-local-meta-field-v1';
@@ -94,5 +96,23 @@ describe('migrateLocalMetaField (Spec 10 Slice D — one-time move off the dupli
     );
     const migrated = migrateLocalMetaField();
     expect(migrated).toEqual({ names: ['Good'], overrides: { good: 3 } });
+  });
+});
+
+describe('legacy deckArchSlug (Spec 7 §5.1: migrated once, deleted after a successful save)', () => {
+  it('reads the legacy slug without deleting it', () => {
+    localStorage.setItem('tcg-deck-arch-slug-v1', 'dragapult-ex');
+    expect(readLegacyDeckArchSlug()).toBe('dragapult-ex');
+    expect(localStorage.getItem('tcg-deck-arch-slug-v1')).toBe('dragapult-ex');
+  });
+
+  it('clearLegacyDeckArchSlug removes the key', () => {
+    localStorage.setItem('tcg-deck-arch-slug-v1', 'dragapult-ex');
+    clearLegacyDeckArchSlug();
+    expect(readLegacyDeckArchSlug()).toBeNull();
+  });
+
+  it('returns null when the key is absent', () => {
+    expect(readLegacyDeckArchSlug()).toBeNull();
   });
 });

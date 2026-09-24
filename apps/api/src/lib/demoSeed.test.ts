@@ -12,6 +12,8 @@ import {
   DEMO_LOGGED_MATCHES,
   DECK_A_MATCHES,
   DECK_A_CARDS_V2,
+  DECK_C_CARDS,
+  DECK_C_MATCHES,
   // Scheibe J (plan §3.11, §4 step 19): the pre-baked demo synthesis fact
   // snapshot + per-language claim lists — do not exist yet, expected to fail
   // module resolution until the implementer adds them to demoSeed.ts.
@@ -207,4 +209,31 @@ describe('demo seed deck synthesis content (plan §3.11)', () => {
       }
     },
   );
+});
+
+// Spec 7 E9: the demo's active archetype is Dragapult ex, so the seed carries a
+// third, Dragapult deck. Its matches must stay OUT of Deck A's recommendation
+// triggers (those are computed per deck, but the opponents are kept disjoint
+// anyway so a reader of the demo never sees contradictory numbers).
+describe('demo seed Dragapult deck (Spec 7 E9)', () => {
+  it('is a 60-card list with at most 4 copies of any non-basic-energy card', () => {
+    expect(DECK_C_CARDS.reduce((sum, c) => sum + c.count, 0)).toBe(60);
+    for (const card of DECK_C_CARDS) {
+      if (card.type === 'Energy' && card.name.startsWith('Basic ')) continue;
+      expect(card.count, card.name).toBeLessThanOrEqual(4);
+    }
+    expect(new Set(DECK_C_CARDS.map((c) => c.name)).size).toBe(DECK_C_CARDS.length);
+  });
+
+  it('contains Dragapult ex', () => {
+    expect(DECK_C_CARDS.some((c) => c.name === 'Dragapult ex')).toBe(true);
+  });
+
+  it('has a few result-only matches against opponents outside the Deck A triggers', () => {
+    expect(DECK_C_MATCHES.length).toBeGreaterThanOrEqual(4);
+    for (const m of DECK_C_MATCHES) {
+      expect(m.log).toBeUndefined();
+      expect(['Dragapult ex', "N's Zoroark"]).not.toContain(m.archetype);
+    }
+  });
 });

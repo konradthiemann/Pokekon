@@ -412,6 +412,29 @@ export async function getAiSettings(): Promise<AiSettings> {
   return request<AiSettings>('/api/analysis/settings');
 }
 
+// ─── User preferences (Spec 7 §5.1, archetype-first UI) ───────────────────────
+
+export interface UserPreferences {
+  activeArchetypeId: string | null;
+  activeDeckIdByArchetype: Record<string, number>;
+}
+
+export interface UserPreferencesPatch {
+  activeArchetypeId?: string | null;
+  activeDeck?: { archetypeId: string; deckId: number | null };
+}
+
+export async function getPreferences(): Promise<UserPreferences> {
+  return request<UserPreferences>('/api/preferences');
+}
+
+export async function updatePreferences(patch: UserPreferencesPatch): Promise<UserPreferences> {
+  return request<UserPreferences>('/api/preferences', {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
 /**
  * Update AI settings. `apiKey` is stored server-side encrypted and never returned:
  * omit it to keep the existing key, send `""` to clear it, or a value to (re)set it.
