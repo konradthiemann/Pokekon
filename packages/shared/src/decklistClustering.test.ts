@@ -318,6 +318,26 @@ function shuffled<T>(xs: readonly T[], rng: () => number): T[] {
   return out;
 }
 
+function permutations<T>(xs: readonly T[]): T[][] {
+  if (xs.length <= 1) return [[...xs]];
+  return xs.flatMap((x, i) =>
+    permutations([...xs.slice(0, i), ...xs.slice(i + 1)]).map((rest) => [x, ...rest]),
+  );
+}
+
+// "Middle" fixture: A~B = 58, B~C = 58, A~C = 56 ⇒ one cluster whoever seeds
+// it; summed overlaps A 114, B 116, C 114 ⇒ B is the medoid.
+function middleDecklists(): {
+  A: TournamentDecklist;
+  B: TournamentDecklist;
+  C: TournamentDecklist;
+} {
+  const A = baseDecklist();
+  const B = withCounts(A, { Switch: 0, 'Field Blower': 2 });
+  const C = withCounts(B, { 'Super Rod': 0, 'Lost Vacuum': 1, 'Earthen Vessel': 1, 'Pal Pad': 1 });
+  return { A, B, C };
+}
+
 describe('Spec 1 fixtures (sanity)', () => {
   it('chain overlaps are 57 / 57 / 54', () => {
     const { A, B, C } = chainDecklists();
@@ -432,5 +452,87 @@ describe('clusterDecklists canonical input order (Spec 1 §3.1)', () => {
       standing({ id: 3, decklist: C }),
     ]);
     expect(clusters.map((c) => c.memberStandingIds)).toEqual([[1, 2], [3]]);
+  });
+});
+
+describe('clusterDecklists representative = medoid (Spec 1 §3.2)', () => {
+  it('middle fixture overlaps are 58 / 58 / 56', () => {
+    const { A, B, C } = middleDecklists();
+    expect(computeDecklistOverlap(A, B).identicalCards).toBe(58);
+    expect(computeDecklistOverlap(B, C).identicalCards).toBe(58);
+    expect(computeDecklistOverlap(A, C).identicalCards).toBe(56);
+  });
+
+  it.each(['A', 'B', 'C'] as const)(
+    'picks the middle list B as representative when %s seeds the cluster, in every input order (AC 2)',
+    (seedKey) => {
+      const lists = middleDecklists();
+      const input = (['A', 'B', 'C'] as const).map((key, i) =>
+        standing({
+          id: i + 1,
+          decklist: lists[key],
+          ...(key === seedKey ? { placing: 1, totalPlayers: 100 } : {}),
+        }),
+      );
+      for (const order of permutations(input)) {
+        const clusters = clusterDecklists(order);
+        expect(clusters).toHaveLength(1);
+        expect(clusters[0]!.representative).toEqual(lists.B);
+      }
+    },
+  );
+
+  it('uses the only member as representative of a single-member cluster (AC 3)', () => {
+    const lone = otherDeck('Lone');
+    const clusters = clusterDecklists([standing({ id: 1, decklist: lone })]);
+    expect(clusters[0]!.representative).toEqual(lone);
+  });
+
+  it('breaks a medoid tie by better placementPercentile before smaller id', () => {
+    const M = baseDecklist();
+    const S = withCounts(M, { 'Night Stretcher': 0, Klawf: 2, 'Super Rod': 0, 'Lost Vacuum': 1 });
+    const X = withCounts(M, { Switch: 1, 'Field Blower': 1 });
+    const Y = withCounts(M, { 'Earthen Vessel': 1, 'Pal Pad': 1 });
+    expect(computeDecklistOverlap(S, X).identicalCards).toBe(56);
+    expect(computeDecklistOverlap(S, Y).identicalCards).toBe(56);
+    expect(computeDecklistOverlap(X, Y).identicalCards).toBe(58);
+
+    const clusters = clusterDecklists([
+      standing({ id: 1, decklist: S, placing: 1, totalPlayers: 100 }),
+      standing({ id: 9, decklist: X, placing: 10, totalPlayers: 100 }),
+      standing({ id: 4, decklist: Y, placing: 20, totalPlayers: 100 }),
+    ]);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0]!.representative).toEqual(X);
+  });
+
+  it('breaks a full medoid tie by smaller id, not by wins − losses', () => {
+    const first = baseDecklist();
+    const second = withCounts(first, { Switch: 0, 'Field Blower': 2 });
+    const clusters = clusterDecklists([
+      standing({ id: 7, decklist: first, wins: 6, losses: 1 }),
+      standing({ id: 3, decklist: second }),
+    ]);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0]!.memberStandingIds).toEqual([7, 3]);
+    expect(clusters[0]!.representative).toEqual(second);
+  });
+
+  it('checks membership against the seed, not the evolving medoid', () => {
+    const A = baseDecklist();
+    const B = withCounts(A, { Switch: 0, 'Field Blower': 2, 'Super Rod': 0, 'Lost Vacuum': 1 });
+    const D = withCounts(B, { 'Earthen Vessel': 0, Klawf: 2, 'Counter Catcher': 1, 'Pal Pad': 1 });
+    expect(computeDecklistOverlap(A, B).identicalCards).toBe(57);
+    expect(computeDecklistOverlap(D, B).identicalCards).toBe(57);
+    expect(computeDecklistOverlap(D, A).identicalCards).toBe(54);
+
+    const clusters = clusterDecklists([
+      standing({ id: 1, decklist: A, placing: 1, totalPlayers: 100 }),
+      standing({ id: 2, decklist: B, placing: 2, totalPlayers: 100 }),
+      standing({ id: 3, decklist: B, placing: 3, totalPlayers: 100 }),
+      standing({ id: 4, decklist: D }),
+    ]);
+    expect(clusters.map((c) => c.memberStandingIds)).toEqual([[1, 2, 3], [4]]);
+    expect(clusters[0]!.representative).toEqual(B);
   });
 });

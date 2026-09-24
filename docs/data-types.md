@@ -823,7 +823,7 @@ interface ClusterableStanding {
 }
 
 interface DecklistCluster {
-  representative: TournamentDecklist;  // first member's list encountered
+  representative: TournamentDecklist;  // medoid of the cluster (Spec 1 §3.2)
   memberStandingIds: number[];
   totalWins: number; totalLosses: number; totalTies: number;
   placements: { placing: number; totalPlayers: number }[];  // only members with BOTH values
@@ -845,6 +845,16 @@ to be "close enough to pool as one data point", not perfectly optimal. `matchRes
 Slice D) is carried through/concatenated the same way `totalWins` etc. are accumulated — raw,
 un-aggregated per-game records; `clusterFieldScore.ts` (below) is what turns them into a
 per-opponent breakdown.
+
+**Representative = medoid (Spec 1 §3.2).** Membership is always checked against the cluster's
+founding member (the *seed*, first in canonical order), never against the current
+representative, so the partition is exactly the greedy one. After the pass, `representative` is
+set to the **medoid**: the member list with the largest summed `identicalCards` to all other
+members, i.e. the most typical list rather than whichever one happened to come first. Ties go to
+the higher `placementPercentile` (missing last), then the smaller standing id. `seed` and the
+member lists are module-internal and never part of `DecklistCluster` or any API response. Cost:
+greedy pass O(n·clusters) plus O(m²) overlap comparisons per cluster of m members, with each
+member's card-count map built once.
 
 ### `RankedCluster`
 ```typescript

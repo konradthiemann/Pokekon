@@ -554,7 +554,9 @@ over an archetype's **ranked decklist clusters** (Spec 10 Slice A: near-identica
 tournament lists merged into one data point; Slice B: ranked by Wilson-score lower bound of the
 tie-weighted win rate, so a lucky small sample can't outrank a proven large one). Clustering is
 deterministic (Spec 1, `specs/archetype-list-foundation.md`): the same standings always yield the
-same clusters, independent of the order the database returns them in. Reuses the exact
+same clusters, independent of the order the database returns them in, and each cluster shows its
+most typical list (the medoid: largest summed card overlap with the other members) instead of an
+arbitrary first member. Reuses the exact
 Spec 8 anti-hallucination gate (`validateSynthesis`) — a claim must reference a real fact id and
 declare a matching `direction`, same as Deck Synthesis.
 
