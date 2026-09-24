@@ -22,7 +22,7 @@ Help Pokemon TCG players:
 
 ### Tech Stack Decisions
 - **Frontend**: React (mandatory) with a free dashboard template (e.g., Tremor, shadcn/ui + recharts, or MUI Joy UI)
-- **Database**: SQLite via sql.js or better-sqlite3 (local, free, file-based, no server needed) OR IndexedDB via Dexie.js for pure browser storage — choose based on deployment context (Electron vs. web)
+- **Database**: PostgreSQL via Drizzle in `apps/api` (Hono, Railway). Entschieden und umgesetzt, siehe `docs/architecture.md`; IndexedDB/Dexie ist nur noch Legacy für den einmaligen Import
 - **Charts/Diagrams**: Recharts or Nivo (free, composable)
 - **State Management**: Zustand or React Query for data-fetching and caching
 - **Refresh Mechanism**: Manual refresh button + optional polling interval to reload latest local DB data
@@ -53,10 +53,10 @@ Help Pokemon TCG players:
 | 1 | **TCG Project Head** | `tcg-meta-project-head.md` | Architektur, Cross-Agent-Konflikte, Priorisierung |
 | 2 | **Plan Agent** | `plan-agent.md` | Vor jeder nicht-trivialen Implementierung |
 | 3 | **React Dev Implementer** | `react-dev-implementer.md` | Komponenten, Hooks, Queries, Store-Actions implementieren |
-| 4 | **Code Review Agent** | `code-review-agent.md` | Nach Implementierung — TypeScript/React/Dexie Review |
+| 4 | **Code Review Agent** | `code-review-agent.md` | Nach Implementierung — TypeScript/React/API Review |
 | 5 | **Security Agent** | `security-agent.md` | Neues User-Input-Processing, API-Calls, Dependency-Updates |
 | 6 | **UI/UX Agent** | `ui-ux-agent.md` | Design-Entscheidungen, Chart-Konfiguration, Accessibility |
-| 7 | **Data Analyst Agent** | `data-analyst-agent.md` | Statistiken, Trends, Korrelationen aus Dexie + MetaSnapshots |
+| 7 | **Data Analyst Agent** | `data-analyst-agent.md` | Statistiken, Trends, Korrelationen aus PostgreSQL (Logs, Turniere, Meta-Snapshots) |
 | 8 | **PTCG Meta Researcher** | `ptcg-meta-researcher.md` | Externe TCG-Turnierdaten von Limitless, PokéGym abrufen |
 | 9 | **Meta Analyst** | `meta-analyst.md` | Strategische Deck-Empfehlungen auf Basis analysierter Daten |
 | 10 | **Docs Agent** | `docs-agent.md` | Dokumentation schreiben + aktuell halten |

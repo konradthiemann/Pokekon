@@ -101,7 +101,7 @@ When implementing any new feature or component, follow this exact sequence:
 Nach jeder Implementierung explizit kommunizieren:
 
 > "Implementierung abgeschlossen. Empfehle als nächste Schritte:
-> - **`code-review-agent`**: Code auf TypeScript/React/Dexie-Standards prüfen
+> - **`code-review-agent`**: Code auf TypeScript/React/API-Standards prüfen
 > - **`docs-agent`**: `.md`-Dokumentation für [Dateiname] erstellen"
 
 ---
