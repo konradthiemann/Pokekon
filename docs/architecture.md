@@ -166,7 +166,18 @@ keys themselves are BYOK: entered by the user, stored encrypted, server-side onl
 
 ### Application Shell
 
-`App.tsx` renders the layout (`Sidebar` + `BottomNav`) and one page based on
+`App.tsx` renders one of two layouts, chosen once per page load by the
+`archetypeCoachUi` flag (§Feature flags). **Flag on:** `components/coach/CoachLayout`
+(Spec 7) — `.coach-ui` root, sprite background, `CoachSidebar` (desktop: Start · Deck ·
+Coaching · Opponents · Tools + account area), `CoachHeader` (red brand band with yellow
+edge: archetype switcher, active-list chip, mobile menu with Tools + account instead of
+the floating avatar chip), `CoachBottomNav` (mobile: [Start, Deck] · ＋ paste a log ·
+[Coaching, Opponents]) and one lazily loaded page from `pages/coach/` per
+`store.coachTab`. Onboarding gate: no archetype and preferences ready → `OnboardingFlow`;
+while preferences load, before the first refresh, or for a demo guest without decks
+(seed in flight) → skeleton; a failed preferences load keeps the pages usable with a
+retry hint. The header's switcher opens the onboarding in `switchArchetype` mode.
+**Flag off (unchanged):** `Sidebar` + `BottomNav` and one page based on
 `store.activeTab` (overview · deck · meta) — the match log has
 no top-level tab of its own. Within `DeckPage`, opponent-log functionality is not
 its own section either (plan `personal-data-role-rework.md` §3.8): the page has
@@ -270,8 +281,6 @@ graph TD
     App --> MetaPage
 
     OverviewPage --> StatCard
-    OverviewPage --> MetaShareChart
-    OverviewPage --> WinRateChart
 
     DeckPage --> DeckSwitcher
     DeckPage --> MyMatchupsTable["MyMatchupsTable"]
@@ -284,7 +293,7 @@ graph TD
     DeckPanel --> AddCardModal
     DeckPanel --> ImportDeckModal
 
-    DeckAnalyticsPanel --> DeckPerformancePanel
+    DeckAnalyticsPanel --> DeckTurnQualityPanel
     DeckAnalyticsPanel --> MatchupMatrix_Deck["MatchupMatrix"]
 
     DeckTipsSection --> RecommendationsPanel
@@ -299,6 +308,44 @@ graph TD
     MetaPage --> MatchupMatrix
     MetaPage --> TournamentMetaTable["TournamentMetaTable"]
     MetaPage --> CollapsibleSection
+```
+
+`MetaShareChart`, `WinRateChart` and `DeckPerformancePanel` exist as files but are
+rendered nowhere (removed from the tree above; candidates for deletion).
+
+Archetype-first UI (`archetypeCoachUi` flag on, Spec 7):
+
+```mermaid
+graph TD
+    App --> CoachLayout
+    CoachLayout --> CoachHeader
+    CoachLayout --> CoachSidebar
+    CoachLayout --> CoachBottomNav
+    CoachLayout --> OnboardingFlow
+    CoachHeader --> ArchetypeSwitcherButton
+    CoachHeader --> ActiveListChip
+    CoachHeader --> HeaderMenuSheet
+    HeaderMenuSheet --> AccountPanel
+    CoachSidebar --> AccountPanel
+    CoachBottomNav --> AddLogModal
+    CoachLayout --> StartPage
+    CoachLayout --> DeckHubPage
+    CoachLayout --> CoachingPage
+    CoachLayout --> OpponentsPage
+    CoachLayout --> ToolsPage
+    DeckHubPage --> DeckSwitcher
+    DeckHubPage --> DeckPanel
+    DeckHubPage --> DeckSettingsWidget
+    DeckHubPage --> DeckAnalyticsPanel
+    DeckHubPage --> DeckTipsSection
+    CoachingPage --> OpponentLog
+    CoachingPage --> DeckTurnQualityPanel
+    OpponentsPage --> LocalMetaPanel
+    OpponentsPage --> PredictionPanel
+    OpponentsPage --> MyMatchupsTable
+    ToolsPage --> ArchetypeDetail
+    ToolsPage --> MatchupMatrix
+    ToolsPage --> EquilibriumPanel
 ```
 
 ---
@@ -368,6 +415,11 @@ be reachable on mobile. **Sync Live Meta** is extracted into the shared `SyncCon
 component: the desktop `Sidebar` renders it at the foot (unchanged), and the mobile
 `MobileAccountSheet` (accessible via the account chip, top right) renders the same
 block, ensuring every user can reload tournament data regardless of viewport.
+
+In the archetype-first UI (`archetypeCoachUi`) the sticky `CoachHeader` replaces the
+floating avatar chip on mobile; its menu (`HeaderMenuSheet`) and the desktop
+`CoachSidebar` both render `AccountPanel` (incl. `SyncControls`). Content is capped at
+`max-w-screen-lg`, with bottom padding for the mobile nav.
 
 ## Visual design
 

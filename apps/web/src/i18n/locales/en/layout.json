@@ -53,5 +53,11 @@
     "opponents": "Opponents",
     "tools": "Tools",
     "settings": "Settings"
+  },
+  "coach": {
+    "prefsError": "Your settings could not be loaded.",
+    "retry": "Try again",
+    "skipToContent": "Skip to content",
+    "pasteLog": "Paste a log"
   }
 }
