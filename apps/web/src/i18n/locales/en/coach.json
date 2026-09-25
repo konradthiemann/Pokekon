@@ -1,0 +1,38 @@
+{
+  "start": {
+    "activeList": "Active list",
+    "noList": "You have no list for this archetype yet.",
+    "setUpList": "Set up a list",
+    "nextStep": "Next step",
+    "next": {
+      "adoptList": {
+        "title": "Set up a list",
+        "body": "Take the meta list or paste your own.",
+        "action": "Set up a list"
+      },
+      "pasteLog": {
+        "title": "Play a round and paste the log",
+        "body": "After the game, copy the log from TCG Live — your coaching learns from it.",
+        "action": "Paste a log"
+      }
+    },
+    "form": "Your form",
+    "formWindow": "Last 7 days",
+    "formRecord": "{{wins}}–{{losses}}–{{ties}}",
+    "formBand": "Range {{low}}–{{high}} %",
+    "formEmpty": "No games in the last 7 days yet.",
+    "field": "Field this week",
+    "fieldShare": "{{share}} % share",
+    "fieldOwn": "you: {{wr}} %",
+    "fieldOwnNone": "not played yet",
+    "fieldLoading": "Loading the field …",
+    "fieldUnavailable": "The field is unavailable right now.",
+    "recent": "Recent games",
+    "recentEmpty": "Play a round and paste the log — your games will show up here.",
+    "result": {
+      "W": "Win",
+      "L": "Loss",
+      "T": "Tie"
+    }
+  }
+}

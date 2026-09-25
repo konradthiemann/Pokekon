@@ -1,0 +1,38 @@
+{
+  "start": {
+    "activeList": "Aktive Liste",
+    "noList": "Für diesen Archetyp hast du noch keine Liste.",
+    "setUpList": "Liste anlegen",
+    "nextStep": "Nächster Schritt",
+    "next": {
+      "adoptList": {
+        "title": "Leg eine Liste an",
+        "body": "Übernimm die Meta-Liste oder füge deine eigene ein.",
+        "action": "Liste anlegen"
+      },
+      "pasteLog": {
+        "title": "Spiel eine Runde und füge das Log ein",
+        "body": "Kopiere nach dem Spiel das Protokoll aus TCG Live – daraus lernt dein Coaching.",
+        "action": "Log einfügen"
+      }
+    },
+    "form": "Deine Form",
+    "formWindow": "Letzte 7 Tage",
+    "formRecord": "{{wins}}–{{losses}}–{{ties}}",
+    "formBand": "Bereich {{low}}–{{high}} %",
+    "formEmpty": "Noch keine Spiele in den letzten 7 Tagen.",
+    "field": "Feld diese Woche",
+    "fieldShare": "{{share}} % Anteil",
+    "fieldOwn": "du: {{wr}} %",
+    "fieldOwnNone": "noch nicht gespielt",
+    "fieldLoading": "Feld wird geladen …",
+    "fieldUnavailable": "Das Feld ist gerade nicht verfügbar.",
+    "recent": "Letzte Spiele",
+    "recentEmpty": "Spiel eine Runde und füge das Log ein – deine Spiele erscheinen dann hier.",
+    "result": {
+      "W": "Sieg",
+      "L": "Niederlage",
+      "T": "Unentschieden"
+    }
+  }
+}
