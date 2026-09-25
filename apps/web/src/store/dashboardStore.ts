@@ -131,6 +131,14 @@ interface DashboardState {
   // UI state
   isLoading: boolean;
   lastRefreshed: Date | null;
+  /** The last refresh() failed (cleared by the next successful one). */
+  refreshError: boolean;
+  /** hydrate() is running — the coach layout waits so no deck of another
+   *  archetype flashes between its two refreshes. */
+  isHydrating: boolean;
+  /** Set by the demo entry while the guest account is being seeded, so the
+   *  coach layout shows a skeleton instead of the onboarding. */
+  demoSeedPending: boolean;
   activeTab: DashboardTab;
   deckSection: DeckSection;
   coachTab: CoachTab;
@@ -154,6 +162,7 @@ interface DashboardState {
    *  migration needs the active deck) → with `archetypeCoachUi` on, a second
    *  refresh so the active deck belongs to the coached archetype. */
   hydrate: () => Promise<void>;
+  setDemoSeedPending: (pending: boolean) => void;
   setActiveTab: (tab: DashboardTab) => void;
   setDeckSection: (section: DeckSection) => void;
   /** Jumps directly into the deck comparison: sets activeTab='deck' AND
@@ -232,6 +241,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   synthesisError: null,
   isLoading: false,
   lastRefreshed: null,
+  refreshError: false,
+  isHydrating: false,
+  demoSeedPending: false,
   activeTab: 'overview',
   deckSection: 'deck',
   coachTab: 'start',
@@ -313,6 +325,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         archetypeStats,
         lastRefreshed: new Date(),
         isLoading: false,
+        refreshError: false,
       });
 
       if (!activeDeck && previousArchetype !== undefined) {
@@ -326,15 +339,22 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       }
     } catch (err) {
       console.error('[DashboardStore] refresh failed:', err);
-      set({ isLoading: false });
+      set({ isLoading: false, refreshError: true });
     }
   },
 
   hydrate: async () => {
-    await get().refresh();
-    await get().loadPreferences();
-    if (isArchetypeCoachUiEnabled()) await get().refresh();
+    set({ isHydrating: true });
+    try {
+      await get().refresh();
+      await get().loadPreferences();
+      if (isArchetypeCoachUiEnabled()) await get().refresh();
+    } finally {
+      set({ isHydrating: false });
+    }
   },
+
+  setDemoSeedPending: (pending) => set({ demoSeedPending: pending }),
 
   setActiveTab: (tab) => set({ activeTab: tab }),
 

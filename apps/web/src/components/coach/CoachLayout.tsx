@@ -1,7 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { authClient } from '../../lib/authClient';
-import { isAnonymousUser } from '../../lib/demo';
 import { useDashboardStore, type CoachTab } from '../../store/dashboardStore';
 import { DemoBanner } from '../auth/DemoBanner';
 import { DeckSpriteBackground } from '../DeckSpriteBackground';
@@ -45,9 +43,17 @@ const PAGES: Record<CoachTab, ReactNode> = {
  */
 export function CoachLayout() {
   const { t } = useTranslation('layout');
-  const { preferencesStatus, activeArchetypeId, decks, coachTab, lastRefreshed, loadPreferences } =
-    useDashboardStore();
-  const { data: session } = authClient.useSession();
+  const {
+    preferencesStatus,
+    activeArchetypeId,
+    coachTab,
+    lastRefreshed,
+    refreshError,
+    isHydrating,
+    demoSeedPending,
+    loadPreferences,
+    hydrate,
+  } = useDashboardStore();
   const [switching, setSwitching] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
 
@@ -57,12 +63,14 @@ export function CoachLayout() {
     window.scrollTo?.({ top: 0 });
   }, [coachTab]);
 
-  const demoSeeding = isAnonymousUser(session?.user) && decks.length === 0;
+  // Skeleton only while something is genuinely in flight; a failed load shows
+  // an error with retry instead (never an endless skeleton).
   const loading =
+    isHydrating ||
+    demoSeedPending ||
     preferencesStatus === 'idle' ||
     preferencesStatus === 'loading' ||
-    lastRefreshed === null ||
-    demoSeeding;
+    (lastRefreshed === null && !refreshError);
   const needsOnboarding = preferencesStatus === 'ready' && activeArchetypeId === null;
 
   let content: ReactNode;
@@ -86,21 +94,38 @@ export function CoachLayout() {
 
   return (
     <div className="coach-ui relative flex min-h-screen">
+      <a
+        href="#coach-main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-bold focus:text-brand-700 focus:shadow-card"
+      >
+        {t('coach.skipToContent')}
+      </a>
       <DeckSpriteBackground />
       <CoachSidebar />
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
         <CoachHeader onSwitchArchetype={() => setSwitching(true)} />
-        <main ref={mainRef} className="flex-1 overflow-y-auto pb-20 md:pb-4">
+        <main
+          id="coach-main"
+          ref={mainRef}
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto pb-20 outline-none md:pb-4"
+        >
           <div className="mx-auto max-w-screen-lg p-3 md:p-4">
             <DemoBanner />
-            {preferencesStatus === 'error' && (
+            {(preferencesStatus === 'error' || refreshError) && (
               <div
                 role="alert"
                 className="card mb-3 flex flex-wrap items-center justify-between gap-2"
               >
-                <p className="text-sm text-slate-900">{t('coach.prefsError')}</p>
-                <button type="button" className="btn-ghost" onClick={() => void loadPreferences()}>
+                <p className="text-sm text-slate-900">
+                  {refreshError ? t('coach.dataError') : t('coach.prefsError')}
+                </p>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => void (refreshError ? hydrate() : loadPreferences())}
+                >
                   {t('coach.retry')}
                 </button>
               </div>

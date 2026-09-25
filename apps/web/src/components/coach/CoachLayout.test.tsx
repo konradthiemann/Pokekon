@@ -11,7 +11,11 @@ interface StoreMock {
   decks: unknown[];
   coachTab: string;
   lastRefreshed: Date | null;
+  refreshError: boolean;
+  isHydrating: boolean;
+  demoSeedPending: boolean;
   loadPreferences: ReturnType<typeof vi.fn>;
+  hydrate: ReturnType<typeof vi.fn>;
 }
 let store: StoreMock;
 vi.mock('../../store/dashboardStore', () => ({ useDashboardStore: () => store }));
@@ -67,7 +71,11 @@ beforeEach(() => {
     decks: [{}],
     coachTab: 'start',
     lastRefreshed: new Date(),
+    refreshError: false,
+    isHydrating: false,
+    demoSeedPending: false,
     loadPreferences: vi.fn(),
+    hydrate: vi.fn(),
   };
 });
 
@@ -97,13 +105,43 @@ describe('CoachLayout (Spec 7 §4, §5.1)', () => {
     expect(screen.getByTestId('coach-skeleton')).toBeInTheDocument();
   });
 
-  it('shows a skeleton for an anonymous user with zero decks (demo seed in flight)', () => {
+  it('shows a skeleton while the demo seed is in flight', () => {
     session(true);
     store.activeArchetypeId = null;
     store.decks = [];
+    store.demoSeedPending = true;
     render(<CoachLayout />);
     expect(screen.queryByTestId('onboarding')).toBeNull();
     expect(screen.getByTestId('coach-skeleton')).toBeInTheDocument();
+  });
+
+  it('does not hang for an anonymous user who deleted every deck (no seed pending)', async () => {
+    session(true);
+    store.decks = [];
+    render(<CoachLayout />);
+    expect(await screen.findByTestId('page-start')).toBeInTheDocument();
+  });
+
+  it("shows a skeleton while hydrating, so no other archetype's deck flashes", () => {
+    store.isHydrating = true;
+    render(<CoachLayout />);
+    expect(screen.getByTestId('coach-skeleton')).toBeInTheDocument();
+  });
+
+  it('shows an error with retry instead of an endless skeleton when loading the data failed', async () => {
+    store.lastRefreshed = null;
+    store.refreshError = true;
+    render(<CoachLayout />);
+    expect(screen.queryByTestId('coach-skeleton')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(store.hydrate).toHaveBeenCalled();
+  });
+
+  it('offers a skip link to the main content', () => {
+    render(<CoachLayout />);
+    const link = screen.getByRole('link', { name: 'Skip to content' });
+    expect(link).toHaveAttribute('href', '#coach-main');
+    expect(document.getElementById('coach-main')).not.toBeNull();
   });
 
   it.each(['start', 'deck', 'coaching', 'opponents', 'tools'])(

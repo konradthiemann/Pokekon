@@ -37,6 +37,9 @@ export function WelcomeScreen() {
   async function startDemo() {
     setIsPreparingDemo(true);
     setDemoFailed(false);
+    // Tells the coach layout that an empty guest account is being seeded —
+    // it shows a skeleton instead of the onboarding meanwhile.
+    useDashboardStore.getState().setDemoSeedPending(true);
     try {
       const { error } = await authClient.signIn.anonymous();
       if (error) throw new Error(error.message ?? 'anonymous sign-in failed');
@@ -49,6 +52,8 @@ export function WelcomeScreen() {
     } catch {
       setDemoFailed(true);
       setIsPreparingDemo(false);
+    } finally {
+      useDashboardStore.getState().setDemoSeedPending(false);
     }
   }
 

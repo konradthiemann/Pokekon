@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
@@ -13,6 +13,15 @@ export function HeaderMenuSheet({ open, onClose }: { open: boolean; onClose: () 
   const { t } = useTranslation('layout');
   const { setCoachTab } = useDashboardStore();
   const [showAiSettings, setShowAiSettings] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  // Focus moves into the dialog on open and back to the trigger on close.
+  useEffect(() => {
+    if (!open) return;
+    const trigger = document.activeElement as HTMLElement | null;
+    closeRef.current?.focus();
+    return () => trigger?.focus?.();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -46,6 +55,7 @@ export function HeaderMenuSheet({ open, onClose }: { open: boolean; onClose: () 
                   {t('header.menu')}
                 </h2>
                 <button
+                  ref={closeRef}
                   type="button"
                   onClick={onClose}
                   aria-label={t('close', { ns: 'common' })}

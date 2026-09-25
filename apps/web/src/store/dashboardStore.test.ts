@@ -874,6 +874,41 @@ describe('dashboardStore preferences + coach navigation (Spec 7 §5.1, plan S4)'
     expect(useDashboardStore.getState().activeDeckId).toBe(1);
   });
 
+  it('refresh flags refreshError on failure and clears it on the next success', async () => {
+    mockedGetDecks.mockRejectedValueOnce(new Error('500'));
+    await useDashboardStore.getState().refresh();
+    expect(useDashboardStore.getState().refreshError).toBe(true);
+    mockedGetDecks.mockResolvedValueOnce([DECK_A]);
+    await useDashboardStore.getState().refresh();
+    expect(useDashboardStore.getState().refreshError).toBe(false);
+  });
+
+  it('isHydrating is true for the whole hydrate (both refreshes), false afterwards', async () => {
+    mockedFlag.mockReturnValue(true);
+    mockedGetDecks.mockResolvedValue([DECK_A, DECK_B]);
+    mockedGetPrefs.mockResolvedValue({
+      activeArchetypeId: 'gardevoir-ex',
+      activeDeckIdByArchetype: {},
+    });
+    const seen: boolean[] = [];
+    mockedGetDecks.mockImplementation(async () => {
+      seen.push(useDashboardStore.getState().isHydrating);
+      return [DECK_A, DECK_B];
+    });
+    const done = useDashboardStore.getState().hydrate();
+    expect(useDashboardStore.getState().isHydrating).toBe(true);
+    await done;
+    expect(seen).toEqual([true, true]);
+    expect(useDashboardStore.getState().isHydrating).toBe(false);
+  });
+
+  it('demoSeedPending can be set and cleared', () => {
+    useDashboardStore.getState().setDemoSeedPending(true);
+    expect(useDashboardStore.getState().demoSeedPending).toBe(true);
+    useDashboardStore.getState().setDemoSeedPending(false);
+    expect(useDashboardStore.getState().demoSeedPending).toBe(false);
+  });
+
   it('coachTab defaults to "start" and setCoachTab switches it', () => {
     expect(useDashboardStore.getState().coachTab).toBe('start');
     useDashboardStore.getState().setCoachTab('opponents');

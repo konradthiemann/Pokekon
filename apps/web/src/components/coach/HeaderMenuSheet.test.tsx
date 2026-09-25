@@ -46,3 +46,16 @@ describe('HeaderMenuSheet (Spec 7 §4, mobile menu)', () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+
+describe('HeaderMenuSheet focus management', () => {
+  it('moves focus into the dialog on open and back to the trigger on close', () => {
+    const trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    trigger.focus();
+    const { rerender } = render(<HeaderMenuSheet open onClose={() => {}} />);
+    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true);
+    rerender(<HeaderMenuSheet open={false} onClose={() => {}} />);
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+});
