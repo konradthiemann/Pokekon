@@ -155,12 +155,14 @@ export function StartPage() {
             <li key={row.archetypeId}>
               <button type="button" className={rowButton} onClick={() => setCoachTab('opponents')}>
                 <PokemonIcon archetype={row.archetypeId} size="sm" />
-                <span className="flex-1 truncate font-semibold text-slate-900">{row.name}</span>
-                <span className="text-xs text-slate-600 tabular-nums">
-                  {t('start.fieldShare', { share: pct.format(row.sharePct) })}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold text-slate-900">{row.name}</span>
+                  <span className="block text-xs text-slate-600 tabular-nums">
+                    {t('start.fieldShare', { share: pct.format(row.sharePct) })}
+                  </span>
                 </span>
                 <span
-                  className={`w-24 text-right text-xs font-semibold tabular-nums ${
+                  className={`shrink-0 text-right text-xs font-semibold tabular-nums ${
                     row.ownWinRatePct === null
                       ? 'text-slate-500'
                       : winRateColorClass(row.ownWinRatePct)

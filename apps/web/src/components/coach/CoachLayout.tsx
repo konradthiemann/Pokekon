@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authClient } from '../../lib/authClient';
 import { isAnonymousUser } from '../../lib/demo';
@@ -49,6 +49,13 @@ export function CoachLayout() {
     useDashboardStore();
   const { data: session } = authClient.useSession();
   const [switching, setSwitching] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+
+  // A new area starts at the top, not at the previous page's scroll offset.
+  useEffect(() => {
+    mainRef.current?.scrollTo?.({ top: 0 });
+    window.scrollTo?.({ top: 0 });
+  }, [coachTab]);
 
   const demoSeeding = isAnonymousUser(session?.user) && decks.length === 0;
   const loading =
@@ -84,7 +91,7 @@ export function CoachLayout() {
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
         <CoachHeader onSwitchArchetype={() => setSwitching(true)} />
-        <main className="flex-1 overflow-y-auto pb-20 md:pb-4">
+        <main ref={mainRef} className="flex-1 overflow-y-auto pb-20 md:pb-4">
           <div className="mx-auto max-w-screen-lg p-3 md:p-4">
             <DemoBanner />
             {preferencesStatus === 'error' && (
