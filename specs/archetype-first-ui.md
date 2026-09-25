@@ -1,6 +1,6 @@
 # Spec 7: UI/UX-Umbau „Archetyp zuerst"
 
-> **Status:** Entwurf, wartet auf Freigabe durch Konrad. **Wireframe:** Design-Canvas
+> **Status:** Freigegeben 2026-09-24. **Scheibe 1 umgesetzt** (PRs #103, #104 und PR (c), hinter `archetypeCoachUi`); Scheibe 2 offen. **Wireframe:** Design-Canvas
 > „Pokekon – Archetyp-Coach Wireframe" (außerhalb des Repos, wie bei der Hub-Spec).
 > Kontext: Teil 7 von 8 aus [`specs/archetype-coach-vision.md`](./archetype-coach-vision.md).
 > Belege: Stand `main` = `baebcc5`.

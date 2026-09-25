@@ -17,7 +17,7 @@ Hono + PostgreSQL backend in `apps/api`, and this documentation site in
 | [agents.md](./agents.md) | Claude agent ecosystem — who does what, when to trigger each agent |
 | [ai-system.md](./ai-system.md) | **KI-System-Gesamtübersicht** — Schichtenmodell, Guardrails, Orchestrierung, Memory, Diagramme |
 | [backend-evolution-plan.md](./backend-evolution-plan.md) | Roadmap: Backend-Ausbau, Battle-Log-Zugqualität, Doku-Viewer (Starlight) |
-| [features.md](./features.md) | All app features explained: meta sync, battle log, deck comparison, recommendations, snapshots |
+| [features.md](./features.md) | All app features explained: meta sync, battle log, deck comparison, recommendations, snapshots; §21 the archetype-first coach UI behind `archetypeCoachUi` |
 | [demo-mode.md](./demo-mode.md) | Guest/demo access — anonymous login, seeded sample data, AI analysis without spending tokens |
 | [getting-started.md](./getting-started.md) | Dev setup, build, deploy |
 

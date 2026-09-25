@@ -682,7 +682,18 @@ To track whether the meta is favoring a deck, we compare the **week-over-week fi
 
 Decks in equilibrium are not necessarily popular, and popular decks are not necessarily in equilibrium. When a deck has high observed meta share but zero equilibrium weight (or a very low weight), that's the "popularity paradox"—played by many pilots despite being suboptimal to play against the current distribution. This is flagged with an icon and label pair (not color alone, for accessibility) in the equilibrium composition display, and the exclusion robustness for such a deck reinforces the statement: "in X% of scenarios, this deck drops out entirely."
 
-## 21. Active Archetype (server-side, Spec 7 — in progress behind `archetypeCoachUi`)
+## 21. Archetype-first Coach UI (Spec 7 Scheibe 1, behind `archetypeCoachUi`)
+
+**Try it:** open the app with `?ff=archetypeCoachUi` (remembered in this browser; turn it off
+with `?ff=-archetypeCoachUi`). Everyone else keeps the old layout until the flag is switched
+after Scheibe 2. The UI revolves around **one coached archetype** and makes the core loop
+visible: pick a list → copy it for TCG Live → play → paste the log (＋ in the bottom nav) →
+coaching. Areas: *Start · Deck · Coaching · Opponents* in the bottom nav, *Tools* in the header
+menu (desktop: all five in the sidebar). The header shows the archetype switcher (reopens the
+onboarding in switch mode) and the active list. Onboarding appears only when no archetype is
+set; existing accounts are migrated once and skip it; the demo opens on Dragapult ex.
+
+### Active archetype (server-side)
 
 **Route:** `GET`/`PATCH /api/preferences` (`apps/api/src/routes/preferences.ts`)
 
