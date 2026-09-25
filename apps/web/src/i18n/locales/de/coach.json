@@ -34,5 +34,21 @@
       "L": "Niederlage",
       "T": "Unentschieden"
     }
+  },
+  "coaching": {
+    "heading": "Coaching",
+    "intro": "Füge nach jedem Spiel das Log aus TCG Live ein. Daraus entstehen Analyse, Zugqualität und später dein Coaching.",
+    "pasteLog": "TCG-Live-Log einfügen",
+    "history": "Verlauf",
+    "turnQuality": "Zugqualität",
+    "guide": {
+      "title": "So kopierst du ein Log aus TCG Live",
+      "steps": [
+        "Spiel eine Partie in Pokémon TCG Live.",
+        "Öffne nach dem Spiel das Spielprotokoll.",
+        "Tippe auf „Kopieren“.",
+        "Tippe hier auf „TCG-Live-Log einfügen“ und füge es ein."
+      ]
+    }
   }
 }

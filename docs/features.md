@@ -720,3 +720,10 @@ moves to Coaching). *Lab* joins with Spec 6. Without a list of the archetype bot
 the onboarding's list step (`ListSetup`: take the meta list / paste own list). `DeckSettingsWidget`
 now lives in `components/deck/` (extracted from `DeckPage`, unchanged in the old layout).
 
+**Coaching (coach layout, `pages/coach/CoachingPage.tsx`, Scheibe 1):** a prominent *paste TCG
+Live log* action (`AddLogModal` for the active deck), the history of this archetype's games
+(`OpponentLog`, only logs of decks of the coached archetype; detail modal and match stats as in §6)
+and the active deck's turn quality (`DeckTurnQualityPanel`, moved here from Deck analytics). Without
+logs a four-step text guide explains how to copy a log from TCG Live. Filters, the result card after
+pasting and the hint to AI settings arrive with Spec 8 / Scheibe 6.
+

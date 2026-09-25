@@ -34,5 +34,21 @@
       "L": "Loss",
       "T": "Tie"
     }
+  },
+  "coaching": {
+    "heading": "Coaching",
+    "intro": "Paste the TCG Live log after every game. Analysis, turn quality and later your coaching are built from it.",
+    "pasteLog": "Paste TCG Live log",
+    "history": "History",
+    "turnQuality": "Turn quality",
+    "guide": {
+      "title": "How to copy a log from TCG Live",
+      "steps": [
+        "Play a game in Pokémon TCG Live.",
+        "After the game, open the game log.",
+        "Tap “Copy”.",
+        "Tap “Paste TCG Live log” here and paste it."
+      ]
+    }
   }
 }
