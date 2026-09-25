@@ -35,7 +35,7 @@ export function SegmentedTabs<T extends string>({
           aria-selected={active === id}
           onClick={() => onChange(id)}
           className={[
-            'flex-1 flex items-center justify-center gap-2 py-3 text-xs font-medium transition-all',
+            'flex-1 flex items-center justify-center gap-2 py-3 min-h-[44px] text-xs font-medium transition-all',
             active === id
               ? 'text-brand-800 bg-brand-50 shadow-[inset_0_-2px_0_0_rgba(96,165,250,0.6)]'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',

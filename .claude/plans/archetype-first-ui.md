@@ -197,7 +197,7 @@ Konsequenzen für den Zuschnitt (alle als Default, siehe §8 Entscheidungsbedarf
 | `apps/web/src/components/deck/DeckTipsSection.tsx` | Ergänzung | Ziel des Local-Meta-Links | S10 |
 | `apps/web/src/components/meta/ArchetypeDetail.tsx` | Ergänzung | `onBack` optional | S13 |
 | `apps/web/src/i18n/index.ts`, `locales/{de,en}/*.json` | Ergänzung | neue Namespaces/Keys | S7–S14 |
-| `apps/web/src/i18n/localeParity.test.ts` | neu | DE/EN-Parität | S7 |
+| `apps/web/src/i18n/actionLabels.test.ts` (A5) | Änderung | DE/EN-Parität existierte schon dort; Namespace-Zahl 9 → 10 (umgesetzt statt einer neuen `localeParity.test.ts`) | S7/S8 |
 | `docs/*.md` | Ergänzung | Docs-Gate + Golden Rule 7 | jede |
 
 ---

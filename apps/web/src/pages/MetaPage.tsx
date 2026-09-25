@@ -20,14 +20,13 @@ import {
 } from 'lucide-react';
 import type { RecentTournament } from '../types';
 import {
-  getFieldAnalysis,
   getMetaEquilibrium,
-  type FieldAnalysis,
   type FieldAnalysisArchetype,
   type MetaEquilibriumResponse,
   type MetaWindow,
 } from '../lib/api';
 import { ArchetypeDetail } from '../components/meta/ArchetypeDetail';
+import { useFieldAnalysis } from '../hooks/useFieldAnalysis';
 import { MetaWindowControl } from '../components/meta/MetaWindowControl';
 import { META_DEFAULT_DAYS } from '../components/meta/metaWindow';
 import { PredictionPanel } from '../components/meta/PredictionPanel';
@@ -498,31 +497,14 @@ export function MetaPage() {
 
   // The overview table IS the day-window field analysis (share, win rate, record
   // and meta-weighted field score per archetype), so the day/online controls
-  // genuinely drive the metashare. The result is tagged with the request key it
-  // answers (window + last sync) so switching windows shows a loading state
-  // rather than stale data — and no setState runs synchronously in the effect.
-  const [loaded, setLoaded] = useState<{ key: string; data: FieldAnalysis } | null>(null);
-  const [failedKey, setFailedKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const key = `${days}|${onlineBo1}|${lastSynced?.getTime() ?? 0}`;
-    getFieldAnalysis({ days, online: onlineBo1, bo1: onlineBo1 })
-      .then((res) => {
-        if (!cancelled) setLoaded({ key, data: res });
-      })
-      .catch(() => {
-        if (!cancelled) setFailedKey(key);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [days, onlineBo1, lastSynced]);
-
-  const requestKey = `${days}|${onlineBo1}|${lastSynced?.getTime() ?? 0}`;
-  const fieldAnalysis = loaded?.key === requestKey ? loaded.data : null;
-  const fieldError = failedKey === requestKey;
-  const isLoadingField = fieldAnalysis === null && !fieldError;
+  // genuinely drive the metashare. useFieldAnalysis tags each answer with its
+  // request key (window + last sync), so switching windows shows a loading state
+  // rather than stale data.
+  const {
+    data: fieldAnalysis,
+    isLoading: isLoadingField,
+    error: fieldError,
+  } = useFieldAnalysis(metaWindow);
 
   // Game-theoretic equilibrium (plan .claude/plans/meta-game-theory-layer.md
   // §3.8 / §4 step 21) — a separate, "experimental" section that reads its

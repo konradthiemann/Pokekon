@@ -96,6 +96,41 @@
       hover:bg-slate-50 hover:border-slate-400;
   }
 
+  /* Destructive action (Spec 7 §9a): red OUTLINE, never filled — a filled red
+     button reads as the primary action. Callers still confirm before deleting. */
+  .btn-destructive {
+    @apply btn bg-white text-poke-600 border border-poke-600 hover:bg-poke-50;
+  }
+
+  /* ── Win-rate colours (winRateColor.ts) ────────────────────────────────── */
+  /* Semantic classes so the archetype-first UI can recolour them: the old
+     layout keeps emerald/amber/red, the coach layout (.coach-ui) uses blue for
+     positive and orange for negative, keeping red exclusively for the brand. */
+  .wr-pos {
+    @apply text-emerald-700;
+  }
+  .wr-mid {
+    @apply text-amber-700;
+  }
+  .wr-neg {
+    @apply text-red-700;
+  }
+  .coach-ui .wr-pos {
+    @apply text-brand-700;
+  }
+  .coach-ui .wr-mid {
+    @apply text-slate-700;
+  }
+  .coach-ui .wr-neg {
+    @apply text-orange-700;
+  }
+
+  /* Coach layout: cards are slightly translucent so the archetype sprite
+     background shows through at the edges (Spec 7 §9a). */
+  .coach-ui .card {
+    background-color: rgb(255 255 255 / 0.94);
+  }
+
   /* ── Form controls ─────────────────────────────────────────────────────── */
   .input {
     @apply w-full rounded-md bg-white border border-slate-300 px-3 py-2.5 text-sm

@@ -189,6 +189,40 @@ service, so the per-browser override lets the new UI be tried in production
 without switching it on for everyone. A pure UI switch, not a security boundary —
 the API remains the authority for all data.
 
+### Archetype-first UI (Spec 7, in progress behind `archetypeCoachUi`)
+
+Building blocks shared by the coach layout (`specs/archetype-first-ui.md`, plan
+`.claude/plans/archetype-first-ui.md`):
+
+- `components/coach/ArchetypeSwitcherButton` — header control: icon + name of the
+  coached archetype (or "choose archetype"), opens the archetype switch.
+- `components/coach/ActiveListChip` — header chip with the active list and its newest
+  snapshot label; opens *Deck › My lists* (where "copy for TCG Live" lives).
+- `components/auth/AccountPanel` — account content (identity, AI settings, sync,
+  language, sign-out, legal links), extracted from `MobileAccountSheet` so the coach
+  header menu can reuse it. Sync stays available to everyone (no admin role, E16).
+- `components/shared/SegmentedTabs` — segment bar (≥44 px tabs), used by `DeckPage`,
+  `ArchetypeDetail` and the coach *Deck* page.
+- `hooks/useFieldAnalysis(window)` — field analysis per meta window with request-key
+  tagging (shared by `MetaPage` and the coach pages).
+- `lib/coach/archetypeName.ts` — display name for a slug: curated list → field
+  analysis → own deck → slug.
+- DE/EN key parity for every namespace is guarded by `i18n/actionLabels.test.ts` (A5).
+- `components/coach/onboarding/OnboardingFlow` (Spec 7 §5.1, namespace `onboarding`):
+  1. **Archetype** — the 10 most-played archetypes of the last 7 days
+     (`useFieldAnalysis`) with share, plus a search over the field and
+     `KNOWN_ARCHETYPES` (name or slug); choosing calls `setActiveArchetype`.
+  2. **List** (skipped when a deck of that archetype exists) — *take the meta list*
+     (Spec 7 E7: until Spec 5 the medoid of the best cluster from
+     `GET /api/analysis/archetype/:id`, 90 days, global; disabled with a hint when
+     there are no clusters; `lib/coach/onboarding.ts#medoidToParsedCards` maps the
+     cards directly — the PTCGL text parser would drop cards without a print),
+     *paste my own list* (empty deck + `ImportDeckModal`) or *later*.
+  3. **TCG Live name** (first run only, skippable) → localStorage `tcg-player-name`
+     until Spec 8 moves it server-side.
+  Mode `switchArchetype` reuses steps 1–2 for the header's archetype switch and can
+  be cancelled. The red strip is the brand surface allowed by `theme/noFilledRed.test.ts`.
+
 ### State Management Pattern
 
 A single Zustand store (`useDashboardStore`) owns the data arrays

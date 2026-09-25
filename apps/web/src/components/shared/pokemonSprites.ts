@@ -178,4 +178,13 @@ export function spriteForPokemon(name: string): string {
   return pokemonToSprite(name);
 }
 
+/** Candidate URLs for an archetype's primary sprite, in the same source order
+ *  as PokemonIcon's cascade (Limitless first, then pokesprite). Empty when
+ *  there is no archetype or no sprite resolves. */
+export function spriteUrlCandidates(archetype: string): string[] {
+  if (!archetype) return [];
+  const primary = resolve(archetype)?.[0];
+  return primary ? SPRITE_BASES.map((base) => `${base}/${primary}.png`) : [];
+}
+
 export { resolve as resolveArchetypeSprites, SPRITE_BASES };

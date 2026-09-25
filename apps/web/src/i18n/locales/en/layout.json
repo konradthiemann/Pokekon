@@ -38,5 +38,20 @@
   },
   "tournaments": {
     "fetchFailed": "Failed"
+  },
+  "header": {
+    "switchArchetype": "Switch archetype",
+    "chooseArchetype": "Choose archetype",
+    "noList": "No list",
+    "activeList": "Active list",
+    "menu": "Menu"
+  },
+  "coachNav": {
+    "start": "Start",
+    "deck": "Deck",
+    "coaching": "Coaching",
+    "opponents": "Opponents",
+    "tools": "Tools",
+    "settings": "Settings"
   }
 }
