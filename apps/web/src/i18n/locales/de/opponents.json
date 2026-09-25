@@ -155,5 +155,13 @@
   "analysis": {
     "apiError": "Anthropic API-Fehler {{status}}: {{message}}",
     "parseError": "Die KI-Antwort konnte nicht gelesen werden (ungültiges JSON)."
+  },
+  "page": {
+    "heading": "Gegner",
+    "intro": "Das Feld aus Sicht deines Archetyps: dein lokales Feld, die Prognose und deine Bilanz pro Gegner.",
+    "myField": "Mein Feld",
+    "myMatchups": "Deine Bilanz pro Gegner",
+    "loading": "Feld wird geladen …",
+    "unavailable": "Das Feld ist gerade nicht verfügbar. Versuch es später noch einmal."
   }
 }

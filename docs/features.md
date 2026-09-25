@@ -727,3 +727,9 @@ and the active deck's turn quality (`DeckTurnQualityPanel`, moved here from Deck
 logs a four-step text guide explains how to copy a log from TCG Live. Filters, the result card after
 pasting and the hint to AI settings arrive with Spec 8 / Scheibe 6.
 
+**Opponents (coach layout, `pages/coach/OpponentsPage.tsx`, Scheibe 1):** the shared meta window
+(store `metaWindow`, `MetaWindowControl`; online and Bo1 move together), *My field*
+(`LocalMetaPanel` + `PredictionPanel` with field score, threats and lists, see §11/§16) and the
+own record per opponent (`MyMatchupsTable`, moved here from the old Deck page). Opponent detail
+(typical cards, coaching hotspot) arrives with Specs 5/8.
+
