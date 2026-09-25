@@ -50,5 +50,18 @@
         "Tap “Paste TCG Live log” here and paste it."
       ]
     }
+  },
+  "tools": {
+    "heading": "Tools",
+    "intro": "Analyses for your archetype. You'll find the general meta on Limitless and TrainerHill.",
+    "tournamentLists": "Tournament lists",
+    "matrix": "Matchup matrix",
+    "gameTheory": "Game theory (experimental)",
+    "loading": "Loading …",
+    "unavailable": "Unavailable right now.",
+    "generalMeta": "General meta",
+    "limitless": "Limitless – decks and tournaments",
+    "trainerhill": "TrainerHill – meta and matchups",
+    "opensNewTab": "opens in a new tab"
   }
 }

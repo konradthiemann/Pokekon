@@ -50,5 +50,18 @@
         "Tippe hier auf „TCG-Live-Log einfügen“ und füge es ein."
       ]
     }
+  },
+  "tools": {
+    "heading": "Werkzeuge",
+    "intro": "Analysen für deinen Archetyp. Das allgemeine Meta findest du bei Limitless und TrainerHill.",
+    "tournamentLists": "Turnierlisten",
+    "matrix": "Matchup-Matrix",
+    "gameTheory": "Spieltheorie (experimentell)",
+    "loading": "Wird geladen …",
+    "unavailable": "Gerade nicht verfügbar.",
+    "generalMeta": "Allgemeines Meta",
+    "limitless": "Limitless – Decks und Turniere",
+    "trainerhill": "TrainerHill – Meta und Matchups",
+    "opensNewTab": "öffnet in neuem Tab"
   }
 }

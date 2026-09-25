@@ -733,3 +733,11 @@ pasting and the hint to AI settings arrive with Spec 8 / Scheibe 6.
 own record per opponent (`MyMatchupsTable`, moved here from the old Deck page). Opponent detail
 (typical cards, coaching hotspot) arrives with Specs 5/8.
 
+**Tools (coach layout, `pages/coach/ToolsPage.tsx`, Scheibe 1, still unfiltered):** the archetype
+drilldown (§15, `ArchetypeDetail`) for the coached archetype, open, without a back button
+(`onBack` is optional now); the matchup matrix (§13) and game theory (§18, shared
+`hooks/useMetaEquilibrium`, also used by `MetaPage`) collapsed; link cards to Limitless and
+TrainerHill for the general meta (`target="_blank"`, `rel="noopener noreferrer"`). The old Meta
+page's general tournament tables are not shown here. Narrowing the tools to the archetype and
+dissolving `ArchetypeDetail` follow in Scheibe 2.
+

@@ -78,7 +78,8 @@ interface ArchetypeDetailProps {
   window: MetaWindow;
   onDaysChange: (days: number) => void;
   onOnlineBo1Change: (onlineBo1: boolean) => void;
-  onBack: () => void;
+  /** Omitted when embedded as a page section (coach Tools, Spec 7 §5.6). */
+  onBack?: () => void;
   /** Own opponent-facing record for every archetype (dashboardStore, always
    *  `[]` at minimum -- never `undefined`), passed through to
    *  `ArchetypeRecommendationPanel`'s "Mein Spielstil" mode (Spec 10 Slice E
@@ -246,10 +247,12 @@ export function ArchetypeDetail({
     <div className="space-y-4">
       {/* Header: back navigation + identity + window selector */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button onClick={onBack} className="btn-ghost text-xs">
-          <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
-          {t('archetypeDetail.back')}
-        </button>
+        {onBack && (
+          <button onClick={onBack} className="btn-ghost text-xs">
+            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+            {t('archetypeDetail.back')}
+          </button>
+        )}
         <MetaWindowControl
           window={window}
           onDaysChange={onDaysChange}
