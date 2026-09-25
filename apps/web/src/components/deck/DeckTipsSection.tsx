@@ -14,7 +14,9 @@ import { Info, MapPin } from 'lucide-react';
  * title (this is a section, not a page). Props-free: reads everything from
  * the store, exactly like the page did before it.
  */
-export function DeckTipsSection() {
+/** `onOpenLocalMeta` (coach layout) replaces the old jump to the Meta tab —
+ *  the local meta lives under Opponents there (Spec 7 §6). */
+export function DeckTipsSection({ onOpenLocalMeta }: { onOpenLocalMeta?: () => void } = {}) {
   const { t } = useTranslation('recommendations');
   const {
     deckCards,
@@ -98,7 +100,7 @@ export function DeckTipsSection() {
                     components={{
                       metaLink: (
                         <button
-                          onClick={() => setActiveTab('meta')}
+                          onClick={onOpenLocalMeta ?? (() => setActiveTab('meta'))}
                           className="underline hover:text-amber-800"
                         />
                       ),

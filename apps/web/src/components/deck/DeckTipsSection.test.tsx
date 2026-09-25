@@ -38,6 +38,8 @@ function log(over: Partial<OpponentLog>): OpponentLog {
 }
 
 let opponentLogs: OpponentLog[];
+let localMeta: string[] = [];
+const setActiveTab = vi.fn();
 
 // Same store surface RecommendationsPage.test.tsx used (plan §3.4.1: the
 // section reads everything from the store, same as the page did before it).
@@ -47,7 +49,7 @@ vi.mock('../../store/dashboardStore', () => ({
     archetypeStats: [],
     opponentLogs,
     deckSnapshots: [],
-    localMeta: [],
+    localMeta,
     activeDeckId: null,
     activeDeck: null,
     cardStats: [],
@@ -57,7 +59,7 @@ vi.mock('../../store/dashboardStore', () => ({
     compareProgress: null,
     compareError: null,
     runDeckComparison: vi.fn(),
-    setActiveTab: vi.fn(),
+    setActiveTab,
     setDeckSection: vi.fn(),
     // Deck-synthesis slice (plan ai-recommendation-synthesis.md §3.10,
     // dashboardStore.ts:104-107,150-154) — required so DeckSynthesisPanel,
@@ -116,5 +118,53 @@ describe('DeckTipsSection — deck synthesis panel is mounted above the recommen
       synthesisPanel.compareDocumentPosition(recommendationsEmptyText) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+});
+
+describe('DeckTipsSection onOpenLocalMeta (Spec 7 §6: local meta lives under Opponents)', () => {
+  it('calls onOpenLocalMeta instead of setActiveTab("meta") when provided', async () => {
+    opponentLogs = [
+      {
+        archetype: 'Charizard ex',
+        eventType: 'Online',
+        eventDate: '2026-09-01',
+        result: 'W',
+        notes: '',
+      },
+    ];
+    localMeta = ['Gardevoir ex'];
+    setActiveTab.mockClear();
+    const onOpenLocalMeta = vi.fn();
+    render(<DeckTipsSection onOpenLocalMeta={onOpenLocalMeta} />);
+    screen
+      .getByText(/Gardevoir ex/)
+      .closest('span')!
+      .querySelector('button')!
+      .click();
+    expect(onOpenLocalMeta).toHaveBeenCalledTimes(1);
+    expect(setActiveTab).not.toHaveBeenCalled();
+    localMeta = [];
+  });
+
+  it('keeps setActiveTab("meta") without the callback (old layout)', () => {
+    opponentLogs = [
+      {
+        archetype: 'Charizard ex',
+        eventType: 'Online',
+        eventDate: '2026-09-01',
+        result: 'W',
+        notes: '',
+      },
+    ];
+    localMeta = ['Gardevoir ex'];
+    setActiveTab.mockClear();
+    render(<DeckTipsSection />);
+    screen
+      .getByText(/Gardevoir ex/)
+      .closest('span')!
+      .querySelector('button')!
+      .click();
+    expect(setActiveTab).toHaveBeenCalledWith('meta');
+    localMeta = [];
   });
 });

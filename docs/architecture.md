@@ -222,6 +222,11 @@ Building blocks shared by the coach layout (`specs/archetype-first-ui.md`, plan
      until Spec 8 moves it server-side.
   Mode `switchArchetype` reuses steps 1–2 for the header's archetype switch and can
   be cancelled. The red strip is the brand surface allowed by `theme/noFilledRed.test.ts`.
+- Coach pages in `pages/coach/`: `StartPage`, `DeckHubPage` (more follow). Shared deck
+  components got opt-in props for the coach layout, defaults keep the old layout:
+  `DeckSwitcher({ archetypeFilter })`, `DeckAnalyticsPanel({ omitTurnQuality })`,
+  `DeckTipsSection({ onOpenLocalMeta })`; `components/deck/DeckSettingsWidget` is
+  extracted from `DeckPage`; the onboarding's list step is exported as `ListSetup`.
 
 ### State Management Pattern
 

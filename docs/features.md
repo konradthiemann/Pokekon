@@ -712,3 +712,11 @@ week* (top 5 by share over 7 days with your own win rate matched by name → Opp
 *Recent games* (3 newest logs of decks of this archetype → Coaching). Pure logic in
 `lib/coach/start.ts`.
 
+**Deck (coach layout, `pages/coach/DeckHubPage.tsx`):** segments *Meta list* (for now the existing
+deck tips, `DeckTipsSection`; its local-meta link opens Opponents instead of the old Meta tab — the
+optimised meta list arrives with Spec 5) and *My lists* (`DeckSwitcher` filtered to the coached
+archetype, `DeckPanel`, `DeckSettingsWidget`, `DeckAnalyticsPanel` without turn quality, which
+moves to Coaching). *Lab* joins with Spec 6. Without a list of the archetype both segments show
+the onboarding's list step (`ListSetup`: take the meta list / paste own list). `DeckSettingsWidget`
+now lives in `components/deck/` (extracted from `DeckPage`, unchanged in the old layout).
+
