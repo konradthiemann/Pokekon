@@ -53,5 +53,12 @@
     "opponents": "Gegner",
     "tools": "Werkzeuge",
     "settings": "Einstellungen"
+  },
+  "coach": {
+    "prefsError": "Deine Einstellungen konnten nicht geladen werden.",
+    "retry": "Erneut versuchen",
+    "skipToContent": "Zum Inhalt springen",
+    "pasteLog": "Log einfügen",
+    "dataError": "Deine Daten konnten nicht geladen werden."
   }
 }

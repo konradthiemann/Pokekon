@@ -139,10 +139,10 @@ function keyTree(value: unknown): unknown {
   return sortedTree;
 }
 
-describe('A5 — de and en have the same key tree in all 10 namespaces (catches missed second-language updates)', () => {
+describe('A5 — de and en have the same key tree in all 11 namespaces (catches missed second-language updates)', () => {
   const namespaces = Object.keys(resources.de) as Namespace[];
-  // 10 since Spec 7 added `onboarding`.
-  expect(namespaces).toHaveLength(10);
+  // 11 since Spec 7 added `onboarding` and `coach`.
+  expect(namespaces).toHaveLength(11);
 
   for (const ns of namespaces) {
     it(`${ns}`, () => {

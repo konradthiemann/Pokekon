@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DEFAULT_MIN_TOURNAMENT_PLAYERS } from '@pokekon/shared';
 import { useDashboardStore } from '../store/dashboardStore';
@@ -19,14 +19,10 @@ import {
   Scale,
 } from 'lucide-react';
 import type { RecentTournament } from '../types';
-import {
-  getMetaEquilibrium,
-  type FieldAnalysisArchetype,
-  type MetaEquilibriumResponse,
-  type MetaWindow,
-} from '../lib/api';
+import { type FieldAnalysisArchetype, type MetaWindow } from '../lib/api';
 import { ArchetypeDetail } from '../components/meta/ArchetypeDetail';
 import { useFieldAnalysis } from '../hooks/useFieldAnalysis';
+import { useMetaEquilibrium } from '../hooks/useMetaEquilibrium';
 import { MetaWindowControl } from '../components/meta/MetaWindowControl';
 import { META_DEFAULT_DAYS } from '../components/meta/metaWindow';
 import { PredictionPanel } from '../components/meta/PredictionPanel';
@@ -510,35 +506,7 @@ export function MetaPage() {
   // §3.8 / §4 step 21) — a separate, "experimental" section that reads its
   // own precomputed window; independent of the field-analysis request above
   // so a slow/failed equilibrium fetch never blocks the existing sections.
-  // Same requestKey pattern as `fieldAnalysis` above (days changed since the
-  // fetch was issued -> keep showing loading, never a stale window's data;
-  // days differs from the key that failed -> retry instead of staying
-  // stuck on the previous error).
-  const [loadedEquilibrium, setLoadedEquilibrium] = useState<{
-    key: string;
-    data: MetaEquilibriumResponse;
-  } | null>(null);
-  const [equilibriumFailedKey, setEquilibriumFailedKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const key = String(days);
-    getMetaEquilibrium(days)
-      .then((res) => {
-        if (!cancelled) setLoadedEquilibrium({ key, data: res });
-      })
-      .catch(() => {
-        if (!cancelled) setEquilibriumFailedKey(key);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [days]);
-
-  const equilibriumRequestKey = String(days);
-  const equilibrium =
-    loadedEquilibrium?.key === equilibriumRequestKey ? loadedEquilibrium.data : null;
-  const equilibriumError = equilibriumFailedKey === equilibriumRequestKey;
+  const { data: equilibrium, error: equilibriumError } = useMetaEquilibrium(days);
 
   // Moved above the `selected` early return (below) so both branches can use
   // it: the drilldown passes it to `ArchetypeRecommendationPanel`'s

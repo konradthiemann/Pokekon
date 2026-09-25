@@ -1,0 +1,67 @@
+{
+  "start": {
+    "activeList": "Aktive Liste",
+    "noList": "Für diesen Archetyp hast du noch keine Liste.",
+    "setUpList": "Liste anlegen",
+    "nextStep": "Nächster Schritt",
+    "next": {
+      "adoptList": {
+        "title": "Leg eine Liste an",
+        "body": "Übernimm die Meta-Liste oder füge deine eigene ein.",
+        "action": "Liste anlegen"
+      },
+      "pasteLog": {
+        "title": "Spiel eine Runde und füge das Log ein",
+        "body": "Kopiere nach dem Spiel das Protokoll aus TCG Live – daraus lernt dein Coaching.",
+        "action": "Log einfügen"
+      }
+    },
+    "form": "Deine Form",
+    "formWindow": "Letzte 7 Tage",
+    "formRecord": "{{wins}}–{{losses}}–{{ties}}",
+    "formBand": "Bereich {{low}}–{{high}} %",
+    "formEmpty": "Noch keine Spiele in den letzten 7 Tagen.",
+    "field": "Feld diese Woche",
+    "fieldShare": "{{share}} % Anteil",
+    "fieldOwn": "du: {{wr}} %",
+    "fieldOwnNone": "noch nicht gespielt",
+    "fieldLoading": "Feld wird geladen …",
+    "fieldUnavailable": "Das Feld ist gerade nicht verfügbar.",
+    "recent": "Letzte Spiele",
+    "recentEmpty": "Spiel eine Runde und füge das Log ein – deine Spiele erscheinen dann hier.",
+    "result": {
+      "W": "Sieg",
+      "L": "Niederlage",
+      "T": "Unentschieden"
+    }
+  },
+  "coaching": {
+    "heading": "Coaching",
+    "intro": "Füge nach jedem Spiel das Log aus TCG Live ein. Daraus entstehen Analyse, Zugqualität und später dein Coaching.",
+    "pasteLog": "TCG-Live-Log einfügen",
+    "history": "Verlauf",
+    "turnQuality": "Zugqualität",
+    "guide": {
+      "title": "So kopierst du ein Log aus TCG Live",
+      "steps": [
+        "Spiel eine Partie in Pokémon TCG Live.",
+        "Öffne nach dem Spiel das Spielprotokoll.",
+        "Tippe auf „Kopieren“.",
+        "Tippe hier auf „TCG-Live-Log einfügen“ und füge es ein."
+      ]
+    }
+  },
+  "tools": {
+    "heading": "Werkzeuge",
+    "intro": "Analysen für deinen Archetyp. Das allgemeine Meta findest du bei Limitless und TrainerHill.",
+    "tournamentLists": "Turnierlisten",
+    "matrix": "Matchup-Matrix",
+    "gameTheory": "Spieltheorie (experimentell)",
+    "loading": "Wird geladen …",
+    "unavailable": "Gerade nicht verfügbar.",
+    "generalMeta": "Allgemeines Meta",
+    "limitless": "Limitless – Decks und Turniere",
+    "trainerhill": "TrainerHill – Meta und Matchups",
+    "opensNewTab": "öffnet in neuem Tab"
+  }
+}

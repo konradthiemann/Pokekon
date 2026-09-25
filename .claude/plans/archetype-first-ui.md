@@ -9,7 +9,12 @@
 > **Code-Stand der Belege:** `origin/main` = `a1d0dc8` (Web-Dateien identisch mit dem
 > ausgecheckten `feat/archetype-list-foundation`, der nur `packages/shared` + `apps/api` für
 > Spec 1 ändert). Die Spec-Belege beziehen sich auf `baebcc5`; jede Angabe ist unten neu geprüft.
-> **Status:** Freigegeben 2026-09-24 (Defaults E1–E18, Ausnahme **E9 = Dragapult ex**, siehe §8).
+> **Status:** Scheibe 1 **umgesetzt** (2026-09-25): (a) #103, (b) #104, (c) `feat/archetype-first-ui-c`.
+> Abweichungen in der Umsetzung: ein Namespace `coach` statt `start`/`coaching`/`tools`;
+> „Liste anlegen" auf Start führt zu Deck › Meine Listen (Leerzustand = Onboarding-Schritt 2 als
+> `ListSetup`) statt das Onboarding erneut zu öffnen; EN-Navigationslabels bis 9 Zeichen;
+> Link „Trainer Hub" = trainerhill.com (zu bestätigen); DE/EN-Parität über den bestehenden A5-Test.
+> Freigegeben 2026-09-24 (Defaults E1–E18, Ausnahme **E9 = Dragapult ex**, siehe §8).
 > Overhaul-Branch zuerst (PR #102). Umsetzung in **drei PRs**, alle hinter dem Flag:
 > **(a)** S1–S4 Flag + Preferences-API + Demo-Seed + Client-Datenpfad ·
 > **(b)** S5–S8 Farben, Hintergrund, Bausteine, Onboarding ·

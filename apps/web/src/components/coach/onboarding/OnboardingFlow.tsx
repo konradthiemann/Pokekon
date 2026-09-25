@@ -120,7 +120,7 @@ export function OnboardingFlow({
           />
         )}
         {step === 'list' && chosen && (
-          <ListStep
+          <ListSetup
             archetype={chosen}
             createNewDeck={createNewDeck}
             refresh={refresh}
@@ -265,16 +265,20 @@ function ArchetypeStep({
   );
 }
 
-function ListStep({
+/** Step 2 — also used on its own as the empty state of Deck › My lists. */
+export function ListSetup({
   archetype,
   createNewDeck,
   refresh,
   onNext,
+  showLater = true,
 }: {
-  archetype: ArchetypeOption;
+  archetype: { slug: string; name: string };
   createNewDeck: (archetype: string, archetypeName: string, variant: string) => Promise<number>;
   refresh: () => Promise<void>;
   onNext: () => void;
+  /** false outside the onboarding, where "later" has nowhere to go. */
+  showLater?: boolean;
 }) {
   const { t } = useTranslation('onboarding');
   const [medoid, setMedoid] = useState<{ slug: string; list: TournamentDecklist | null } | null>(
@@ -366,13 +370,15 @@ function ListStep({
           </span>
         </button>
 
-        <button type="button" className={optionButton} disabled={busy} onClick={onNext}>
-          <Clock className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
-          <span className="flex-1">
-            <span className="block font-semibold">{t('list.later')}</span>
-            <span className="block text-xs text-slate-600">{t('list.laterHint')}</span>
-          </span>
-        </button>
+        {showLater && (
+          <button type="button" className={optionButton} disabled={busy} onClick={onNext}>
+            <Clock className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+            <span className="flex-1">
+              <span className="block font-semibold">{t('list.later')}</span>
+              <span className="block text-xs text-slate-600">{t('list.laterHint')}</span>
+            </span>
+          </button>
+        )}
       </div>
       {failed && (
         <p role="alert" className="mt-3 text-sm text-slate-900">

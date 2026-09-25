@@ -21,10 +21,10 @@ export function ArchetypeSwitcherButton({
       type="button"
       onClick={onClick}
       aria-label={`${t('header.switchArchetype')}: ${label}`}
-      className="inline-flex min-h-[44px] items-center gap-2 rounded-md px-2 text-left text-white hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-energy-500"
+      className="inline-flex min-h-[44px] min-w-0 max-w-full items-center gap-2 rounded-md px-2 text-left text-white hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-energy-500"
     >
-      {archetypeId && <PokemonIcon archetype={archetypeId} size="sm" />}
-      <span className="truncate text-sm font-bold">{label}</span>
+      {archetypeId && <PokemonIcon archetype={archetypeId} size="sm" className="shrink-0" />}
+      <span className="min-w-0 truncate text-sm font-bold">{label}</span>
       <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />
     </button>
   );

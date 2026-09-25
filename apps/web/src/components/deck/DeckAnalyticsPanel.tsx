@@ -21,6 +21,8 @@ interface Props {
   allLogs: OpponentLog[];
   metaSnapshots: MetaSnapshot[];
   activeDeckId: number | null;
+  /** Coach layout: turn quality lives under Coaching instead (Spec 7 §6). */
+  omitTurnQuality?: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -499,7 +501,13 @@ function MetaInsights({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId }: Props) {
+export function DeckAnalyticsPanel({
+  decks,
+  allLogs,
+  metaSnapshots,
+  activeDeckId,
+  omitTurnQuality = false,
+}: Props) {
   const { t } = useTranslation('deck');
   const freqMap = useMemo(
     () => new Map(metaSnapshots.map((s) => [s.archetype.toLowerCase(), s.frequencyPct])),
@@ -604,7 +612,7 @@ export function DeckAnalyticsPanel({ decks, allLogs, metaSnapshots, activeDeckId
       )}
 
       {/* Server-side turn-quality analytics (from parsed battle logs) */}
-      {activeDeckId != null && <DeckTurnQualityPanel deckId={activeDeckId} />}
+      {activeDeckId != null && !omitTurnQuality && <DeckTurnQualityPanel deckId={activeDeckId} />}
 
       {/* Active variant analytics */}
       {activeStats && (

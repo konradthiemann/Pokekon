@@ -15,6 +15,8 @@ import { ImportLocalDataModal } from './components/auth/ImportLocalDataModal';
 import { shouldOfferLocalImport } from './lib/localImport';
 import { LegalPage } from './pages/LegalPage';
 import { legalDocForPath } from './lib/legalRoutes';
+import { isArchetypeCoachUiEnabled } from './lib/featureFlags';
+import { CoachLayout } from './components/coach/CoachLayout';
 
 // Each page is its own chunk: Recharts-heavy pages no longer block first paint.
 const OverviewPage = lazy(() =>
@@ -39,6 +41,17 @@ function Dashboard() {
       await hydrate();
     })();
   }, [hydrate]);
+
+  // Spec 7 §9: the archetype-first UI lives behind the `archetypeCoachUi`
+  // flag; the old layout stays untouched until the flag is switched for all.
+  if (isArchetypeCoachUiEnabled()) {
+    return (
+      <>
+        <CoachLayout />
+        {showLocalImport && <ImportLocalDataModal onClose={() => setShowLocalImport(false)} />}
+      </>
+    );
+  }
 
   const PAGE: Record<DashboardTab, ReactNode> = {
     overview: <OverviewPage />,

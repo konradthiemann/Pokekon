@@ -23,11 +23,16 @@ export function ActiveListChip() {
         setDeckView('myLists');
       }}
       aria-label={`${t('header.activeList')}: ${name}${newest ? ` (${newest.label})` : ''}`}
-      className="inline-flex min-h-[44px] max-w-[50vw] items-center gap-1.5 rounded-md bg-white/15 px-2.5 text-xs font-semibold text-white hover:bg-white/25 focus-visible:ring-2 focus-visible:ring-energy-500"
+      className="inline-flex min-h-[44px] min-w-0 max-w-[45%] shrink items-center gap-1.5 rounded-md bg-white/15 px-2.5 text-xs font-semibold text-white hover:bg-white/25 focus-visible:ring-2 focus-visible:ring-energy-500"
     >
       <ListChecks className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-      <span className="truncate">{name}</span>
-      {newest && <span className="shrink-0 opacity-80">· {newest.label}</span>}
+      <span className="min-w-0 truncate">{name}</span>
+      {/* The list name wins on narrow screens; the version joins from `sm`. */}
+      {newest && (
+        <span className="hidden min-w-0 max-w-[8rem] truncate opacity-80 sm:inline">
+          · {newest.label}
+        </span>
+      )}
     </button>
   );
 }

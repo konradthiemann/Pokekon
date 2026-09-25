@@ -155,5 +155,13 @@
   "analysis": {
     "apiError": "Anthropic API error {{status}}: {{message}}",
     "parseError": "The AI response could not be parsed (invalid JSON)."
+  },
+  "page": {
+    "heading": "Opponents",
+    "intro": "The field from your archetype's point of view: your local field, the prediction and your record per opponent.",
+    "myField": "My field",
+    "myMatchups": "Your record per opponent",
+    "loading": "Loading the field …",
+    "unavailable": "The field is unavailable right now. Please try again later."
   }
 }

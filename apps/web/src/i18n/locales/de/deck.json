@@ -251,5 +251,10 @@
     "add": "Hinzufügen",
     "suggestions": "Vorschläge",
     "remove": "{{archetype}} entfernen"
+  },
+  "hub": {
+    "metaList": "Meta-Liste",
+    "myLists": "Meine Listen",
+    "noListTitle": "Noch keine Liste für diesen Archetyp"
   }
 }

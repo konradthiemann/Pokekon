@@ -1,0 +1,67 @@
+{
+  "start": {
+    "activeList": "Active list",
+    "noList": "You have no list for this archetype yet.",
+    "setUpList": "Set up a list",
+    "nextStep": "Next step",
+    "next": {
+      "adoptList": {
+        "title": "Set up a list",
+        "body": "Take the meta list or paste your own.",
+        "action": "Set up a list"
+      },
+      "pasteLog": {
+        "title": "Play a round and paste the log",
+        "body": "After the game, copy the log from TCG Live — your coaching learns from it.",
+        "action": "Paste a log"
+      }
+    },
+    "form": "Your form",
+    "formWindow": "Last 7 days",
+    "formRecord": "{{wins}}–{{losses}}–{{ties}}",
+    "formBand": "Range {{low}}–{{high}} %",
+    "formEmpty": "No games in the last 7 days yet.",
+    "field": "Field this week",
+    "fieldShare": "{{share}} % share",
+    "fieldOwn": "you: {{wr}} %",
+    "fieldOwnNone": "not played yet",
+    "fieldLoading": "Loading the field …",
+    "fieldUnavailable": "The field is unavailable right now.",
+    "recent": "Recent games",
+    "recentEmpty": "Play a round and paste the log — your games will show up here.",
+    "result": {
+      "W": "Win",
+      "L": "Loss",
+      "T": "Tie"
+    }
+  },
+  "coaching": {
+    "heading": "Coaching",
+    "intro": "Paste the TCG Live log after every game. Analysis, turn quality and later your coaching are built from it.",
+    "pasteLog": "Paste TCG Live log",
+    "history": "History",
+    "turnQuality": "Turn quality",
+    "guide": {
+      "title": "How to copy a log from TCG Live",
+      "steps": [
+        "Play a game in Pokémon TCG Live.",
+        "After the game, open the game log.",
+        "Tap “Copy”.",
+        "Tap “Paste TCG Live log” here and paste it."
+      ]
+    }
+  },
+  "tools": {
+    "heading": "Tools",
+    "intro": "Analyses for your archetype. You'll find the general meta on Limitless and TrainerHill.",
+    "tournamentLists": "Tournament lists",
+    "matrix": "Matchup matrix",
+    "gameTheory": "Game theory (experimental)",
+    "loading": "Loading …",
+    "unavailable": "Unavailable right now.",
+    "generalMeta": "General meta",
+    "limitless": "Limitless – decks and tournaments",
+    "trainerhill": "TrainerHill – meta and matchups",
+    "opensNewTab": "opens in a new tab"
+  }
+}

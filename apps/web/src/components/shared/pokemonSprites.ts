@@ -168,7 +168,15 @@ function resolve(archetype: string): Pair | undefined {
   if (ARCHETYPE_SPRITES[archetype]) return ARCHETYPE_SPRITES[archetype];
   if (SLUG_SPRITES[archetype]) return SLUG_SPRITES[archetype];
   const norm = archetype.replace(/[''ʼʹ]/g, "'");
-  return ARCHETYPE_SPRITES[norm] ?? SLUG_SPRITES[norm] ?? autoBuild(archetype);
+  if (ARCHETYPE_SPRITES[norm] ?? SLUG_SPRITES[norm])
+    return ARCHETYPE_SPRITES[norm] ?? SLUG_SPRITES[norm];
+  // An unmapped kebab slug ("mega-kangaskhan-ex") reads like a name once its
+  // dashes are spaces — otherwise the whole slug becomes the file name and no
+  // sprite loads (e.g. the coached archetype's background).
+  const asName = /^[a-z0-9]+(?:-[a-z0-9]+)+$/.test(archetype)
+    ? archetype.replace(/-/g, ' ')
+    : archetype;
+  return autoBuild(asName);
 }
 
 /** Map a single Pokémon slug (e.g. a Limitless `deck.icons` entry) to its

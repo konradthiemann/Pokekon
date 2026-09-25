@@ -30,10 +30,22 @@ function deckLabel(deck: { archetypeName: string; variant: string }): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function DeckSwitcher() {
+/** `archetypeFilter` (coach layout, Spec 7 §5.3) limits the list to decks of
+ *  that archetype; without it every deck is shown (old layout). */
+export function DeckSwitcher({ archetypeFilter }: { archetypeFilter?: string } = {}) {
   const { t } = useTranslation('deck');
-  const { decks, activeDeckId, opponentLogs, setActiveDeck, removeDecks, updateCurrentDeck } =
-    useDashboardStore();
+  const {
+    decks: allDecks,
+    activeDeckId,
+    opponentLogs,
+    setActiveDeck,
+    removeDecks,
+    updateCurrentDeck,
+  } = useDashboardStore();
+  const decks = useMemo(
+    () => (archetypeFilter ? allDecks.filter((d) => d.archetype === archetypeFilter) : allDecks),
+    [allDecks, archetypeFilter],
+  );
 
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
