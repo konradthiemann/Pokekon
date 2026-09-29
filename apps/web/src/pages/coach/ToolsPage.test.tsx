@@ -29,10 +29,24 @@ vi.mock('../../hooks/useMetaEquilibrium', () => ({
 
 const seen: Record<string, unknown> = {};
 vi.mock('../../components/meta/ArchetypeDetail', () => ({
-  ArchetypeDetail: (p: Record<string, unknown>) => {
-    seen.detail = p;
-    return <div data-testid="archetype-detail" />;
+  ArchetypeDetail: () => {
+    throw new Error('ArchetypeDetail must not render on Tools (Scheibe 2)');
   },
+}));
+vi.mock('../../components/tools/ArchetypeMetaSummary', () => ({
+  ArchetypeMetaSummary: (p: Record<string, unknown>) => {
+    seen.summary = p;
+    return <div data-testid="meta-summary" />;
+  },
+}));
+vi.mock('../../components/tools/TournamentListsPanel', () => ({
+  TournamentListsPanel: (p: Record<string, unknown>) => {
+    seen.lists = p;
+    return <div data-testid="tournament-lists" />;
+  },
+}));
+vi.mock('../../components/meta/MetaWindowControl', () => ({
+  MetaWindowControl: () => <div data-testid="window-control" />,
 }));
 vi.mock('../../components/meta/MatchupMatrix', () => ({
   MatchupMatrix: () => <div data-testid="matchup-matrix" />,
@@ -81,16 +95,27 @@ function section(title: RegExp): HTMLElement {
 }
 
 describe('ToolsPage (Spec 7 §5.6, Scheibe 1: unfiltered)', () => {
-  it('embeds ArchetypeDetail for the active archetype without a back button', () => {
+  it('renders the window control, summary and tournament lists for the active archetype', () => {
     render(<ToolsPage />);
-    expect(screen.getByTestId('archetype-detail')).toBeInTheDocument();
-    expect(seen.detail).toMatchObject({
+    expect(screen.getByTestId('window-control')).toBeInTheDocument();
+    expect(seen.summary).toMatchObject({
       archetypeId: 'dragapult-ex',
       archetypeName: 'Dragapult ex',
       window: WINDOW,
     });
-    expect((seen.detail as { onBack?: unknown }).onBack).toBeUndefined();
+    expect(seen.lists).toMatchObject({ archetypeId: 'dragapult-ex', window: WINDOW });
     expect(section(/Tournament lists/).dataset.open).toBe('true');
+  });
+
+  it('keeps the section order: summary, tournament lists, matrix, game theory', () => {
+    render(<ToolsPage />);
+    const titles = screen.getAllByTestId('collapsible').map((s) => s.dataset.title);
+    expect(titles).toEqual(['Tournament lists', 'Matchup matrix', 'Game theory (experimental)']);
+    const summary = screen.getByTestId('meta-summary');
+    expect(
+      summary.compareDocumentPosition(section(/Tournament lists/)) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('has the matchup matrix and game theory collapsed, equilibrium for the window days', () => {

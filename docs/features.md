@@ -749,11 +749,12 @@ the local field (`lib/coach/opponents.ts#ownFieldScore`). Below always the own r
 (`MyMatchupsTable`, this archetype only). Opponent detail
 (typical cards, coaching hotspot) arrives with Specs 5/8.
 
-**Tools (coach layout, `pages/coach/ToolsPage.tsx`, Scheibe 1, still unfiltered):** the archetype
-drilldown (§15, `ArchetypeDetail`) for the coached archetype, open, without a back button
-(`onBack` is optional now); the matchup matrix (§13) and game theory (§18, shared
-`hooks/useMetaEquilibrium`, also used by `MetaPage`) collapsed; link cards to Limitless and
-TrainerHill for the general meta (`target="_blank"`, `rel="noopener noreferrer"`). The old Meta
-page's general tournament tables are not shown here. Narrowing the tools to the archetype and
-dissolving `ArchetypeDetail` follow in Scheibe 2.
+**Tools (coach layout, `pages/coach/ToolsPage.tsx`):** everything about the coached archetype only
+(Spec 7 Scheibe 2), in this order: the shared meta window; *Your archetype in the meta*
+(`components/tools/ArchetypeMetaSummary`: share, win rate with Wilson band, players, field score with
+rank, weekly trend); *Tournament lists* (`components/tools/TournamentListsPanel`: recommendation =
+ranked clusters + AI text §20, best list per tournament, published decklists with "load more");
+then, collapsed, the matchup matrix (§13) and game theory (§18); finally link cards to Limitless and
+TrainerHill for the general meta. `ArchetypeDetail` is no longer used here — its matchups tab lives
+under Opponents › Global field.
 

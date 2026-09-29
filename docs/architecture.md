@@ -216,6 +216,9 @@ Building blocks shared by the coach layout (`specs/archetype-first-ui.md`, plan
   `ArchetypeDetail` and the coach *Deck* page.
 - `hooks/useFieldAnalysis(window)` — field analysis per meta window with request-key
   tagging (shared by `MetaPage` and the coach pages).
+- `components/tools/ArchetypeMetaSummary` (KPI head + trend) and
+  `components/tools/TournamentListsPanel` (recommendation · tournament · decklists) — the
+  rest of the former `ArchetypeDetail`, on the Tools page.
 - `components/opponents/GlobalFieldPanel` — the coached archetype vs the global field
   (Opponents › Global field), formerly the Matchups tab of `ArchetypeDetail`.
 - `hooks/useArchetypeAnalysis`, `useArchetypeLists` (paged, "load more"),
