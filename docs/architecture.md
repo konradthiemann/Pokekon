@@ -216,6 +216,10 @@ Building blocks shared by the coach layout (`specs/archetype-first-ui.md`, plan
   `ArchetypeDetail` and the coach *Deck* page.
 - `hooks/useFieldAnalysis(window)` — field analysis per meta window with request-key
   tagging (shared by `MetaPage` and the coach pages).
+- `hooks/useArchetypeAnalysis`, `useArchetypeLists` (paged, "load more"),
+  `useArchetypeTournaments` (own failure domain, `[]` on error) — the per-archetype
+  reads formerly inside `ArchetypeDetail`, shared by Opponents and Tools (Spec 7
+  Scheibe 2). Same request-key pattern; a 404 of the analysis is `notInWindow`.
 - `lib/coach/archetypeName.ts` — display name for a slug: curated list → field
   analysis → own deck → slug.
 - DE/EN key parity for every namespace is guarded by `i18n/actionLabels.test.ts` (A5).
