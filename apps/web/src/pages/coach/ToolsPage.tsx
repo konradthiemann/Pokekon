@@ -7,6 +7,7 @@ import { MatchupMatrix } from '../../components/meta/MatchupMatrix';
 import { MetaWindowControl } from '../../components/meta/MetaWindowControl';
 import { ArchetypeMetaSummary } from '../../components/tools/ArchetypeMetaSummary';
 import { TournamentListsPanel } from '../../components/tools/TournamentListsPanel';
+import { CardStatsPanel } from '../../components/tools/CardStatsPanel';
 import { KNOWN_ARCHETYPES } from '../../constants/archetypes';
 import { useFieldAnalysis } from '../../hooks/useFieldAnalysis';
 import { useMetaEquilibrium } from '../../hooks/useMetaEquilibrium';
@@ -74,6 +75,9 @@ export function ToolsPage() {
               archetypes={archetypes}
               localMeta={localMeta}
             />
+          </CollapsibleSection>
+          <CollapsibleSection title={t('tools.cardStatsTitle')} defaultOpen={false}>
+            <CardStatsPanel archetypeId={activeArchetypeId} days={metaWindow.days} />
           </CollapsibleSection>
         </>
       )}

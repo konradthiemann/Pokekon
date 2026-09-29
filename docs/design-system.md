@@ -61,6 +61,7 @@ Electric `#f59e0b`, Psychic `#d946ef` (deepen for chart bars so each clears ~3:1
 - `.btn` / `.btn-primary` (solid `bg-brand-600`, white text, no gradient) / `.btn-ghost` — ≥44px tall, flat, `rounded-md`.
 - `.btn-destructive` — white with `poke-600` outline and text (Spec 7); never filled.
 - `.wr-pos` / `.wr-mid` / `.wr-neg` — win-rate text colours returned by `winRateColorClass()` (thresholds 50 / 45). Emerald/amber/red by default; blue/slate/orange inside `.coach-ui`.
+- `CardDelta` (`components/shared/`, tier labels in `cardSignalTiers.ts`) — signal tier icon + label + delta with band and the correlation note; shared by `DeckComparisonPanel` and the coach card statistics.
 - `SegmentedTabs` (`components/shared/`) — one-panel-at-a-time segment bar, `role="tablist"`, every tab ≥44 px tall.
 - Coach header band — `bg-poke-600` with `border-b-4 border-energy-500` (`CoachHeader`); the only large red surface besides the onboarding strip.
 - Coach ＋ FAB — `bg-brand-600` with `ring-4 ring-energy-500` (`CoachBottomNav`): blue acts, yellow marks the core-loop action.

@@ -753,7 +753,7 @@ the local field (`lib/coach/opponents.ts#ownFieldScore`). Below always the own r
 (Spec 7 Scheibe 2), in this order: the shared meta window; *Your archetype in the meta*
 (`components/tools/ArchetypeMetaSummary`: share, win rate with Wilson band, players, field score with
 rank, weekly trend); *Tournament lists* (`components/tools/TournamentListsPanel`: recommendation =
-ranked clusters + AI text §20, best list per tournament, published decklists with "load more");
+ranked clusters + AI text §20, best list per tournament, published decklists with "load more"); *Card statistics* (`components/tools/CardStatsPanel`: every card of the archetype from `archetype_card_stats` with play rate, average count and performance delta + signal tier, grouped by type, tier filter chips; header shows the snapped window 7/14/21/28 days and "always online Bo1"; cold start explained; §17);
 then, collapsed, the matchup matrix (§13; `focusArchetypeId` shows only the coached archetype's row until "show full matrix") and game theory (§18; `highlightArchetypeId` marks the row with `aria-current` and a "your archetype" label and adds a one-line summary; the only Tools section that stays meta-wide, Spec 7 decision F9); finally link cards to Limitless and
 TrainerHill for the general meta. `ArchetypeDetail` is no longer used here — its matchups tab lives
 under Opponents › Global field.

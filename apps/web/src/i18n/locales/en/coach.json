@@ -63,6 +63,25 @@
     "limitless": "Limitless – decks and tournaments",
     "trainerhill": "TrainerHill – meta and matchups",
     "opensNewTab": "opens in a new tab",
-    "summary": "Your archetype in the meta"
+    "summary": "Your archetype in the meta",
+    "cardStats": {
+      "title": "Card statistics",
+      "header": "{{lists}} lists · last {{days}} days · always online Bo1 · as of {{date}}",
+      "coldStart": "Card statistics for this archetype have not been computed yet. They are created with the next meta sync.",
+      "loading": "Loading card statistics …",
+      "error": "Card statistics are unavailable right now.",
+      "filterAll": "All",
+      "card": "Card",
+      "inclusion": "Play rate",
+      "avgCount": "Avg. count",
+      "signal": "Signal",
+      "types": {
+        "pokemon": "Pokémon",
+        "trainer": "Trainer",
+        "energy": "Energy"
+      },
+      "empty": "No cards for this filter."
+    },
+    "cardStatsTitle": "Card statistics"
   }
 }

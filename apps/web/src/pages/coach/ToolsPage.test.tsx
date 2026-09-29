@@ -45,6 +45,12 @@ vi.mock('../../components/tools/TournamentListsPanel', () => ({
     return <div data-testid="tournament-lists" />;
   },
 }));
+vi.mock('../../components/tools/CardStatsPanel', () => ({
+  CardStatsPanel: (p: Record<string, unknown>) => {
+    seen.cardStats = p;
+    return <div data-testid="card-stats" />;
+  },
+}));
 vi.mock('../../components/meta/MetaWindowControl', () => ({
   MetaWindowControl: () => <div data-testid="window-control" />,
 }));
@@ -116,7 +122,15 @@ describe('ToolsPage (Spec 7 §5.6, Scheibe 1: unfiltered)', () => {
   it('keeps the section order: summary, tournament lists, matrix, game theory', () => {
     render(<ToolsPage />);
     const titles = screen.getAllByTestId('collapsible').map((s) => s.dataset.title);
-    expect(titles).toEqual(['Tournament lists', 'Matchup matrix', 'Game theory (experimental)']);
+    // A6 adds card statistics between tournament lists and the matrix.
+    expect(titles).toEqual([
+      'Tournament lists',
+      'Card statistics',
+      'Matchup matrix',
+      'Game theory (experimental)',
+    ]);
+    expect(section(/Card statistics/).dataset.open).toBe('false');
+    expect(seen.cardStats).toEqual({ archetypeId: 'dragapult-ex', days: 14 });
     const summary = screen.getByTestId('meta-summary');
     expect(
       summary.compareDocumentPosition(section(/Tournament lists/)) &
