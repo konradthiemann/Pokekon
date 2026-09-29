@@ -9,6 +9,8 @@ interface StoreMock {
   metaWindow: MetaWindow;
   setMetaWindow: ReturnType<typeof vi.fn>;
   archetypeStats: { archetype: string }[];
+  activeArchetypeId: string | null;
+  decks: unknown[];
 }
 let store: StoreMock;
 vi.mock('../../store/dashboardStore', () => ({ useDashboardStore: () => store }));
@@ -31,7 +33,7 @@ vi.mock('../../components/deck/LocalMetaPanel', () => ({
   LocalMetaPanel: () => <div data-testid="local-meta" />,
 }));
 vi.mock('../../components/meta/PredictionPanel', () => ({
-  PredictionPanel: (p: { archetypes: unknown; window: unknown }) => {
+  PredictionPanel: (p: Record<string, unknown>) => {
     seen.prediction = p;
     return <div data-testid="prediction" />;
   },
@@ -40,6 +42,17 @@ vi.mock('../../components/meta/MyMatchupsTable', () => ({
   MyMatchupsTable: (p: { stats: unknown }) => {
     seen.matchups = p.stats;
     return <div data-testid="my-matchups" />;
+  },
+}));
+vi.mock('../../components/opponents/GlobalFieldPanel', () => ({
+  GlobalFieldPanel: (p: { archetypeId: string; window: MetaWindow }) => {
+    seen.global = p;
+    return <div data-testid="global-field" />;
+  },
+}));
+vi.mock('../../components/meta/ArchetypeDetail', () => ({
+  ArchetypeDetail: () => {
+    throw new Error('ArchetypeDetail must not render on Opponents');
   },
 }));
 vi.mock('../../components/meta/MetaWindowControl', () => ({
@@ -64,6 +77,8 @@ beforeEach(() => {
     metaWindow: WINDOW,
     setMetaWindow: vi.fn(),
     archetypeStats: [{ archetype: 'Gardevoir ex' }],
+    activeArchetypeId: 'dragapult-ex',
+    decks: [],
   };
   fieldState = {
     data: { archetypes: [{ archetypeId: 'gardevoir-ex' } as FieldAnalysisArchetype] },
@@ -72,33 +87,49 @@ beforeEach(() => {
   };
 });
 
-describe('OpponentsPage (Spec 7 §5.5, Scheibe 1)', () => {
-  it('renders LocalMetaPanel, PredictionPanel and MyMatchupsTable', () => {
+describe('OpponentsPage (Spec 7 §5.5, Scheibe 2)', () => {
+  it('shows the global field of the active archetype by default', () => {
     render(<OpponentsPage />);
-    expect(screen.getByTestId('local-meta')).toBeInTheDocument();
-    expect(screen.getByTestId('prediction')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Global field' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByTestId('global-field')).toBeInTheDocument();
+    expect(seen.global).toEqual({ archetypeId: 'dragapult-ex', window: WINDOW });
+    expect(screen.queryByTestId('prediction')).toBeNull();
+  });
+
+  it('switches to my field: LocalMetaPanel and PredictionPanel with the active archetype as perspective', () => {
+    render(<OpponentsPage />);
+    screen.getByRole('tab', { name: 'My field' }).click();
+    return screen.findByTestId('prediction').then(() => {
+      expect(screen.getByTestId('local-meta')).toBeInTheDocument();
+      expect(requestedWindow).toEqual(WINDOW);
+      expect(seen.prediction).toMatchObject({
+        archetypes: [{ archetypeId: 'gardevoir-ex' }],
+        window: WINDOW,
+        perspectiveArchetypeId: 'dragapult-ex',
+      });
+      expect(screen.queryByTestId('global-field')).toBeNull();
+    });
+  });
+
+  it('always shows MyMatchupsTable with the (archetype-scoped) stats', () => {
+    render(<OpponentsPage />);
     expect(screen.getByTestId('my-matchups')).toBeInTheDocument();
     expect(seen.matchups).toEqual([{ archetype: 'Gardevoir ex' }]);
   });
 
-  it('passes the store metaWindow and the field archetypes to PredictionPanel', () => {
-    render(<OpponentsPage />);
-    expect(requestedWindow).toEqual(WINDOW);
-    expect(seen.prediction).toEqual({
-      archetypes: [{ archetypeId: 'gardevoir-ex' }],
-      window: WINDOW,
-    });
-  });
-
-  it('shows a loading state and an error card for the field analysis', () => {
+  it('shows loading and error states of the field analysis on my field', async () => {
     fieldState = { data: null, isLoading: true, error: false };
     const { unmount } = render(<OpponentsPage />);
-    expect(screen.getByRole('status')).toHaveTextContent(/Loading/);
-    expect(screen.queryByTestId('prediction')).toBeNull();
+    screen.getByRole('tab', { name: 'My field' }).click();
+    expect(await screen.findByRole('status')).toHaveTextContent(/Loading/);
     unmount();
     fieldState = { data: null, isLoading: false, error: true };
     render(<OpponentsPage />);
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    screen.getByRole('tab', { name: 'My field' }).click();
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
   it('binds MetaWindowControl to setMetaWindow (online and Bo1 move together)', () => {

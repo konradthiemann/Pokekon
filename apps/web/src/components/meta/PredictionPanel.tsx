@@ -29,12 +29,18 @@ import { FieldScorePanel } from './FieldScorePanel';
 import { ListFieldPerformance } from './ListFieldPerformance';
 import { seedWeight } from './localFieldWeight';
 import { ThreatsPanel } from './ThreatsPanel';
+import { ownFieldScore } from '../../lib/coach/opponents';
 
 interface PredictionPanelProps {
   /** Current online meta — the option source for the picker and the seed. */
   archetypes: FieldAnalysisArchetype[];
   /** Active meta window — the matchup matrix and per-deck lists respect it. */
   window: MetaWindow;
+  /** Coach layout (Spec 7 §5.5, AC 4): evaluate exactly this archetype against
+   *  the local field — no perspective picker, no "best positioned" line, and
+   *  its own lists, even if it is not part of the local field. */
+  perspectiveArchetypeId?: string;
+  perspectiveArchetypeName?: string;
 }
 
 /**
@@ -53,7 +59,12 @@ interface PredictionPanelProps {
  * shared list + the (now much smaller) per-entry weight-override map, once,
  * on mount.
  */
-export function PredictionPanel({ archetypes, window }: PredictionPanelProps) {
+export function PredictionPanel({
+  archetypes,
+  window,
+  perspectiveArchetypeId,
+  perspectiveArchetypeName,
+}: PredictionPanelProps) {
   const { t } = useTranslation('meta');
   const { days, online, bo1 } = window;
   const { localMeta, setLocalMeta } = useDashboardStore();
@@ -151,7 +162,26 @@ export function PredictionPanel({ archetypes, window }: PredictionPanelProps) {
     return computeFieldScores(shares, matchups.rows);
   }, [field, totalWeight, matchups]);
 
-  const selected = scores.find((s) => s.archetypeId === selectedId) ?? scores[0] ?? null;
+  // Fixed perspective (coach layout): the own archetype, scored against the
+  // local field even when it is not part of it.
+  const perspective = useMemo<FieldScore | null>(() => {
+    if (!perspectiveArchetypeId || matchups === null || totalWeight <= 0) return null;
+    const shares: ArchetypeShare[] = field.map((e) => ({
+      archetypeId: e.archetypeId,
+      archetypeName: e.name,
+      sharePct: (e.weight / totalWeight) * 100,
+    }));
+    return ownFieldScore(
+      perspectiveArchetypeId,
+      perspectiveArchetypeName ?? perspectiveArchetypeId,
+      shares,
+      matchups.rows,
+    );
+  }, [perspectiveArchetypeId, perspectiveArchetypeName, field, totalWeight, matchups]);
+
+  const selected = perspectiveArchetypeId
+    ? perspective
+    : (scores.find((s) => s.archetypeId === selectedId) ?? scores[0] ?? null);
   // scores is already sorted by field win rate → scores[0] is the best-positioned.
   const best = scores[0] ?? null;
 
@@ -235,7 +265,7 @@ export function PredictionPanel({ archetypes, window }: PredictionPanelProps) {
       {/* Results */}
       {field.length === 0 ? null : matchups === null ? (
         <p className="py-6 text-center text-xs text-slate-500">{t('prediction.loading')}</p>
-      ) : scores.length === 0 ? (
+      ) : scores.length === 0 || (perspectiveArchetypeId !== undefined && selected === null) ? (
         <p className="py-6 text-center text-xs text-slate-500">{t('prediction.noResult')}</p>
       ) : (
         <div className="space-y-4">
@@ -245,36 +275,38 @@ export function PredictionPanel({ archetypes, window }: PredictionPanelProps) {
                   field. Replaces the old count-ordered "ranking"; the dropdown is
                   ordered by field score and shows each deck's field WR, so the
                   best-positioned deck stays obvious without a noisy list. */}
-              <div className="card space-y-2 p-3">
-                {best && best.fieldWinRatePct !== null && (
-                  <p className="flex items-center gap-1.5 text-xs text-slate-600">
-                    <Trophy className="h-3.5 w-3.5 text-amber-600" aria-hidden="true" />
-                    {t('prediction.bestPositionedInterval', {
-                      deck: best.archetypeName,
-                      range: formatWithInterval(
-                        best.fieldWinRatePct,
-                        best.fieldWinRateLowPct,
-                        best.fieldWinRateHighPct,
-                      ),
-                    })}
-                  </p>
-                )}
-                <label className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600">
-                  {t('prediction.perspective')}
-                  <select
-                    value={selected.archetypeId}
-                    onChange={(e) => setSelectedId(e.target.value)}
-                    className="input max-w-xs flex-1 px-2 py-1.5 text-xs"
-                  >
-                    {scores.map((s) => (
-                      <option key={s.archetypeId} value={s.archetypeId}>
-                        {s.archetypeName}
-                        {s.fieldWinRatePct !== null ? ` · ${s.fieldWinRatePct.toFixed(1)}%` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
+              {!perspectiveArchetypeId && (
+                <div className="card space-y-2 p-3">
+                  {best && best.fieldWinRatePct !== null && (
+                    <p className="flex items-center gap-1.5 text-xs text-slate-600">
+                      <Trophy className="h-3.5 w-3.5 text-amber-600" aria-hidden="true" />
+                      {t('prediction.bestPositionedInterval', {
+                        deck: best.archetypeName,
+                        range: formatWithInterval(
+                          best.fieldWinRatePct,
+                          best.fieldWinRateLowPct,
+                          best.fieldWinRateHighPct,
+                        ),
+                      })}
+                    </p>
+                  )}
+                  <label className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600">
+                    {t('prediction.perspective')}
+                    <select
+                      value={selected.archetypeId}
+                      onChange={(e) => setSelectedId(e.target.value)}
+                      className="input max-w-xs flex-1 px-2 py-1.5 text-xs"
+                    >
+                      {scores.map((s) => (
+                        <option key={s.archetypeId} value={s.archetypeId}>
+                          {s.archetypeName}
+                          {s.fieldWinRatePct !== null ? ` · ${s.fieldWinRatePct.toFixed(1)}%` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <FieldScorePanel

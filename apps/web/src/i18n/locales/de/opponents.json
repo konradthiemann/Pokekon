@@ -162,6 +162,10 @@
     "myField": "Mein Feld",
     "myMatchups": "Deine Bilanz pro Gegner",
     "loading": "Feld wird geladen …",
-    "unavailable": "Das Feld ist gerade nicht verfügbar. Versuch es später noch einmal."
+    "unavailable": "Das Feld ist gerade nicht verfügbar. Versuch es später noch einmal.",
+    "globalField": "Globales Feld",
+    "myFieldTab": "Mein Feld",
+    "notInWindow": "Dein Archetyp wurde in diesem Zeitfenster nicht gespielt. Vergrößere das Fenster oder synchronisiere das Meta.",
+    "perspectiveTitle": "{{deck}} gegen dein Feld"
   }
 }

@@ -738,10 +738,15 @@ and the active deck's turn quality (`DeckTurnQualityPanel`, moved here from Deck
 logs a four-step text guide explains how to copy a log from TCG Live. Filters, the result card after
 pasting and the hint to AI settings arrive with Spec 8 / Scheibe 6.
 
-**Opponents (coach layout, `pages/coach/OpponentsPage.tsx`, Scheibe 1):** the shared meta window
-(store `metaWindow`, `MetaWindowControl`; online and Bo1 move together), *My field*
-(`LocalMetaPanel` + `PredictionPanel` with field score, threats and lists, see §11/§16) and the
-own record per opponent (`MyMatchupsTable`, moved here from the old Deck page). Opponent detail
+**Opponents (coach layout, `pages/coach/OpponentsPage.tsx`):** the shared meta window
+(store `metaWindow`, `MetaWindowControl`; online and Bo1 move together) and a segment
+*Global field · My field*. *Global field* (`components/opponents/GlobalFieldPanel`, formerly the
+Matchups tab of `ArchetypeDetail`) shows the coached archetype's field score, threats / free wins and
+the full head-to-head table on demand. *My field* is `LocalMetaPanel` + `PredictionPanel` with a
+**fixed perspective** (`perspectiveArchetypeId`): no picker, no "best positioned" line — field score,
+threats and lists are always the coached archetype's, scored with share 0 when it is not part of
+the local field (`lib/coach/opponents.ts#ownFieldScore`). Below always the own record per opponent
+(`MyMatchupsTable`, this archetype only). Opponent detail
 (typical cards, coaching hotspot) arrives with Specs 5/8.
 
 **Tools (coach layout, `pages/coach/ToolsPage.tsx`, Scheibe 1, still unfiltered):** the archetype
