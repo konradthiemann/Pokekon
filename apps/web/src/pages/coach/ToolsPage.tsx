@@ -79,12 +79,19 @@ export function ToolsPage() {
       )}
 
       <CollapsibleSection title={t('tools.matrix')} defaultOpen={false}>
-        <MatchupMatrix window={metaWindow} iconsById={iconsById} />
+        <MatchupMatrix
+          window={metaWindow}
+          iconsById={iconsById}
+          focusArchetypeId={activeArchetypeId ?? undefined}
+        />
       </CollapsibleSection>
 
       <CollapsibleSection title={t('tools.gameTheory')} defaultOpen={false}>
         {equilibrium ? (
-          <EquilibriumPanel data={equilibrium} />
+          <EquilibriumPanel
+            data={equilibrium}
+            highlightArchetypeId={activeArchetypeId ?? undefined}
+          />
         ) : (
           <p className="text-sm text-slate-600">
             {equilibriumError ? t('tools.unavailable') : t('tools.loading')}

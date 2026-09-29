@@ -39,7 +39,15 @@ function DirectionIcon({ direction }: { direction: EquilibriumArchetypeRow['dire
   return <Minus className="w-3.5 h-3.5" aria-hidden="true" />;
 }
 
-function ArchetypeRow({ row, resamples }: { row: EquilibriumArchetypeRow; resamples: number }) {
+function ArchetypeRow({
+  row,
+  resamples,
+  highlighted = false,
+}: {
+  row: EquilibriumArchetypeRow;
+  resamples: number;
+  highlighted?: boolean;
+}) {
   const { t } = useTranslation('meta');
   const band = exclusionBand(row.exclusionRatePct);
   const paradox = isPopularityParadox(row);
@@ -48,10 +56,20 @@ function ArchetypeRow({ row, resamples }: { row: EquilibriumArchetypeRow; resamp
   return (
     <div
       data-testid={`equilibrium-archetype-${row.archetypeId}`}
-      className="py-2 border-b border-slate-100 last:border-0 space-y-1.5"
+      aria-current={highlighted ? 'true' : undefined}
+      className={`py-2 border-b border-slate-100 last:border-0 space-y-1.5 ${
+        highlighted ? '-mx-2 rounded-md border-l-4 border-l-energy-500 bg-brand-50 px-2' : ''
+      }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-slate-800">{row.archetypeName}</span>
+        <span className="text-sm font-semibold text-slate-800">
+          {row.archetypeName}
+          {highlighted && (
+            <span className="ml-2 rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-bold text-brand-800">
+              {t('equilibrium.yourArchetype')}
+            </span>
+          )}
+        </span>
         <span className="text-xs text-slate-500 tabular-nums">
           {row.sharePct.toFixed(1)} % → {row.weightPct.toFixed(1)} %
         </span>
@@ -130,7 +148,14 @@ function ArchetypeRow({ row, resamples }: { row: EquilibriumArchetypeRow; resamp
   );
 }
 
-export function EquilibriumPanel({ data }: { data: MetaEquilibriumResponse }) {
+export function EquilibriumPanel({
+  data,
+  highlightArchetypeId,
+}: {
+  data: MetaEquilibriumResponse;
+  /** Coach Tools (Spec 7 §5.6): mark the coached archetype and summarise it. */
+  highlightArchetypeId?: string;
+}) {
   const { t } = useTranslation('meta');
 
   if (data.run === null) {
@@ -177,13 +202,36 @@ export function EquilibriumPanel({ data }: { data: MetaEquilibriumResponse }) {
         </div>
       )}
 
+      {highlightArchetypeId !== undefined && (
+        <p
+          data-testid="equilibrium-your-summary"
+          className="rounded-md border-l-4 border-energy-500 bg-brand-50 px-3 py-2 text-sm text-slate-900"
+        >
+          {(() => {
+            const own = data.archetypes.find((a) => a.archetypeId === highlightArchetypeId);
+            return own
+              ? t('equilibrium.yourSummary', {
+                  name: own.archetypeName,
+                  share: own.sharePct.toFixed(1),
+                  weight: own.weightPct.toFixed(1),
+                })
+              : t('equilibrium.yourMissing');
+          })()}
+        </p>
+      )}
+
       <div>
         <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 mb-1">
           <Scale className="w-3.5 h-3.5 text-brand-700" aria-hidden="true" />
           {t('equilibrium.composition.title')}
         </h4>
         {data.archetypes.map((row) => (
-          <ArchetypeRow key={row.archetypeId} row={row} resamples={run.resamples} />
+          <ArchetypeRow
+            key={row.archetypeId}
+            row={row}
+            resamples={run.resamples}
+            highlighted={row.archetypeId === highlightArchetypeId}
+          />
         ))}
       </div>
 

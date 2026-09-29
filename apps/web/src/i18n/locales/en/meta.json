@@ -256,7 +256,10 @@
     "sourceBlend": "Real data: {{ownGames}} online-Bo1 matches ({{ownPairs}} pairings) · {{fallback}} pairings via TrainerHill (approx.) · win rate from row deck's perspective",
     "conflictNote_one": "· {{count}} pairing disagrees with TrainerHill by >15pp",
     "conflictNote_other": "· {{count}} pairings disagree with TrainerHill by >15pp",
-    "reload": "Reload matchup data"
+    "reload": "Reload matchup data",
+    "showFull": "Show full matrix",
+    "hideFull": "Only your row",
+    "focusMissing": "There is no matchup data for your archetype in this window."
   },
   "metaShareChart": {
     "empty": "No meta data loaded.",
@@ -332,6 +335,9 @@
     "source": "As of {{computedAt}}, {{days}}-day window, {{runs}} runs, seed {{seed}}",
     "sourceImputed": "{{pct}} % of matchup cells have no data",
     "empty": "Not computed yet.",
-    "methodNote": "The calculation assumes a zero-sum game (win rate + opponent win rate = 100 %) and symmetrizes conflicting matchup numbers between two decks. It does not account for correlations between matchups and is only as good as the underlying tournament data."
+    "methodNote": "The calculation assumes a zero-sum game (win rate + opponent win rate = 100 %) and symmetrizes conflicting matchup numbers between two decks. It does not account for correlations between matchups and is only as good as the underlying tournament data.",
+    "yourArchetype": "Your archetype",
+    "yourSummary": "{{name}}: {{share}} % share → {{weight}} % in equilibrium",
+    "yourMissing": "Your archetype is not part of this computation."
   }
 }

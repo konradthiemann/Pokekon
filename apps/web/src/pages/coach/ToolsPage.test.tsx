@@ -49,10 +49,16 @@ vi.mock('../../components/meta/MetaWindowControl', () => ({
   MetaWindowControl: () => <div data-testid="window-control" />,
 }));
 vi.mock('../../components/meta/MatchupMatrix', () => ({
-  MatchupMatrix: () => <div data-testid="matchup-matrix" />,
+  MatchupMatrix: (p: Record<string, unknown>) => {
+    seen.matrix = p;
+    return <div data-testid="matchup-matrix" />;
+  },
 }));
 vi.mock('../../components/meta/EquilibriumPanel', () => ({
-  EquilibriumPanel: () => <div data-testid="equilibrium" />,
+  EquilibriumPanel: (p: Record<string, unknown>) => {
+    seen.equilibrium = p;
+    return <div data-testid="equilibrium" />;
+  },
 }));
 vi.mock('../../components/layout/CollapsibleSection', () => ({
   CollapsibleSection: ({
@@ -125,6 +131,8 @@ describe('ToolsPage (Spec 7 §5.6, Scheibe 1: unfiltered)', () => {
     expect(within(section(/Game theory/)).getByTestId('equilibrium')).toBeInTheDocument();
     expect(section(/Game theory/).dataset.open).toBe('false');
     expect(equilibriumDays).toBe(14);
+    expect(seen.matrix).toMatchObject({ focusArchetypeId: 'dragapult-ex' });
+    expect(seen.equilibrium).toMatchObject({ highlightArchetypeId: 'dragapult-ex' });
   });
 
   it('links to Limitless and TrainerHill in a new tab safely', () => {
