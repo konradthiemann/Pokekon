@@ -46,6 +46,8 @@ import {
 } from '../lib/preferences';
 import { isArchetypeCoachUiEnabled } from '../lib/featureFlags';
 import { pickMigrationArchetype, resolveActiveDeckId } from '../lib/coach/activeDeck';
+import { logsOfArchetype } from '../lib/coach/start';
+import { computeArchetypeStats } from '../lib/archetypeStats';
 import { META_DEFAULT_DAYS } from '../components/meta/metaWindow';
 
 // `loadCardStats` can be in flight from two independent, network-timing-
@@ -304,7 +306,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           ? get().loadCardStats(activeDeck.archetype)
           : Promise.resolve();
 
-      const [deckCards, deckSnapshots, opponentLogs, metaSnapshots, archetypeStats] =
+      const [deckCards, deckSnapshots, opponentLogs, metaSnapshots, allDecksStats] =
         await Promise.all([
           getDeckCards(activeDeckId ?? undefined),
           getDeckSnapshots(activeDeckId ?? undefined),
@@ -313,6 +315,17 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           getArchetypeStats(),
           cardStatsPromise,
         ]);
+
+      // Coach layout (Spec 7 AC 4): the own record per opponent counts only the
+      // coached archetype's decks — Start, Opponents, "Mein Spielstil" and the
+      // deck tips all read this slice. Old layout / onboarding: all decks.
+      const archetypeStats =
+        isArchetypeCoachUiEnabled() && activeArchetypeId !== null
+          ? computeArchetypeStats(
+              logsOfArchetype(opponentLogs, decks, activeArchetypeId),
+              metaSnapshots,
+            )
+          : allDecksStats;
 
       set({
         decks,

@@ -718,7 +718,7 @@ paste own list, or later; skipped when a deck of the archetype exists) → TCG L
 coached archetype only — *Active list* (name + "copy for TCG Live"; without a deck "set up a
 list" → Deck › My lists), *Next step* (Scheibe 1: set up a list, else paste a log → `AddLogModal`
 for the active deck; experiments / meta-list changes / coaching hotspots join with Specs 5/6/8),
-*Your form* (last 7 days incl. today, tie-weighted win rate, W–L–T, Wilson range), *Field this
+*Your form* (last 7 days incl. today, like every own record in the coach layout counting only games with decks of the coached archetype, tie-weighted win rate, W–L–T, Wilson range), *Field this
 week* (top 5 by share over 7 days with your own win rate matched by name → Opponents) and
 *Recent games* (3 newest logs of decks of this archetype → Coaching). Pure logic in
 `lib/coach/start.ts`.

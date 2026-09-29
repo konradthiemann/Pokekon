@@ -927,3 +927,71 @@ describe('dashboardStore preferences + coach navigation (Spec 7 §5.1, plan S4)'
     expect(useDashboardStore.getState().metaWindow).toEqual({ days: 14, online: false, bo1: true });
   });
 });
+
+describe('archetype-scoped archetypeStats (Spec 7 AC 4)', () => {
+  const mockedFlag = vi.mocked(isArchetypeCoachUiEnabled);
+  const DRAGA = { ...DECK_A, id: 1, archetype: 'dragapult-ex' };
+  const ZORO = { ...DECK_B, id: 2, archetype: 'n-zoroark', archetypeName: "N's Zoroark" };
+  const LOGS = [
+    {
+      deckId: 1,
+      archetype: 'Gardevoir ex',
+      result: 'W',
+      eventType: 'Online',
+      eventDate: '2026-09-01',
+      notes: '',
+    },
+    {
+      deckId: 2,
+      archetype: 'Gardevoir ex',
+      result: 'L',
+      eventType: 'Online',
+      eventDate: '2026-09-01',
+      notes: '',
+    },
+  ] as never;
+  const ALL_DECKS_STATS = [{ archetype: 'Gardevoir ex', encounters: 2 }] as never;
+
+  beforeEach(() => {
+    mockedFlag.mockReset().mockReturnValue(false);
+    mockedGetDecks.mockResolvedValue([DRAGA, ZORO]);
+    mockedGetOpponentLogs.mockResolvedValue(LOGS);
+    mockedGetArchetypeStats.mockResolvedValue(ALL_DECKS_STATS);
+    useDashboardStore.setState({
+      activeDeckId: 1,
+      activeArchetypeId: 'dragapult-ex',
+      activeDeckIdByArchetype: {},
+    } as never);
+  });
+
+  const gardevoir = () =>
+    useDashboardStore.getState().archetypeStats.find((s) => s.archetype === 'Gardevoir ex');
+
+  it('with the flag on, archetypeStats only count logs of decks of the active archetype', async () => {
+    mockedFlag.mockReturnValue(true);
+    await useDashboardStore.getState().refresh();
+    expect(gardevoir()).toMatchObject({ encounters: 1, wins: 1, losses: 0 });
+  });
+
+  it('with the flag off, archetypeStats keep counting all decks', async () => {
+    await useDashboardStore.getState().refresh();
+    expect(gardevoir()).toMatchObject({ encounters: 2 });
+  });
+
+  it('without an active archetype (onboarding), archetypeStats keep counting all decks', async () => {
+    mockedFlag.mockReturnValue(true);
+    useDashboardStore.setState({ activeArchetypeId: null } as never);
+    await useDashboardStore.getState().refresh();
+    expect(gardevoir()).toMatchObject({ encounters: 2 });
+  });
+
+  it('setActiveArchetype re-scopes archetypeStats', async () => {
+    mockedFlag.mockReturnValue(true);
+    vi.mocked(saveUserPreferences).mockResolvedValue({
+      activeArchetypeId: 'n-zoroark',
+      activeDeckIdByArchetype: {},
+    });
+    await useDashboardStore.getState().setActiveArchetype('n-zoroark');
+    expect(gardevoir()).toMatchObject({ encounters: 1, wins: 0, losses: 1 });
+  });
+});

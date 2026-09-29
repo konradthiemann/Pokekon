@@ -269,7 +269,9 @@ same archetype → newest deck of that archetype → none. `setActiveDeck()`
 remembers the deck per archetype server-side (best effort, never blocks the
 switch); `setActiveArchetype()` persists and re-resolves. `deckArchSlug` is now a
 derived value (`activeArchetypeId ?? ''`) — which also fixes the deck comparison
-showing "not set up" for accounts that never had the legacy key. Coach-only UI
+showing "not set up" for accounts that never had the legacy key. With the flag on and an archetype set, `archetypeStats` (own record per opponent) is
+computed from the coached archetype's decks only (`lib/archetypeStats.ts#computeArchetypeStats`
+over `logsOfArchetype`, Spec 7 AC 4); otherwise it covers all decks. Coach-only UI
 state: `coachTab` (`start · deck · coaching · opponents · tools`), `deckView`
 (`metaList · myLists`), `metaWindow` (shared meta window, default 30 days,
 online, Bo1).
