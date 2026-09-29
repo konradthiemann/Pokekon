@@ -232,7 +232,8 @@ Building blocks shared by the coach layout (`specs/archetype-first-ui.md`, plan
   analysis → own deck → slug.
 - DE/EN key parity for every namespace is guarded by `i18n/actionLabels.test.ts` (A5).
 - `components/coach/onboarding/OnboardingFlow` (Spec 7 §5.1, namespace `onboarding`):
-  1. **Archetype** — the 10 most-played archetypes of the last 7 days
+  1. **Archetype** — first "your archetypes" (valid archetypes of the own decks with
+     their list count, `ownDeckArchetypes`), then the 10 most-played archetypes of the last 7 days
      (`useFieldAnalysis`) with share, plus a search over the field and
      `KNOWN_ARCHETYPES` (name or slug); choosing calls `setActiveArchetype`.
   2. **List** (skipped when a deck of that archetype exists) — *take the meta list*
@@ -267,7 +268,7 @@ session exists (`App.tsx`, and `WelcomeScreen` after seeding the demo): `refresh
 second `refresh()`. When the server has no archetype yet, `loadPreferences()`
 migrates **once**: a valid legacy localStorage slug (`tcg-deck-arch-slug-v1`,
 deleted only after the migrated value was saved), else the active deck's
-archetype, else `null` (→ onboarding). This runs for **every** account, flag on or
+archetype, else the newest deck with a valid slug, else `null` (→ onboarding). This runs for **every** account, flag on or
 off — a single extra `GET` per load (plus at most one `PATCH` for the migration);
 nothing changes visibly with the flag off except that the deck comparison now
 knows the archetype. Active-deck resolution lives in the pure

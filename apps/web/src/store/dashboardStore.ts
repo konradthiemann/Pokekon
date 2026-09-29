@@ -523,6 +523,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       activeArchetypeId = pickMigrationArchetype({
         legacySlug: readLegacyDeckArchSlug(),
         activeDeck: get().activeDeck,
+        decks: get().decks,
       });
       if (activeArchetypeId !== null) {
         try {

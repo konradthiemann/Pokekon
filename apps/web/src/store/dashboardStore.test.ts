@@ -737,6 +737,18 @@ describe('dashboardStore preferences + coach navigation (Spec 7 §5.1, plan S4)'
     expect(useDashboardStore.getState().activeArchetypeId).toBe('gardevoir-ex');
   });
 
+  it('loadPreferences migrates from another deck when the active deck has an invalid slug', async () => {
+    const invalid = { ...DECK_A, id: 9, archetype: "N's Zoroark" };
+    useDashboardStore.setState({ activeDeck: invalid, decks: [invalid, DECK_B] } as never);
+    mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
+    mockedSavePrefs.mockResolvedValue({
+      activeArchetypeId: 'gardevoir-ex',
+      activeDeckIdByArchetype: {},
+    });
+    await useDashboardStore.getState().loadPreferences();
+    expect(mockedSavePrefs).toHaveBeenCalledWith({ activeArchetypeId: 'gardevoir-ex' });
+  });
+
   it('loadPreferences leaves activeArchetypeId null (→ onboarding) without any source', async () => {
     useDashboardStore.setState({ activeDeck: null } as never);
     mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });

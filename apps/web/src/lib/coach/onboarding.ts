@@ -1,6 +1,6 @@
 // Pure helpers of the archetype-first onboarding (Spec 7 §5.1).
-import type { TournamentDecklist } from '@pokekon/shared';
-import type { CardType } from '../../types';
+import { ARCHETYPE_SLUG_PATTERN, type TournamentDecklist } from '@pokekon/shared';
+import type { CardType, Deck } from '../../types';
 import type { FieldAnalysisArchetype } from '../api';
 import { inferCardRole, type ParsedCard } from '../deckImport';
 
@@ -32,4 +32,19 @@ export function medoidToParsedCards(representative: TournamentDecklist): ParsedC
     ...map(representative.trainer, 'Trainer'),
     ...map(representative.energy, 'Energy'),
   ];
+}
+
+/** Archetypes of the user's own decks (valid slugs only), each once with the
+ *  number of lists, most first — shown on top of onboarding step 1. */
+export function ownDeckArchetypes(
+  decks: readonly Pick<Deck, 'archetype' | 'archetypeName'>[],
+): { slug: string; name: string; count: number }[] {
+  const bySlug = new Map<string, { slug: string; name: string; count: number }>();
+  for (const d of decks) {
+    if (!ARCHETYPE_SLUG_PATTERN.test(d.archetype)) continue;
+    const entry = bySlug.get(d.archetype) ?? { slug: d.archetype, name: d.archetypeName, count: 0 };
+    entry.count += 1;
+    bySlug.set(d.archetype, entry);
+  }
+  return [...bySlug.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }

@@ -98,20 +98,22 @@ describe('resolveActiveDeckId', () => {
 
 describe('pickMigrationArchetype', () => {
   it('prefers a valid legacy slug', () => {
-    expect(pickMigrationArchetype({ legacySlug: 'dragapult-ex', activeDeck: ZORO_OLD })).toBe(
-      'dragapult-ex',
-    );
+    expect(
+      pickMigrationArchetype({ legacySlug: 'dragapult-ex', activeDeck: ZORO_OLD, decks: DECKS }),
+    ).toBe('dragapult-ex');
   });
 
   it('falls back to the active deck archetype for an invalid legacy slug', () => {
-    expect(pickMigrationArchetype({ legacySlug: 'N Zoroark', activeDeck: ZORO_OLD })).toBe(
+    expect(
+      pickMigrationArchetype({ legacySlug: 'N Zoroark', activeDeck: ZORO_OLD, decks: DECKS }),
+    ).toBe('n-zoroark');
+    expect(pickMigrationArchetype({ legacySlug: '  ', activeDeck: ZORO_OLD, decks: DECKS })).toBe(
       'n-zoroark',
     );
-    expect(pickMigrationArchetype({ legacySlug: '  ', activeDeck: ZORO_OLD })).toBe('n-zoroark');
   });
 
   it('returns null without any source', () => {
-    expect(pickMigrationArchetype({ legacySlug: null, activeDeck: null })).toBeNull();
+    expect(pickMigrationArchetype({ legacySlug: null, activeDeck: null, decks: [] })).toBeNull();
   });
 
   it('returns null when the active deck archetype is not a valid slug', () => {
@@ -119,7 +121,28 @@ describe('pickMigrationArchetype', () => {
       pickMigrationArchetype({
         legacySlug: null,
         activeDeck: deck(4, "N's Zoroark", '2026-01-01T00:00:00.000Z'),
+        decks: [deck(4, "N's Zoroark", '2026-01-01T00:00:00.000Z')],
       }),
     ).toBeNull();
+  });
+});
+
+describe('pickMigrationArchetype fallback over all decks (Spec 7 Scheibe 2, A8)', () => {
+  const INVALID = deck(5, "N's Zoroark", '2026-02-01T00:00:00.000Z');
+
+  it('falls back to the newest deck with a valid slug when the active deck has none', () => {
+    expect(
+      pickMigrationArchetype({
+        legacySlug: null,
+        activeDeck: INVALID,
+        decks: [ZORO_OLD, DRAGA, INVALID],
+      }),
+    ).toBe('dragapult-ex');
+  });
+
+  it('prefers the active deck over the newest valid deck', () => {
+    expect(pickMigrationArchetype({ legacySlug: null, activeDeck: ZORO_OLD, decks: DECKS })).toBe(
+      'n-zoroark',
+    );
   });
 });

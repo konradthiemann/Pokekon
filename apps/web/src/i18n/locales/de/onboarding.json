@@ -14,7 +14,8 @@
     "loading": "Meta wird geladen …",
     "unavailable": "Die Meta ist gerade nicht verfügbar – nutze die Suche.",
     "share": "{{share}} %",
-    "failed": "Das hat nicht geklappt. Bitte versuch es noch einmal."
+    "failed": "Das hat nicht geklappt. Bitte versuch es noch einmal.",
+    "yours": "Deine Archetypen"
   },
   "list": {
     "heading": "Womit willst du starten?",
