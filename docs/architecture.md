@@ -219,6 +219,8 @@ Building blocks shared by the coach layout (`specs/archetype-first-ui.md`, plan
 - `components/tools/ArchetypeMetaSummary` (KPI head + trend) and
   `components/tools/TournamentListsPanel` (recommendation · tournament · decklists) — the
   rest of the former `ArchetypeDetail`, on the Tools page.
+- `components/deck/OtherArchetypeDecks` (+ `lib/coach/otherDecks.ts`) — decks of other
+  archetypes on Deck › My lists; store `reassignDeckArchetype(deckId)`.
 - `components/tools/CardStatsPanel` + `hooks/useArchetypeCardStats` — card statistics tool.
 - `components/opponents/GlobalFieldPanel` — the coached archetype vs the global field
   (Opponents › Global field), formerly the Matchups tab of `ArchetypeDetail`.

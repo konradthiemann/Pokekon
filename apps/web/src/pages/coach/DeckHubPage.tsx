@@ -6,6 +6,9 @@ import { DeckPanel } from '../../components/deck/DeckPanel';
 import { DeckSettingsWidget } from '../../components/deck/DeckSettingsWidget';
 import { DeckSwitcher } from '../../components/deck/DeckSwitcher';
 import { DeckTipsSection } from '../../components/deck/DeckTipsSection';
+import { OtherArchetypeDecks } from '../../components/deck/OtherArchetypeDecks';
+import { useMemo } from 'react';
+import { logsOfArchetype } from '../../lib/coach/start';
 import { SegmentedTabs } from '../../components/shared/SegmentedTabs';
 import { KNOWN_ARCHETYPES } from '../../constants/archetypes';
 import { archetypeDisplayName } from '../../lib/coach/archetypeName';
@@ -34,6 +37,17 @@ export function DeckHubPage() {
     createNewDeck,
     refresh,
   } = useDashboardStore();
+
+  // Only this archetype's lists and games (Spec 7 AC 4): the variant
+  // comparison must not compare other archetypes' decks.
+  const archetypeDecks = useMemo(
+    () => (activeArchetypeId ? decks.filter((d) => d.archetype === activeArchetypeId) : []),
+    [decks, activeArchetypeId],
+  );
+  const archetypeLogs = useMemo(
+    () => (activeArchetypeId ? logsOfArchetype(opponentLogs, decks, activeArchetypeId) : []),
+    [opponentLogs, decks, activeArchetypeId],
+  );
 
   if (!activeArchetypeId) return null;
 
@@ -71,15 +85,16 @@ export function DeckHubPage() {
       {deckView === 'myLists' && (
         <>
           <DeckSwitcher archetypeFilter={activeArchetypeId} />
+          <OtherArchetypeDecks />
           {activeDeck ? (
             <>
               <DeckPanel deckCards={deckCards} />
               <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-                <DeckSettingsWidget />
+                <DeckSettingsWidget lockArchetype />
               </div>
               <DeckAnalyticsPanel
-                decks={decks}
-                allLogs={opponentLogs}
+                decks={archetypeDecks}
+                allLogs={archetypeLogs}
                 metaSnapshots={metaSnapshots}
                 activeDeckId={activeDeckId}
                 omitTurnQuality

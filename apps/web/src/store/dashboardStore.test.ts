@@ -56,6 +56,7 @@ import {
   getArchetypeStats,
   getUserPreferences,
   saveUserPreferences,
+  updateDeck,
 } from '../db/queries';
 import { isArchetypeCoachUiEnabled } from '../lib/featureFlags';
 import type { Deck } from '../types';
@@ -993,5 +994,40 @@ describe('archetype-scoped archetypeStats (Spec 7 AC 4)', () => {
     });
     await useDashboardStore.getState().setActiveArchetype('n-zoroark');
     expect(gardevoir()).toMatchObject({ encounters: 1, wins: 0, losses: 1 });
+  });
+});
+
+describe('reassignDeckArchetype (Spec 7 Scheibe 2, A7)', () => {
+  const LEGACY = {
+    id: 7,
+    archetype: 'N Zoroark',
+    archetypeName: 'N Zoroark',
+    variant: 'x',
+    createdAt: '2026-01-01',
+  };
+  beforeEach(() => {
+    vi.mocked(updateDeck)
+      .mockReset()
+      .mockResolvedValue(undefined as never);
+    mockedGetDecks.mockResolvedValue([DECK_A, LEGACY]);
+  });
+
+  it('moves a deck to the active archetype and refreshes', async () => {
+    useDashboardStore.setState({
+      activeArchetypeId: 'dragapult-ex',
+      decks: [DECK_A, LEGACY],
+    } as never);
+    await useDashboardStore.getState().reassignDeckArchetype(7);
+    expect(updateDeck).toHaveBeenCalledWith(7, {
+      archetype: 'dragapult-ex',
+      archetypeName: 'Dragapult ex',
+    });
+    expect(mockedGetDecks).toHaveBeenCalled();
+  });
+
+  it('does nothing without an active archetype', async () => {
+    useDashboardStore.setState({ activeArchetypeId: null, decks: [DECK_A, LEGACY] } as never);
+    await useDashboardStore.getState().reassignDeckArchetype(7);
+    expect(updateDeck).not.toHaveBeenCalled();
   });
 });

@@ -48,7 +48,8 @@
     "newVariantTitle": "New variant of this deck",
     "newVariantHint": "Copies all cards into a new {{archetype}} variant so you can tweak without losing this one.",
     "variantNamePlaceholder": "e.g. \"Control\"",
-    "create": "Create"
+    "create": "Create",
+    "archetypeLocked": "Archetype: {{name}} — switch it in the header."
   },
   "switcher": {
     "myDecks": "My Decks",
@@ -255,6 +256,11 @@
   "hub": {
     "metaList": "Meta list",
     "myLists": "My lists",
-    "noListTitle": "No list for this archetype yet"
+    "noListTitle": "No list for this archetype yet",
+    "otherArchetypes": "You also have lists for:",
+    "switchTo": "Switch to {{name}}",
+    "assignHere": "Assign {{name}} to this archetype",
+    "listCount_one": "{{count}} list",
+    "listCount_other": "{{count}} lists"
   }
 }

@@ -726,8 +726,12 @@ week* (top 5 by share over 7 days with your own win rate matched by name → Opp
 **Deck (coach layout, `pages/coach/DeckHubPage.tsx`):** segments *Meta list* (for now the existing
 deck tips, `DeckTipsSection`; its local-meta link opens Opponents instead of the old Meta tab — the
 optimised meta list arrives with Spec 5) and *My lists* (`DeckSwitcher` filtered to the coached
-archetype, `DeckPanel`, `DeckSettingsWidget`, `DeckAnalyticsPanel` without turn quality, which
-moves to Coaching). *Lab* joins with Spec 6. Without a list of the archetype both segments show
+archetype, `DeckPanel`, `DeckSettingsWidget` with `lockArchetype` — archetype shown, not
+editable, only the variant is saved (E13) — and `DeckAnalyticsPanel` over this archetype's decks and
+games only, without turn quality, which moves to Coaching). Below the switcher
+`components/deck/OtherArchetypeDecks` lists decks of other archetypes: "switch to …" for valid
+archetypes, "assign … to this archetype" for legacy free-text ones (`reassignDeckArchetype`, existing
+`PATCH /api/decks/:id`). *Lab* joins with Spec 6. Without a list of the archetype both segments show
 the onboarding's list step (`ListSetup`: take the meta list / paste own list). `DeckSettingsWidget`
 now lives in `components/deck/` (extracted from `DeckPage`, unchanged in the old layout).
 
