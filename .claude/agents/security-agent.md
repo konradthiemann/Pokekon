@@ -1,6 +1,6 @@
 ---
 name: security-agent
-description: "Use this agent to audit security aspects of this React + Hono/PostgreSQL monorepo — specifically: authorization and user scoping of API routes, input validation (battle logs, deck imports), server-side external API calls, secret and BYOK-key handling, LLM output validation, XSS, dependency vulnerabilities, and Content Security Policy configuration.\n\n<example>\nContext: A new battle log import feature processes raw text input from the user.\nuser: \"Wir haben einen neuen Battle-Log-Parser implementiert, bitte prüfe ob der sicher ist\"\nassistant: \"Der Security Agent prüft den Parser auf XSS-Risiken und unsichere String-Verarbeitung.\"\n<commentary>\nAny new user-input processing pipeline should trigger the security-agent to check for injection and XSS risks.\n</commentary>\n</example>\n\n<example>\nContext: The app fetches data from Limitless TCG API with a CORS proxy fallback.\nuser: \"Wir haben die Limitless-API-Integration überarbeitet — bitte Security-Check\"\nassistant: \"Ich lasse den Security Agent die CORS-Konfiguration und den Proxy-Fallback prüfen.\"\n<commentary>\nExternal API integrations need a security review for CORS misconfigurations and potential data exfiltration risks.\n</commentary>\n</example>\n\n<example>\nContext: User wants a periodic dependency vulnerability check.\nuser: \"Führe einen Dependency-Audit durch\"\nassistant: \"Der Security Agent führt npm audit aus und bewertet die gefundenen CVEs.\"\n<commentary>\nRegular dependency audits are a core security-agent task for this project.\n</commentary>\n</example>"
+description: "Use before merging anything that adds user input processing (deck import, battle-log paste), new API routes, external API calls, BYOK-key handling, LLM output handling or dependency updates. Read-only security audit with severity and fix."
 model: sonnet
 memory: project
 ---
@@ -117,7 +117,7 @@ npm audit   # im Repo-Root (npm workspaces)
 
 - Code-Qualität beurteilen (→ `code-review-agent`)
 - Performance-Probleme finden (→ `code-review-agent`)
-- Security-Features implementieren (→ `react-dev-implementer`)
+- Security-Features implementieren (→ Hauptsession)
 
 **Update deine Agent-Memory** mit entdeckten Vulnerability-Patterns und gemachten Fixes, damit du bei zukünftigen Audits gezielt nachfassen kannst.
 
