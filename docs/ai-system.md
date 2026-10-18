@@ -22,7 +22,7 @@ flowchart TB
         CLAUDE["CLAUDE.md<br/>Golden Rules · Gates · Hard-Constraints"]
     end
     subgraph L2["②  Orchestrierung & Ausführung"]
-        AGENTS[".claude/agents/<br/>11 spezialisierte Agents"]
+        AGENTS[".claude/agents · .claude/skills<br/>5 Agents · Skill ptcg-meta"]
         COMMANDS[".claude/commands/<br/>/feature /review /port-to-backend /docs-sync"]
     end
     subgraph L3["③  Gedächtnis"]
@@ -57,7 +57,7 @@ flowchart TB
 | Schicht | Ort | Verantwortung |
 |--------|-----|---------------|
 | ① Verfassung | [`CLAUDE.md`](../CLAUDE.md) | Nicht verhandelbare Regeln, Workflow, Quality-Gates. Hat Vorrang vor allem darunter. |
-| ② Orchestrierung | [`.claude/agents/`](../.claude/agents/), [`.claude/commands/`](../.claude/commands/) | Wer macht was; wiederverwendbare Abläufe. |
+| ② Orchestrierung | [`.claude/agents/`](../.claude/agents/), [`.claude/skills/`](../.claude/skills/), [`.claude/commands/`](../.claude/commands/) | Unabhängige Prüfung, Spezialisten, Domänenwissen auf Abruf; wiederverwendbare Abläufe. |
 | ③ Gedächtnis | `.claude/agent-memory/` | Persistentes Wissen pro Agent über Sessions hinweg. |
 | ④ Wissen | [`docs/`](./) | Architektur, Datenmodell, Roadmap, dieses Dokument. |
 | ⑤ Auslieferung | `apps/docs` (geplant) | Starlight-Viewer, automatisch auf GitHub Pages. |
@@ -91,93 +91,51 @@ Beide nutzen `temperature: 0`, JSON-Struktur und die **geteilte Engine** `@pokek
 
 ---
 
-## 4. Agent-Roster (Schicht ②)
+## 4. Agents & Skills (Schicht ②)
 
-Elf Agents, gruppiert nach Funktion. Details und Trigger-Beispiele in [`agents.md`](./agents.md); die Definitionen liegen in [`.claude/agents/`](../.claude/agents/).
+Die Hauptsession plant (Plan-Mode), schreibt Tests zuerst und implementiert. Subagents gibt es nur noch dort, wo ein **frischer, unabhängiger Kontext** etwas bringt; selten gebrauchtes Domänenwissen liegt in einem **Skill**, der erst bei Bedarf geladen wird. Details in [`agents.md`](./agents.md).
 
-```mermaid
-flowchart LR
-    User(["User / Coding-Agent"])
+| Art | Name | Kurzrolle |
+|-----|------|-----------|
+| Prüfung | `code-review-agent` | Review des fertigen Diffs (rein lesend) |
+| Prüfung | `security-agent` | Input-Processing, Routen, externe Calls, Secrets, Dependencies |
+| Spezialist | `data-analyst-agent` | Quantitative Insights aus PostgreSQL (Zahlen, keine Strategie) |
+| Spezialist | `ui-ux-agent` | Design, Charts, Accessibility, Mockups |
+| Spezialist | `docs-agent` | Doku nach Strukturänderungen nachziehen |
+| Skill | `ptcg-meta` | Meta-Recherche, Formate/Quellen, Deck- und Matchup-Empfehlungen |
 
-    subgraph Orchestration["Orchestrierung"]
-        PH["tcg-meta-project-head<br/>Architektur & Entscheidungen"]
-        PLAN["plan-agent<br/>Implementierungsplanung"]
-    end
-    subgraph Impl["Implementierung"]
-        REACT["react-dev-implementer<br/>Komponenten, Hooks, Store"]
-        UIUX["ui-ux-agent<br/>Design & Accessibility"]
-    end
-    subgraph Data["Daten & Meta"]
-        RES["ptcg-meta-researcher<br/>Limitless-Daten holen"]
-        DA["data-analyst-agent<br/>Statistiken & Trends"]
-        MA["meta-analyst<br/>Strategie-Empfehlungen"]
-    end
-    subgraph Quality["Qualität"]
-        CR["code-review-agent"]
-        SEC["security-agent"]
-        DOCSA["docs-agent"]
-        AQC["agent-quality-controller<br/>auditiert Agent-Files"]
-    end
-
-    User --> PH
-    PH --> PLAN
-    PLAN --> REACT
-    PLAN --> UIUX
-    REACT --> CR
-    REACT --> SEC
-    REACT --> DOCSA
-    RES --> DA --> MA
-    PH --> AQC
-```
-
-| Gruppe | Agent | Kurzrolle |
-|--------|-------|-----------|
-| Orchestrierung | `tcg-meta-project-head` | Höchster Orchestrator, Architektur, Konfliktlösung |
-| Orchestrierung | `plan-agent` | Plan vor jeder nicht-trivialen Implementierung |
-| Implementierung | `react-dev-implementer` | React-Komponenten, Hooks, Store, Utils (TDD) |
-| Implementierung | `ui-ux-agent` | Design, Charts, Accessibility, Wireframes |
-| Daten | `ptcg-meta-researcher` | Externe TCG-/Turnierdaten holen |
-| Daten | `data-analyst-agent` | Quantitative Insights (Zahlen, keine Strategie) |
-| Daten | `meta-analyst` | Strategische Deck-Empfehlungen aus den Zahlen |
-| Qualität | `code-review-agent` | TS/React/Dexie-Review (rein lesend) |
-| Qualität | `security-agent` | Input-Processing, API-Calls, Dependencies |
-| Qualität | `docs-agent` | Doku schreiben & aktuell halten |
-| Qualität | `agent-quality-controller` | Auditiert die Agent-Files selbst (Meta-Ebene) |
+**Seit 2026-10-18 entfernt:** `tcg-meta-project-head`, `plan-agent`, `react-dev-implementer`, `agent-quality-controller` (Rollen, die die Hauptsession selbst abdeckt; teils noch auf der alten Dexie-Architektur) sowie `ptcg-meta-researcher` und `meta-analyst` (jetzt Skill `ptcg-meta`).
 
 ---
 
 ## 5. Standard-Flows (wie Arbeit fließt)
 
-Der Standard-Lebenszyklus eines Features — durchgesetzt durch `CLAUDE.md` und gekapselt im Command [`/feature`](../.claude/commands/feature.md):
+Der Standard-Lebenszyklus eines Features — beschrieben in `CLAUDE.md` §3 und im Command [`/feature`](../.claude/commands/feature.md):
 
 ```mermaid
 sequenceDiagram
     actor U as User
-    participant PH as project-head
-    participant PL as plan-agent
-    participant DEV as react-dev-implementer
+    participant M as Hauptsession
     participant CR as code-review-agent
     participant SEC as security-agent
-    participant DOC as docs-agent
 
-    U->>PH: Feature-Wunsch
-    PH->>PL: nicht-trivial? Plan anfordern
-    PL-->>PH: Plan (Dateien, Datenfluss, Tests)
-    PH->>DEV: implementieren (TDD)
-    DEV->>CR: Review anfordern
-    DEV->>SEC: bei neuem Input/API: Security-Review
-    CR-->>DEV: Findings
-    SEC-->>DEV: Findings
-    DEV->>DOC: Doku aktualisieren
-    DEV-->>U: Gates grün (typecheck · lint · test) → fertig
+    U->>M: Feature-Wunsch
+    M->>U: Plan (Plan-Mode) zur Freigabe
+    U-->>M: Freigabe
+    M->>M: Tests zuerst, dann Implementierung
+    M->>CR: Review anfordern
+    M->>SEC: bei neuem Input/API/Secrets: Security-Review
+    CR-->>M: Findings
+    SEC-->>M: Findings
+    M->>M: Doku nachziehen (Docs-Gate)
+    M-->>U: Gates grün (typecheck · lint · test) → PR
 ```
 
-Weitere Flows (aus [`agents.md`](./agents.md)):
+Weitere Flows:
 
-- **Design-Entscheidung:** `ui-ux-agent` → `react-dev-implementer`
-- **Daten-/Meta-Feature:** `ptcg-meta-researcher` → `data-analyst-agent` → `meta-analyst`
+- **Daten-/Meta-Feature:** Skill `ptcg-meta` (Recherche, Empfehlungen) + `data-analyst-agent` (Zahlen)
+- **Design-Entscheidung:** `ui-ux-agent` (Mockup/Spezifikation) → Hauptsession implementiert
 - **Security-Check:** jedes neue Input-Processing → `security-agent` (Pflicht vor Merge)
-- **Agent-Wartung:** neue/auffällige Agents → `agent-quality-controller`
 
 ---
 
@@ -221,11 +179,11 @@ Jeder Agent hat ein persistentes Verzeichnis `.claude/agent-memory/<agent-name>/
 
 ```mermaid
 flowchart TB
-    subgraph Agent["Ein Agent, z. B. tcg-meta-project-head"]
+    subgraph Agent["Ein Agent, z. B. code-review-agent"]
         IDX["MEMORY.md (Index)"]
-        M1["project_architecture.md"]
-        M2["project_schema.md"]
-        M3["project_meta_data.md"]
+        M1["project-recurring-patterns.md"]
+        M2["project_*.md"]
+        M3["reference_*.md"]
         M4["feedback_*.md"]
     end
     IDX -.verweist auf.-> M1 & M2 & M3 & M4
@@ -276,15 +234,15 @@ flowchart TB
 ## 10. Bekannte Drift / Pflege-Hinweise
 
 - **`architecture.md` — Drift behoben (2026-08):** Die frühere „zero-backend SPA"-Beschreibung ist korrigiert; die Datei beschreibt jetzt die reale Hono+Postgres-Architektur mit serverseitiger, provider-agnostischer LLM-Analyse (siehe [`backend-evolution-plan.md`](./backend-evolution-plan.md) Abschnitt 1).
-- **Agent-Definitionen vs. Realität:** Einige Agent-Files (z. B. `tcg-meta-project-head`) beschreiben den Stack noch rein Dexie-zentriert. Beim nächsten `agent-quality-controller`-Lauf an die Backend-Realität angleichen.
-- **Pflege:** Bei neuen Agents/Commands dieses Dokument und [`agents.md`](./agents.md) mitführen (`/docs-sync`).
+- **Agent-Definitionen vs. Realität — behoben (2026-10-18):** Die Dexie-zentrierten Rollen-Agents sind entfernt; die verbliebenen fünf Agents beschreiben die Hono+Postgres-Realität.
+- **Pflege:** Bei neuen Agents/Skills/Commands dieses Dokument und [`agents.md`](./agents.md) mitführen (`/docs-sync`). Neues Wissen lieber als Skill (lädt bei Bedarf) als als neuen Agent.
 
 ---
 
 ## Verweise
 
 - [`../CLAUDE.md`](../CLAUDE.md) — Verfassung / Hard-Rules
-- [`agents.md`](./agents.md) — Agent-Referenz & Flows
+- [`agents.md`](./agents.md) — Agents, Skills & Flows
 - [`backend-evolution-plan.md`](./backend-evolution-plan.md) — Roadmap inkl. Battle-Log-Zugqualität & Doku-Viewer
 - [`architecture.md`](./architecture.md) — App-Architektur
 - [`../.claude/commands/`](../.claude/commands/) — Prompt-Bausteine

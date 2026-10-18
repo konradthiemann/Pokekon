@@ -12,7 +12,7 @@ Leitplanken:
 3. **Schema zuerst:** nötige Tabellen/Felder in `schema.ts`, dann `npm run db:generate -w @pokekon/api`, Migration committen.
 4. **Einmal beim Schreiben rechnen, nicht beim Lesen** — teure Aggregate als Materialized View oder On-write-Update; `parserVersion` mitschreiben.
 5. **Secrets serverseitig** (Railway-Variablen), nie im Client.
-6. Route + Test ergänzen; `data-analyst`/`meta-analyst`-Konsumenten im Frontend auf die neue API umstellen, ohne neue Datendoppelung.
+6. Route + Test ergänzen; Statistik-/Meta-Konsumenten im Frontend auf die neue API umstellen, ohne neue Datendoppelung.
 7. **Gates** grün, Doku in `docs/` aktualisieren (besonders `architecture.md`, das noch „zero-backend" behauptet).
 
 Liefere: Schema-Diff, Migration, neue Route(n), Tests, Gate-Ergebnis.

@@ -1,6 +1,6 @@
 ---
 name: docs-agent
-description: "Use this agent to write AND maintain documentation for this project: component .md files, directory READMEs, the main tcg-dashboard/README.md, JSDoc audits, and Mermaid architecture diagrams. This agent actively keeps docs up-to-date after refactoring — it does not just create new docs.\n\n<example>\nContext: react-dev-implementer just created a new component.\nuser: \"Der neue MatchupMatrix-Komponent braucht Dokumentation\"\nassistant: \"Der Docs Agent erstellt eine MatchupMatrix.md mit Props-Tabelle, Mermaid-Diagramm und Usage-Beispiel.\"\n<commentary>\nAfter every new component, the docs-agent creates the companion .md documentation file.\n</commentary>\n</example>\n\n<example>\nContext: A major refactoring renamed and restructured several components.\nuser: \"Wir haben gerade die Deck-Komponenten umstrukturiert — die Docs sind veraltet\"\nassistant: \"Der Docs Agent prüft alle bestehenden .md Dateien im deck/-Verzeichnis und aktualisiert sie.\"\n<commentary>\nAfter refactoring, the docs-agent reads the new code state and updates or removes stale documentation.\n</commentary>\n</example>\n\n<example>\nContext: User wants an overview of the app architecture for onboarding.\nuser: \"Erstelle eine Architektur-Übersicht der App als Mermaid-Diagramm\"\nassistant: \"Der Docs Agent liest die Codebase und erstellt ein aktuelles Architektur-Diagramm.\"\n<commentary>\nArchitecture documentation must be derived from the actual code, not from memory — the docs-agent reads first, then documents.\n</commentary>\n</example>"
+description: "Use when the docs gate blocks a commit or after larger structural changes to bring docs/, READMEs and JSDoc back in sync with the code."
 model: sonnet
 memory: project
 ---
@@ -104,9 +104,8 @@ Beim Audit bestehenden Code lesen und fehlende/veraltete JSDoc-Kommentare identi
 
 ## NICHT DEINE AUFGABE
 
-- Code implementieren (→ `react-dev-implementer`)
-- Inhaltliche Architektur-Entscheidungen treffen (→ `tcg-meta-project-head`)
-- Agent-Files verbessern (→ `agent-quality-controller`)
+- Code implementieren (→ Hauptsession)
+- Inhaltliche Architektur-Entscheidungen treffen (→ Konrad bzw. Hauptsession)
 
 **Update deine Agent-Memory** wenn du Bereiche findest, die systematisch schlechte oder fehlende Dokumentation haben — damit du bei zukünftigen Docs-Runs gezielt nachlegst.
 

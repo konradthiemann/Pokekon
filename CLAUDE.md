@@ -40,12 +40,12 @@ Die Richtung steht in [`docs/backend-evolution-plan.md`](./docs/backend-evolutio
 ## 3. Standard-Workflow
 
 ```
-Aufgabe verstehen → (nicht-trivial?) plan-agent → implementieren → code-review-agent + security-agent → docs-agent → Gates prüfen
+Aufgabe verstehen → (nicht-trivial?) Plan-Mode → test-first implementieren → code-review-agent (+ security-agent) → Doku → Gates prüfen
 ```
 
-- **Nicht-triviale Implementierung** beginnt mit einem Plan (Datei in `.claude/plans/` oder `plan-agent`). Kein Blind-Drauflos-Coden bei Schema-, Architektur- oder Multi-File-Änderungen.
+- **Nicht-triviale Implementierung** beginnt mit einem Plan (Plan-Mode, bei Bedarf als Datei in `.claude/plans/`). Kein Blind-Drauflos-Coden bei Schema-, Architektur- oder Multi-File-Änderungen.
 - **Neues User-Input-Processing oder externer API-Call** ⇒ immer `security-agent`, bevor gemergt wird (Deck-Import, Battle-Log-Paste, neue Routen).
-- **Daten-/Meta-Feature** ⇒ `ptcg-meta-researcher` → `data-analyst-agent` → `meta-analyst`.
+- **Daten-/Meta-Feature** ⇒ `ptcg-meta`-Skill (Recherche & Empfehlungen) + `data-analyst-agent` (Zahlen).
 - Wiederverwendbare Prompt-Bausteine für diese Flows liegen in [`.claude/commands/`](./.claude/commands/).
 
 ---
@@ -87,6 +87,7 @@ Aufgabe verstehen → (nicht-trivial?) plan-agent → implementieren → code-re
 - [`docs/ai-system.md`](./docs/ai-system.md) — vollständige KI-System-Doku mit Diagrammen
 - [`docs/agents.md`](./docs/agents.md) — Agent-Referenz & Delegations-Flows
 - [`docs/backend-evolution-plan.md`](./docs/backend-evolution-plan.md) — Roadmap (Backend, Battle-Log-Zugqualität, Doku-Viewer)
-- [`.claude/agents/`](./.claude/agents/) — die 11 spezialisierten Agents
+- [`.claude/agents/`](./.claude/agents/) — Review-, Security-, Daten-, UI/UX- und Docs-Agent
+- [`.claude/skills/`](./.claude/skills/) — Domänenwissen (`ptcg-meta`)
 - [`.claude/commands/`](./.claude/commands/) — wiederverwendbare Prompt-Bausteine
 - [`docs/README.md`](./docs/README.md) — Doku-Index

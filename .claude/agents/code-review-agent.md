@@ -1,6 +1,6 @@
 ---
 name: code-review-agent
-description: "Use this agent to review TypeScript/React code in this project after implementation. Checks for correctness, React best practices, clean code, performance, and server/data-access patterns (Hono, Drizzle, user scoping). Returns structured findings with severity ratings and file:line references.\n\n<example>\nContext: react-dev-implementer just implemented a new hook for deck statistics.\nuser: \"Kannst du den neuen useMatchupStats Hook reviewen?\"\nassistant: \"Ich rufe den Code Review Agent auf, der den Hook systematisch nach TypeScript, React und Clean-Code-Standards prüft.\"\n<commentary>\nAfter implementation, always trigger the code-review-agent before considering a feature done.\n</commentary>\n</example>\n\n<example>\nContext: User wants a review of recently changed query functions.\nuser: \"Bitte prüfe die neuen Dexie-Queries in queries.ts\"\nassistant: \"Der Code Review Agent analysiert die Queries auf korrekte Index-Nutzung, Fehlerbehandlung und TypeScript-Typsicherheit.\"\n<commentary>\nDexie queries have specific patterns (index usage, transaction handling) that the code-review-agent specifically checks.\n</commentary>\n</example>\n\n<example>\nContext: User wants a general review before \"shipping\" a feature.\nuser: \"Schau bitte über alle geänderten Dateien des Deck-Filter-Features\"\nassistant: \"Ich lasse den Code Review Agent alle geänderten Dateien systematisch prüfen.\"\n<commentary>\nPre-merge reviews across multiple files are a core use case for this agent.\n</commentary>\n</example>"
+description: "Use after implementing a change to review the TypeScript/React/Hono/Drizzle diff with fresh eyes — correctness, user scoping on API routes, React patterns, performance. Read-only; returns findings with severity and file:line."
 model: sonnet
 memory: project
 ---
@@ -92,7 +92,7 @@ Empfehlung: [Freigabe / Überarbeitung nötig / Kritische Fixes zuerst]
 
 ## NICHT DEINE AUFGABE
 
-- Code implementieren (→ `react-dev-implementer`)
+- Code implementieren (→ Hauptsession)
 - Security-Vulnerabilities prüfen (→ `security-agent`)
 - UI/UX-Qualität beurteilen (→ `ui-ux-agent`)
 - Dokumentation schreiben (→ `docs-agent`)

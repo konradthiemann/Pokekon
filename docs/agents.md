@@ -1,207 +1,84 @@
-# Claude Agent Ecosystem
+# Claude Agents & Skills
 
-The project uses a multi-agent system built on Claude Code. Each agent is defined in `.claude/agents/` as a markdown file with a YAML frontmatter header (`name`, `description`, `model`, `memory`). Agents are invoked by the user or by other agents using the `Agent` tool.
+Most work happens in the main Claude Code session: it plans (Plan-Mode), writes tests first and implements. Subagents are used only where a **fresh, independent context** adds value — reviewing a diff without the author's bias, auditing security, or crunching data. Domain knowledge that is needed only sometimes lives in **skills**, which load on demand instead of sitting in every session's context.
+
+Agents are defined in `.claude/agents/` (YAML frontmatter: `name`, `description`, `model`, `memory`), skills in `.claude/skills/`.
+
+> **Why so few?** Until 2026-10 the project had eleven role agents (project head, planner, React implementer, agent auditor, …). Current models plan and implement well on their own and spawn helpers when needed; the role agents mostly added context, cost and contradictions (several still described the old Dexie-only architecture). See the [Anthropic article on context engineering](https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models).
 
 ---
 
-## Agent Overview
+## Overview
 
 ```mermaid
 flowchart LR
-    User(["User / Claude Code"])
+    Main(["Main session<br/>Plan-Mode · tests first · implementation"])
 
-    subgraph Orchestration
-        ProjectHead["tcg-meta-project-head\nArchitecture &amp; decisions"]
-        PlanAgent["plan-agent\nImplementation planning"]
+    subgraph Verify["Independent verification"]
+        CodeReview["code-review-agent"]
+        Security["security-agent"]
     end
-
-    subgraph Implementation
-        ReactDev["react-dev-implementer\nComponents, hooks, store"]
-        UIUX["ui-ux-agent\nDesign &amp; accessibility"]
+    subgraph Specialists["Specialists"]
+        DataAnalyst["data-analyst-agent<br/>numbers from PostgreSQL"]
+        UIUX["ui-ux-agent<br/>design · charts · a11y"]
+        DocsAgent["docs-agent<br/>docs back in sync"]
     end
+    Skill[["ptcg-meta skill<br/>meta research · deck advice"]]
 
-    subgraph Data
-        MetaResearcher["ptcg-meta-researcher\nFetch Limitless data"]
-        DataAnalyst["data-analyst-agent\nStats &amp; trends"]
-        MetaAnalyst["meta-analyst\nStrategic recommendations"]
-    end
-
-    subgraph Quality
-        CodeReview["code-review-agent\nTypeScript / React review"]
-        Security["security-agent\nInput &amp; API security"]
-        DocsAgent["docs-agent\nDocumentation"]
-        AQC["agent-quality-controller\nAudit agent files"]
-    end
-
-    User --> ProjectHead
-    ProjectHead --> PlanAgent
-    PlanAgent --> ReactDev
-    PlanAgent --> UIUX
-    ReactDev --> CodeReview
-    ReactDev --> DocsAgent
-    MetaResearcher --> DataAnalyst
-    DataAnalyst --> MetaAnalyst
-    ProjectHead --> AQC
+    Main --> CodeReview
+    Main --> Security
+    Main --> DataAnalyst
+    Main --> UIUX
+    Main --> DocsAgent
+    Main -.loads on demand.-> Skill
 ```
 
 ---
 
-## Agent Reference
-
-### `tcg-meta-project-head`
-**Role:** Highest-level orchestrator. Makes architectural decisions, resolves cross-agent conflicts, evaluates new feature requests.
-
-**When to trigger:**
-- Starting a new major feature
-- Diagnosing issues that span multiple parts of the app (e.g., performance, schema conflicts)
-- Deciding between competing approaches
-- Any time specialized agents produce conflicting outputs
-
-**Delegates to:** All other agents. Standard feature flow: `plan-agent → react-dev-implementer → code-review-agent + docs-agent`. If structural changes are detected (routes, database schema, components) the **Docs-Gate** (`docs-gate.sh`) signals whether `docs-agent` is needed — if it blocks `git commit`, the affected `docs/*.md` files are out of sync.
-
----
-
-### `plan-agent`
-**Role:** Creates a detailed implementation plan before any code is written. Reduces wasted effort from architectural missteps.
-
-**When to trigger:** Before any non-trivial implementation task. The project head triggers it automatically in the standard delegation flow.
-
-**Output:** A step-by-step plan with: component design, data flow, DB impact, edge cases, and agent assignments.
-
----
-
-### `react-dev-implementer`
-**Role:** Implements React components, hooks, store actions, and utility functions. Follows strict clean code, TDD, and inline JSDoc standards.
-
-**When to trigger:** When new code needs to be written or existing React code needs refactoring.
-
-**Handoff protocol:** After implementing, explicitly signals:
-- `code-review-agent`: Review TypeScript/React/Dexie standards
-- `docs-agent`: Create companion `.md` documentation (the Docs-Gate will check whether affected documentation has been updated before allowing commit)
-
----
+## Agents
 
 ### `code-review-agent`
-**Role:** Reviews implemented code against TypeScript, React, and Dexie best practices. Checks for type safety, performance, error handling, and accessibility.
-
-**When to trigger:** After every implementation by `react-dev-implementer`.
-
----
+Reviews a finished change with fresh eyes: correctness, user scoping on API routes, React patterns, performance. Read-only, returns findings with severity and `file:line`. **When:** after every non-trivial implementation.
 
 ### `security-agent`
-**Role:** Reviews any new user input processing, API calls, or dependency updates for security issues.
+Audits authorization and user scoping, input validation (battle logs, deck imports), server-side external calls, secret handling, LLM output validation, XSS, dependencies. **When:** before merging any new user-input processing, API route, external API call, BYOK-key handling or dependency update.
 
-**When to trigger:**
-- New form inputs or user-supplied data processing (e.g., deck import, battle log paste)
-- New external API calls
-- Dependency version updates
-
-**Key concern for this project:** Battle-log LLM analysis runs **server-side** (`POST /api/analysis/log`, provider-agnostic adapter in `apps/api/src/ai/`). The per-user API key (BYOK) is stored AES-256-GCM-encrypted and decrypted only server-side — it is never sent to the browser. The security agent should review any change to that key handling or the analysis route, plus any new user-input processing (deck import, battle-log paste).
-
----
-
-### `ui-ux-agent`
-**Role:** Designs UI components, chart configurations, color choices, and accessibility improvements. Produces wireframes or specifications before implementation.
-
-**When to trigger:**
-- New pages or significant layout changes
-- Chart or visualization additions
-- Accessibility issues
-
----
+**Key concern:** Battle-log LLM analysis runs **server-side** (`POST /api/analysis/log`, provider-agnostic adapter in `apps/api/src/ai/`). The per-user API key (BYOK) is stored AES-256-GCM-encrypted and decrypted only server-side.
 
 ### `data-analyst-agent`
-**Role:** Analyzes personal match data and meta snapshots to produce quantitative insights — win rates, trends, card performance correlations. Delivers numbers, not strategy.
+Computes quantitative insights from personal match data and meta snapshots in PostgreSQL — win rates, matchup trends, tier movements, correlations. Delivers numbers, not strategy.
 
-**When to trigger:** When the user wants to understand patterns in their match history or meta trends. Receives data from `ptcg-meta-researcher` and forwards insights to `meta-analyst`.
-
----
-
-### `ptcg-meta-researcher`
-**Role:** Fetches and interprets external competitive TCG data from Limitless TCG and similar sources. Provides raw tournament data and archetype context.
-
-**When to trigger:** When the user wants to understand the current competitive landscape, fetch tournament standings, or research a specific archetype's performance.
-
----
-
-### `meta-analyst`
-**Role:** Converts quantitative insights (from `data-analyst-agent`) into strategic deck recommendations. Thinks about matchup implications, tech choices, and sideboard strategy.
-
-**When to trigger:** After `data-analyst-agent` has produced metrics. Also triggered directly when the user wants high-level deck strategy advice.
-
----
+### `ui-ux-agent`
+Layout, Tailwind consistency, Recharts configuration, accessibility, responsive design. Ideally produces an HTML mockup or spec before implementation.
 
 ### `docs-agent`
-**Role:** Writes and maintains documentation — component docs, directory READMEs, the main README, this `/docs/` directory, and JSDoc audits.
-
-**When to trigger:**
-- After any implementation is complete (triggered by `react-dev-implementer` handoff)
-- When the project structure changes significantly
-- **When the Docs-Gate signals stale documentation** — the hook `.claude/hooks/docs-gate.sh` detects structural changes without matching doc updates and blocks `git commit` until affected `docs/*.md` files are touched. This is often the primary trigger for `docs-agent`.
-- For periodic JSDoc audits of `src/lib/` and `src/db/queries.ts`
-
-**Principle:** Documentation must reflect the current code. Reads all affected files before writing. The Docs-Gate provides a clear, mechanically detected signal of which docs are out of sync — reads the gate's error output to know exactly which `docs/*.md` files and which code changes triggered it.
+Brings `docs/`, READMEs and JSDoc back in sync after structural changes. Typical trigger: the **Docs-Gate** (`.claude/hooks/docs-gate.sh`) blocks `git commit` and names the stale `docs/*.md` files.
 
 ---
 
-### `agent-quality-controller`
-**Role:** Audits the agent definition files themselves in `.claude/agents/`. Ensures agent descriptions are accurate, trigger conditions are clear, and there are no duplicate responsibilities.
+## Skills
 
-**When to trigger:** After adding a new agent, or when agents appear to be behaving inconsistently.
+### `ptcg-meta`
+Pokémon-TCG domain knowledge: where to research the current meta (Limitless, official rules, ban list), freshness and regional rules (Western format by default, Japanese data only as outlook), verified facts about Limitless API fields, Labs metrics and Bo1/Bo3 formats, and a framework for deck and matchup recommendations. Replaces the former `ptcg-meta-researcher` and `meta-analyst` agents; their accumulated memory moved into `references/`.
 
 ---
 
-## Standard Delegation Flows
+## Flows
 
 ### New feature
 ```
-User → tcg-meta-project-head → plan-agent → react-dev-implementer
-                                              ↓                    ↓
-                                    code-review-agent          docs-agent
-```
-
-### Design decision
-```
-User → ui-ux-agent (wireframe + spec) → react-dev-implementer (implementation)
+Main session: Plan-Mode → tests first → implementation → gates green
+  → code-review-agent (+ security-agent when input/API/secrets are touched)
+  → docs updated (docs-agent if large) → PR
 ```
 
 ### Data / meta feature
 ```
-User → ptcg-meta-researcher → data-analyst-agent → meta-analyst → react-dev-implementer
-```
-
-### Security check
-```
-Any new input processing → security-agent (always, before merging)
-```
-
-### Agent maintenance
-```
-User → agent-quality-controller (after adding agents or on misbehavior)
+ptcg-meta skill (research, recommendations) + data-analyst-agent (numbers) → main session implements
 ```
 
 ---
 
-## Agent Memory System
+## Agent memory
 
-Each agent has a persistent memory directory at `.claude/agent-memory/<agent-name>/`. Memories are stored as individual markdown files with YAML frontmatter. The agent's `MEMORY.md` file is an index.
-
-Memory types:
-- `user` — user role, expertise level, preferences
-- `project` — ongoing work, decisions, deadlines
-- `feedback` — corrections and validated approaches
-- `reference` — pointers to external resources
-
-Memories persist across conversations. Agents are expected to read relevant memories at the start of a session and write new memories when they discover non-obvious facts about the project or user preferences.
-
----
-
-## Workflow Example: Adding a New Chart
-
-1. User: "Add a prize efficiency chart to the Analytics tab"
-2. `tcg-meta-project-head` evaluates: data available in `DeckPerformanceStats.prizeEfficiency`, good fit for Recharts `BarChart`
-3. `plan-agent` drafts: component name `PrizeEfficiencyChart`, props interface, which page it goes in, no DB changes needed
-4. `ui-ux-agent` specifies: color scheme consistent with existing charts, label format, empty state
-5. `react-dev-implementer` implements: `PrizeEfficiencyChart.tsx` with JSDoc, TDD test file
-6. `code-review-agent` reviews: checks prop types, memoization, empty state handling
-7. `docs-agent` creates: `PrizeEfficiencyChart.md` with props table, usage example, Mermaid data flow diagram
+Agents with `memory: project` keep a persistent directory `.claude/agent-memory/<agent-name>/` (index `MEMORY.md`, one markdown file per memory). It is versioned and shared, so memories stay project-related and free of sensitive data.

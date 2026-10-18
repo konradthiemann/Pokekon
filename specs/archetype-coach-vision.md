@@ -167,7 +167,7 @@ Geprüft gegen den Workflow in `CLAUDE.md` §3 und die Agenten in `.claude/agent
 
 ### 9.1 Pro Spec
 ```
-Spec lesen → plan-agent (Plan in .claude/plans/<slug>.md, Belege neu verifizieren)
+Spec lesen → Plan-Mode (Plan in .claude/plans/<slug>.md, Belege neu verifizieren)
   → Konrad gibt den Plan frei
   → pro Scheibe: Tests aus den ACs zuerst → Implementierung → Gates grün → Commit
   → code-review-agent (+ security-agent, wo die Spec es verlangt) → docs-agent → PR
@@ -181,7 +181,7 @@ Spec lesen → plan-agent (Plan in .claude/plans/<slug>.md, Belege neu verifizie
    schreibt daraus zuerst fehlschlagende Tests, der Implementierer macht sie grün. Kein AC ohne
    Test, außer ausdrücklich manuelle Abnahme.
 3. **Belege veralten.** Alle `datei:zeile`-Angaben gelten für `baebcc5`. Der Plan verifiziert
-   jede Angabe neu, bevor er sie übernimmt (steht jetzt auch im `plan-agent`).
+   jede Angabe neu, bevor er sie übernimmt.
 4. **Keine offenen Fragen im Plan.** Specs haben Default-Entscheidungen. Weicht der Code davon
    ab, stoppt der Agent und fragt, statt zu raten.
 5. **Reine Logik zuerst.** Statistik und Optimierung (Spec 1, 4, 5 S1–S3, 6 S2–S4) liegen als
@@ -202,4 +202,7 @@ Spec lesen → plan-agent (Plan in .claude/plans/<slug>.md, Belege neu verifizie
 übersehen. Sie sind jetzt auf Hono, PostgreSQL und Drizzle ausgerichtet. Die hartkodierten
 Pfade `/Users/konrad.thiemann/tcg/...` (Plan-Ablage, Agent-Memory) sind **unverändert**, weil
 nur Konrad weiß, ob sie auf seinem Rechner stimmen. **Bitte prüfen.**
+
+*Nachtrag 2026-10-18:* `plan-agent` und `tcg-meta-project-head` sind entfernt (Plan-Mode der
+Hauptsession übernimmt die Planung); siehe [`docs/agents.md`](../docs/agents.md).
 
