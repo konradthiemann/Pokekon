@@ -1,6 +1,6 @@
 ---
 name: ui-ux-agent
-description: "Use this agent for UI/UX design decisions, Tailwind implementation consistency, Recharts configuration, accessibility audits, responsive design, and visual design system questions for the TCG Dashboard.\n\n<example>\nContext: Developer wants to add a new chart to the Meta page.\nuser: \"Welchen Chart-Typ soll ich für die Win-Rate-Entwicklung über Zeit nehmen?\"\nassistant: \"Der UI/UX Agent empfiehlt den passenden Recharts-Typ und gibt die konkrete Konfiguration vor.\"\n<commentary>\nChart type selection and configuration is a UI/UX decision — use the ui-ux-agent to ensure visual consistency.\n</commentary>\n</example>\n\n<example>\nContext: User notices the mobile layout looks broken on the Opponents page.\nuser: \"Auf Mobile überlappen sich die Karten in der OpponentLog-Liste\"\nassistant: \"Ich lasse den UI/UX Agent das Responsive-Layout analysieren und einen Fix vorschlagen.\"\n<commentary>\nMobile layout issues need ui-ux-agent analysis of the Tailwind breakpoints and component structure.\n</commentary>\n</example>\n\n<example>\nContext: User wants a new modal component designed.\nuser: \"Ich brauche ein neues Modal für Deck-Vergleiche — wie soll es aussehen?\"\nassistant: \"Der UI/UX Agent erstellt einen Mermaid-Wireframe und definiert die Tailwind-Klassen.\"\n<commentary>\nNew UI components should be designed by the ui-ux-agent before implementation begins.\n</commentary>\n</example>"
+description: "Use for UI/UX decisions — layout, Tailwind consistency, Recharts configuration, accessibility, responsive design — ideally producing an HTML mockup or spec before implementation."
 model: sonnet
 memory: project
 ---
@@ -113,7 +113,7 @@ Jede Daten-abhängige View braucht:
 
 ## NICHT DEINE AUFGABE
 
-- React-Komponenten implementieren (→ `react-dev-implementer`)
+- React-Komponenten implementieren (→ Hauptsession)
 - TypeScript-Fehler finden (→ `code-review-agent`)
 - Daten analysieren (→ `data-analyst-agent`)
 

@@ -104,13 +104,7 @@ Dexie schema v3 with six tables: `cards`, `decks`, `deckCards`, `deckSnapshots`,
 
 ## Agent Ecosystem
 
-Development is supported by eleven specialized Claude agents defined in `.claude/agents/`. See [`/docs/agents.md`](../docs/agents.md) for the full roster and delegation workflows.
-
-Key agents:
-- `tcg-meta-project-head` — architecture and cross-cutting decisions
-- `react-dev-implementer` — component and hook implementation
-- `docs-agent` — this documentation
-- `meta-analyst` — deck strategy recommendations
+Development is supported by a few Claude agents for independent review (`code-review-agent`, `security-agent`) and specialised work (`data-analyst-agent`, `ui-ux-agent`, `docs-agent`), plus the `ptcg-meta` skill for TCG domain knowledge. See [`/docs/agents.md`](../docs/agents.md).
 
 ---
 
