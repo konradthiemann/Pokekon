@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import i18n from '../../i18n';
 import { PredictionPanel } from './PredictionPanel';
 import type { FieldAnalysisArchetype, MetaWindow } from '../../lib/api';
@@ -209,9 +209,12 @@ describe('PredictionPanel fixed perspective (Spec 7 §5.5, AC 4)', () => {
       />,
     );
     await screen.findByText(/Dragapult ex/, { selector: 'h3' });
-    expect(vi.mocked(api.getArchetypeLists)).toHaveBeenCalledWith(
-      'dragapult-ex',
-      expect.objectContaining({ limit: 3 }),
+    // The lists fetch runs in a passive effect, which can flush after the heading is in the DOM.
+    await waitFor(() =>
+      expect(vi.mocked(api.getArchetypeLists)).toHaveBeenCalledWith(
+        'dragapult-ex',
+        expect.objectContaining({ limit: 3 }),
+      ),
     );
     expect(vi.mocked(api.getArchetypeLists)).not.toHaveBeenCalledWith(
       'raging-bolt-ex',
