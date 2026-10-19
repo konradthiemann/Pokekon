@@ -2,9 +2,12 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from 'lucide-react';
 import { CollapsibleSection } from '../../components/layout/CollapsibleSection';
-import { ArchetypeDetail } from '../../components/meta/ArchetypeDetail';
 import { EquilibriumPanel } from '../../components/meta/EquilibriumPanel';
 import { MatchupMatrix } from '../../components/meta/MatchupMatrix';
+import { MetaWindowControl } from '../../components/meta/MetaWindowControl';
+import { ArchetypeMetaSummary } from '../../components/tools/ArchetypeMetaSummary';
+import { TournamentListsPanel } from '../../components/tools/TournamentListsPanel';
+import { CardStatsPanel } from '../../components/tools/CardStatsPanel';
 import { KNOWN_ARCHETYPES } from '../../constants/archetypes';
 import { useFieldAnalysis } from '../../hooks/useFieldAnalysis';
 import { useMetaEquilibrium } from '../../hooks/useMetaEquilibrium';
@@ -31,6 +34,9 @@ export function ToolsPage() {
   const { data: equilibrium, error: equilibriumError } = useMetaEquilibrium(metaWindow.days);
 
   const archetypes = useMemo(() => field?.archetypes ?? [], [field]);
+  const archetypeName = activeArchetypeId
+    ? archetypeDisplayName(activeArchetypeId, { known: KNOWN_ARCHETYPES, field: archetypes, decks })
+    : '';
   const iconsById = useMemo(() => {
     const map: Record<string, string[]> = {};
     for (const a of archetypes) if (a.icons?.length) map[a.archetypeId] = a.icons;
@@ -42,36 +48,54 @@ export function ToolsPage() {
       <section className="card">
         <h2 className="text-base font-extrabold text-slate-900">{t('tools.heading')}</h2>
         <p className="mt-1 text-sm text-slate-600">{t('tools.intro')}</p>
-      </section>
-
-      {activeArchetypeId && (
-        <CollapsibleSection title={t('tools.tournamentLists')} defaultOpen>
-          <ArchetypeDetail
-            archetypeId={activeArchetypeId}
-            archetypeName={archetypeDisplayName(activeArchetypeId, {
-              known: KNOWN_ARCHETYPES,
-              field: archetypes,
-              decks,
-            })}
+        <div className="mt-3">
+          <MetaWindowControl
             window={metaWindow}
             onDaysChange={(days) => setMetaWindow({ ...metaWindow, days })}
             onOnlineBo1Change={(onlineBo1) =>
               setMetaWindow({ ...metaWindow, online: onlineBo1, bo1: onlineBo1 })
             }
-            archetypeStats={archetypeStats}
-            archetypes={archetypes}
-            localMeta={localMeta}
           />
-        </CollapsibleSection>
+        </div>
+      </section>
+
+      {activeArchetypeId && (
+        <>
+          <ArchetypeMetaSummary
+            archetypeId={activeArchetypeId}
+            archetypeName={archetypeName}
+            window={metaWindow}
+          />
+          <CollapsibleSection title={t('tools.tournamentLists')} defaultOpen>
+            <TournamentListsPanel
+              archetypeId={activeArchetypeId}
+              archetypeName={archetypeName}
+              window={metaWindow}
+              archetypeStats={archetypeStats}
+              archetypes={archetypes}
+              localMeta={localMeta}
+            />
+          </CollapsibleSection>
+          <CollapsibleSection title={t('tools.cardStatsTitle')} defaultOpen={false}>
+            <CardStatsPanel archetypeId={activeArchetypeId} days={metaWindow.days} />
+          </CollapsibleSection>
+        </>
       )}
 
       <CollapsibleSection title={t('tools.matrix')} defaultOpen={false}>
-        <MatchupMatrix window={metaWindow} iconsById={iconsById} />
+        <MatchupMatrix
+          window={metaWindow}
+          iconsById={iconsById}
+          focusArchetypeId={activeArchetypeId ?? undefined}
+        />
       </CollapsibleSection>
 
       <CollapsibleSection title={t('tools.gameTheory')} defaultOpen={false}>
         {equilibrium ? (
-          <EquilibriumPanel data={equilibrium} />
+          <EquilibriumPanel
+            data={equilibrium}
+            highlightArchetypeId={activeArchetypeId ?? undefined}
+          />
         ) : (
           <p className="text-sm text-slate-600">
             {equilibriumError ? t('tools.unavailable') : t('tools.loading')}

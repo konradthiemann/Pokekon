@@ -216,11 +216,24 @@ Building blocks shared by the coach layout (`specs/archetype-first-ui.md`, plan
   `ArchetypeDetail` and the coach *Deck* page.
 - `hooks/useFieldAnalysis(window)` — field analysis per meta window with request-key
   tagging (shared by `MetaPage` and the coach pages).
+- `components/tools/ArchetypeMetaSummary` (KPI head + trend) and
+  `components/tools/TournamentListsPanel` (recommendation · tournament · decklists) — the
+  rest of the former `ArchetypeDetail`, on the Tools page.
+- `components/deck/OtherArchetypeDecks` (+ `lib/coach/otherDecks.ts`) — decks of other
+  archetypes on Deck › My lists; store `reassignDeckArchetype(deckId)`.
+- `components/tools/CardStatsPanel` + `hooks/useArchetypeCardStats` — card statistics tool.
+- `components/opponents/GlobalFieldPanel` — the coached archetype vs the global field
+  (Opponents › Global field), formerly the Matchups tab of `ArchetypeDetail`.
+- `hooks/useArchetypeAnalysis`, `useArchetypeLists` (paged, "load more"),
+  `useArchetypeTournaments` (own failure domain, `[]` on error) — the per-archetype
+  reads formerly inside `ArchetypeDetail`, shared by Opponents and Tools (Spec 7
+  Scheibe 2). Same request-key pattern; a 404 of the analysis is `notInWindow`.
 - `lib/coach/archetypeName.ts` — display name for a slug: curated list → field
   analysis → own deck → slug.
 - DE/EN key parity for every namespace is guarded by `i18n/actionLabels.test.ts` (A5).
 - `components/coach/onboarding/OnboardingFlow` (Spec 7 §5.1, namespace `onboarding`):
-  1. **Archetype** — the 10 most-played archetypes of the last 7 days
+  1. **Archetype** — first "your archetypes" (valid archetypes of the own decks with
+     their list count, `ownDeckArchetypes`), then the 10 most-played archetypes of the last 7 days
      (`useFieldAnalysis`) with share, plus a search over the field and
      `KNOWN_ARCHETYPES` (name or slug); choosing calls `setActiveArchetype`.
   2. **List** (skipped when a deck of that archetype exists) — *take the meta list*
@@ -255,7 +268,7 @@ session exists (`App.tsx`, and `WelcomeScreen` after seeding the demo): `refresh
 second `refresh()`. When the server has no archetype yet, `loadPreferences()`
 migrates **once**: a valid legacy localStorage slug (`tcg-deck-arch-slug-v1`,
 deleted only after the migrated value was saved), else the active deck's
-archetype, else `null` (→ onboarding). This runs for **every** account, flag on or
+archetype, else the newest deck with a valid slug, else `null` (→ onboarding). This runs for **every** account, flag on or
 off — a single extra `GET` per load (plus at most one `PATCH` for the migration);
 nothing changes visibly with the flag off except that the deck comparison now
 knows the archetype. Active-deck resolution lives in the pure
@@ -265,7 +278,9 @@ same archetype → newest deck of that archetype → none. `setActiveDeck()`
 remembers the deck per archetype server-side (best effort, never blocks the
 switch); `setActiveArchetype()` persists and re-resolves. `deckArchSlug` is now a
 derived value (`activeArchetypeId ?? ''`) — which also fixes the deck comparison
-showing "not set up" for accounts that never had the legacy key. Coach-only UI
+showing "not set up" for accounts that never had the legacy key. With the flag on and an archetype set, `archetypeStats` (own record per opponent) is
+computed from the coached archetype's decks only (`lib/archetypeStats.ts#computeArchetypeStats`
+over `logsOfArchetype`, Spec 7 AC 4); otherwise it covers all decks. Coach-only UI
 state: `coachTab` (`start · deck · coaching · opponents · tools`), `deckView`
 (`metaList · myLists`), `metaWindow` (shared meta window, default 30 days,
 online, Bo1).

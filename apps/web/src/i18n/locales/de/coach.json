@@ -62,6 +62,26 @@
     "generalMeta": "Allgemeines Meta",
     "limitless": "Limitless – Decks und Turniere",
     "trainerhill": "TrainerHill – Meta und Matchups",
-    "opensNewTab": "öffnet in neuem Tab"
+    "opensNewTab": "öffnet in neuem Tab",
+    "summary": "Dein Archetyp im Meta",
+    "cardStats": {
+      "title": "Kartenstatistik",
+      "header": "{{lists}} Listen · letzte {{days}} Tage · immer Online-Bo1 · Stand {{date}}",
+      "coldStart": "Die Kartenstatistik für diesen Archetyp wurde noch nicht berechnet. Sie entsteht beim nächsten Meta-Sync.",
+      "loading": "Kartenstatistik wird geladen …",
+      "error": "Die Kartenstatistik ist gerade nicht verfügbar.",
+      "filterAll": "Alle",
+      "card": "Karte",
+      "inclusion": "Spielrate",
+      "avgCount": "Ø Anzahl",
+      "signal": "Signal",
+      "types": {
+        "pokemon": "Pokémon",
+        "trainer": "Trainer",
+        "energy": "Energie"
+      },
+      "empty": "Keine Karten für diesen Filter."
+    },
+    "cardStatsTitle": "Kartenstatistik"
   }
 }

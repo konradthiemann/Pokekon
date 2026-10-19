@@ -6,7 +6,11 @@ import { KNOWN_ARCHETYPES } from '../../../constants/archetypes';
 import { useFieldAnalysis } from '../../../hooks/useFieldAnalysis';
 import { getArchetypeSynthesis } from '../../../lib/api';
 import { archetypeDisplayName } from '../../../lib/coach/archetypeName';
-import { medoidToParsedCards, topFieldArchetypes } from '../../../lib/coach/onboarding';
+import {
+  medoidToParsedCards,
+  ownDeckArchetypes,
+  topFieldArchetypes,
+} from '../../../lib/coach/onboarding';
 import { importCards } from '../../../lib/deckImport';
 import { PLAYER_NAME_KEY } from '../../../lib/demo';
 import { useDashboardStore } from '../../../store/dashboardStore';
@@ -193,6 +197,9 @@ function ArchetypeStep({
 
   const searching = query.trim() !== '';
   const options = searching ? results : top;
+  // Archetypes the user already has lists for (Spec 7 Scheibe 2): found
+  // without searching, e.g. to switch back after the new UI is on for all.
+  const yours = useMemo(() => ownDeckArchetypes(decks), [decks]);
 
   return (
     <div>
@@ -213,6 +220,32 @@ function ArchetypeStep({
           className="input pl-9"
         />
       </label>
+
+      {!searching && yours.length > 0 && (
+        <>
+          <p className="mt-4 text-[11px] font-extrabold uppercase tracking-widest text-slate-500">
+            {t('archetype.yours')}
+          </p>
+          <ul aria-label={t('archetype.yours')} className="mt-2 space-y-2">
+            {yours.map((o) => (
+              <li key={o.slug}>
+                <button
+                  type="button"
+                  className={optionButton}
+                  disabled={disabled}
+                  onClick={() => onChoose({ slug: o.slug, name: o.name })}
+                >
+                  <PokemonIcon archetype={o.slug} size="sm" />
+                  <span className="flex-1 truncate font-semibold">{o.name}</span>
+                  <span className="text-xs tabular-nums text-slate-600">
+                    {t('deck:hub.listCount', { count: o.count })}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <p className="mt-4 text-[11px] font-extrabold uppercase tracking-widest text-slate-500">
         {searching ? t('archetype.results') : t('archetype.mostPlayed')}

@@ -152,7 +152,10 @@ describe('OnboardingFlow (Spec 7 §5.1)', () => {
   it('skips step 2 when a deck of the archetype already exists', async () => {
     store.decks = [{ id: 5, archetype: 'deck-11', archetypeName: 'Deck 11' }];
     render(<OnboardingFlow mode="firstRun" onDone={() => {}} />);
-    await chooseArchetype(/Deck 11/);
+    // Scheibe 2: the deck's archetype now also appears under "your
+    // archetypes"; choose it from the most-played list as before.
+    const mostPlayed = screen.getByRole('list', { name: /most played/i });
+    await userEvent.click(within(mostPlayed).getByRole('button', { name: /Deck 11/ }));
     expect(await screen.findByLabelText(/TCG Live name/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Take the meta list/ })).toBeNull();
   });
@@ -218,5 +221,31 @@ describe('OnboardingFlow (Spec 7 §5.1)', () => {
       expect(b.tagName).toBe('BUTTON');
       expect(b.className).toMatch(/min-h-\[44px\]|\bbtn\b|btn-/);
     }
+  });
+});
+
+describe('OnboardingFlow "your archetypes" (Spec 7 Scheibe 2, A8)', () => {
+  it('lists own deck archetypes above the most played ones', () => {
+    store.decks = [{ id: 5, archetype: 'n-zoroark', archetypeName: "N's Zoroark" }];
+    render(<OnboardingFlow mode="switchArchetype" onDone={() => {}} onCancel={() => {}} />);
+    const yours = screen.getByRole('list', { name: /your archetypes/i });
+    expect(within(yours).getByRole('button', { name: /N's Zoroark/ })).toBeInTheDocument();
+    const lists = screen.getAllByRole('list');
+    expect(lists[0]).toBe(yours);
+  });
+
+  it('choosing an own archetype skips the list step (a deck exists)', async () => {
+    const onDone = vi.fn();
+    store.decks = [{ id: 5, archetype: 'n-zoroark', archetypeName: "N's Zoroark" }];
+    render(<OnboardingFlow mode="switchArchetype" onDone={onDone} onCancel={() => {}} />);
+    const yours = screen.getByRole('list', { name: /your archetypes/i });
+    await userEvent.click(within(yours).getByRole('button', { name: /N's Zoroark/ }));
+    expect(store.setActiveArchetype).toHaveBeenCalledWith('n-zoroark');
+    expect(onDone).toHaveBeenCalled();
+  });
+
+  it('hides the block without own decks', () => {
+    render(<OnboardingFlow mode="firstRun" onDone={() => {}} />);
+    expect(screen.queryByRole('list', { name: /your archetypes/i })).toBeNull();
   });
 });

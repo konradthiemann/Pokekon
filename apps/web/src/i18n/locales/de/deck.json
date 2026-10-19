@@ -48,7 +48,8 @@
     "newVariantTitle": "Neue Variante dieses Decks",
     "newVariantHint": "Kopiert alle Karten in eine neue {{archetype}}-Variante, damit du experimentieren kannst, ohne diese zu verlieren.",
     "variantNamePlaceholder": "z.B. \"Control\"",
-    "create": "Erstellen"
+    "create": "Erstellen",
+    "archetypeLocked": "Archetyp: {{name}} – wechseln kannst du oben im Header."
   },
   "switcher": {
     "myDecks": "Meine Decks",
@@ -255,6 +256,11 @@
   "hub": {
     "metaList": "Meta-Liste",
     "myLists": "Meine Listen",
-    "noListTitle": "Noch keine Liste für diesen Archetyp"
+    "noListTitle": "Noch keine Liste für diesen Archetyp",
+    "otherArchetypes": "Du hast auch Listen für:",
+    "switchTo": "Zu {{name}} wechseln",
+    "assignHere": "{{name}} diesem Archetyp zuordnen",
+    "listCount_one": "{{count}} Liste",
+    "listCount_other": "{{count}} Listen"
   }
 }

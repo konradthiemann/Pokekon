@@ -82,3 +82,81 @@ describe('MatchupMatrix — reload control still triggers a refetch (F2, plan §
     expect(getMetaMatchupsMock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('MatchupMatrix focus row (Spec 7 §5.6, coach Tools)', () => {
+  const row = (deck1: string, deck2: string) => ({
+    deck1,
+    deck2,
+    wins: 6,
+    losses: 4,
+    ties: 0,
+    total: 10,
+    winRate: 60,
+  });
+  function withRows(): MetaMatchups {
+    return {
+      ...emptyMatchups(),
+      rows: [
+        row('dragapult-ex', 'gardevoir-ex'),
+        row('gardevoir-ex', 'dragapult-ex'),
+        row('gardevoir-ex', 'raging-bolt-ex'),
+        row('raging-bolt-ex', 'gardevoir-ex'),
+      ],
+    };
+  }
+  const bodyRows = () => document.querySelectorAll('tbody tr');
+
+  it('with focusArchetypeId renders only that row, all columns', async () => {
+    getMetaMatchupsMock.mockResolvedValue(withRows());
+    render(
+      <MatchupMatrix
+        window={{ days: 14, online: true, bo1: true }}
+        iconsById={{}}
+        focusArchetypeId="dragapult-ex"
+      />,
+    );
+    await screen.findByRole('table');
+    expect(bodyRows()).toHaveLength(1);
+    expect(document.querySelectorAll('thead th').length).toBeGreaterThan(3);
+  });
+
+  it('"show full matrix" reveals all rows and can collapse again', async () => {
+    getMetaMatchupsMock.mockResolvedValue(withRows());
+    render(
+      <MatchupMatrix
+        window={{ days: 14, online: true, bo1: true }}
+        iconsById={{}}
+        focusArchetypeId="dragapult-ex"
+      />,
+    );
+    await screen.findByRole('table');
+    const toggle = screen.getByRole('button', { name: i18n.t('meta:matchupMatrix.showFull') });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    expect(bodyRows()).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('meta:matchupMatrix.hideFull') }));
+    expect(bodyRows()).toHaveLength(1);
+  });
+
+  it('without focusArchetypeId renders the full matrix (unchanged)', async () => {
+    getMetaMatchupsMock.mockResolvedValue(withRows());
+    render(<MatchupMatrix window={{ days: 14, online: true, bo1: true }} iconsById={{}} />);
+    await screen.findByRole('table');
+    expect(bodyRows()).toHaveLength(3);
+    expect(
+      screen.queryByRole('button', { name: i18n.t('meta:matchupMatrix.showFull') }),
+    ).toBeNull();
+  });
+
+  it('shows a hint when the focused archetype has no row in the window', async () => {
+    getMetaMatchupsMock.mockResolvedValue(withRows());
+    render(
+      <MatchupMatrix
+        window={{ days: 14, online: true, bo1: true }}
+        iconsById={{}}
+        focusArchetypeId="n-zoroark"
+      />,
+    );
+    expect(await screen.findByText(i18n.t('meta:matchupMatrix.focusMissing'))).toBeInTheDocument();
+  });
+});

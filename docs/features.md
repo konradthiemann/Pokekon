@@ -718,7 +718,7 @@ paste own list, or later; skipped when a deck of the archetype exists) → TCG L
 coached archetype only — *Active list* (name + "copy for TCG Live"; without a deck "set up a
 list" → Deck › My lists), *Next step* (Scheibe 1: set up a list, else paste a log → `AddLogModal`
 for the active deck; experiments / meta-list changes / coaching hotspots join with Specs 5/6/8),
-*Your form* (last 7 days incl. today, tie-weighted win rate, W–L–T, Wilson range), *Field this
+*Your form* (last 7 days incl. today, like every own record in the coach layout counting only games with decks of the coached archetype, tie-weighted win rate, W–L–T, Wilson range), *Field this
 week* (top 5 by share over 7 days with your own win rate matched by name → Opponents) and
 *Recent games* (3 newest logs of decks of this archetype → Coaching). Pure logic in
 `lib/coach/start.ts`.
@@ -726,8 +726,12 @@ week* (top 5 by share over 7 days with your own win rate matched by name → Opp
 **Deck (coach layout, `pages/coach/DeckHubPage.tsx`):** segments *Meta list* (for now the existing
 deck tips, `DeckTipsSection`; its local-meta link opens Opponents instead of the old Meta tab — the
 optimised meta list arrives with Spec 5) and *My lists* (`DeckSwitcher` filtered to the coached
-archetype, `DeckPanel`, `DeckSettingsWidget`, `DeckAnalyticsPanel` without turn quality, which
-moves to Coaching). *Lab* joins with Spec 6. Without a list of the archetype both segments show
+archetype, `DeckPanel`, `DeckSettingsWidget` with `lockArchetype` — archetype shown, not
+editable, only the variant is saved (E13) — and `DeckAnalyticsPanel` over this archetype's decks and
+games only, without turn quality, which moves to Coaching). Below the switcher
+`components/deck/OtherArchetypeDecks` lists decks of other archetypes: "switch to …" for valid
+archetypes, "assign … to this archetype" for legacy free-text ones (`reassignDeckArchetype`, existing
+`PATCH /api/decks/:id`). *Lab* joins with Spec 6. Without a list of the archetype both segments show
 the onboarding's list step (`ListSetup`: take the meta list / paste own list). `DeckSettingsWidget`
 now lives in `components/deck/` (extracted from `DeckPage`, unchanged in the old layout).
 
@@ -738,17 +742,23 @@ and the active deck's turn quality (`DeckTurnQualityPanel`, moved here from Deck
 logs a four-step text guide explains how to copy a log from TCG Live. Filters, the result card after
 pasting and the hint to AI settings arrive with Spec 8 / Scheibe 6.
 
-**Opponents (coach layout, `pages/coach/OpponentsPage.tsx`, Scheibe 1):** the shared meta window
-(store `metaWindow`, `MetaWindowControl`; online and Bo1 move together), *My field*
-(`LocalMetaPanel` + `PredictionPanel` with field score, threats and lists, see §11/§16) and the
-own record per opponent (`MyMatchupsTable`, moved here from the old Deck page). Opponent detail
+**Opponents (coach layout, `pages/coach/OpponentsPage.tsx`):** the shared meta window
+(store `metaWindow`, `MetaWindowControl`; online and Bo1 move together) and a segment
+*Global field · My field*. *Global field* (`components/opponents/GlobalFieldPanel`, formerly the
+Matchups tab of `ArchetypeDetail`) shows the coached archetype's field score, threats / free wins and
+the full head-to-head table on demand. *My field* is `LocalMetaPanel` + `PredictionPanel` with a
+**fixed perspective** (`perspectiveArchetypeId`): no picker, no "best positioned" line — field score,
+threats and lists are always the coached archetype's, scored with share 0 when it is not part of
+the local field (`lib/coach/opponents.ts#ownFieldScore`). Below always the own record per opponent
+(`MyMatchupsTable`, this archetype only). Opponent detail
 (typical cards, coaching hotspot) arrives with Specs 5/8.
 
-**Tools (coach layout, `pages/coach/ToolsPage.tsx`, Scheibe 1, still unfiltered):** the archetype
-drilldown (§15, `ArchetypeDetail`) for the coached archetype, open, without a back button
-(`onBack` is optional now); the matchup matrix (§13) and game theory (§18, shared
-`hooks/useMetaEquilibrium`, also used by `MetaPage`) collapsed; link cards to Limitless and
-TrainerHill for the general meta (`target="_blank"`, `rel="noopener noreferrer"`). The old Meta
-page's general tournament tables are not shown here. Narrowing the tools to the archetype and
-dissolving `ArchetypeDetail` follow in Scheibe 2.
+**Tools (coach layout, `pages/coach/ToolsPage.tsx`):** everything about the coached archetype only
+(Spec 7 Scheibe 2), in this order: the shared meta window; *Your archetype in the meta*
+(`components/tools/ArchetypeMetaSummary`: share, win rate with Wilson band, players, field score with
+rank, weekly trend); *Tournament lists* (`components/tools/TournamentListsPanel`: recommendation =
+ranked clusters + AI text §20, best list per tournament, published decklists with "load more"); *Card statistics* (`components/tools/CardStatsPanel`: every card of the archetype from `archetype_card_stats` with play rate, average count and performance delta + signal tier, grouped by type, tier filter chips; header shows the snapped window 7/14/21/28 days and "always online Bo1"; cold start explained; §17);
+then, collapsed, the matchup matrix (§13; `focusArchetypeId` shows only the coached archetype's row until "show full matrix") and game theory (§18; `highlightArchetypeId` marks the row with `aria-current` and a "your archetype" label and adds a one-line summary; the only Tools section that stays meta-wide, Spec 7 decision F9); finally link cards to Limitless and
+TrainerHill for the general meta. `ArchetypeDetail` is no longer used here — its matchups tab lives
+under Opponents › Global field.
 

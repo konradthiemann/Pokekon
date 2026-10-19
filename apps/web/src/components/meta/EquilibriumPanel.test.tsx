@@ -355,3 +355,36 @@ describe('EquilibriumPanel — thin row coverage (plan §3.2 "Equalizer" risk / 
     expect(within(row).getByTestId('row-coverage-thin')).toBeInTheDocument();
   });
 });
+
+describe('EquilibriumPanel highlight (Spec 7 §5.6, coach Tools)', () => {
+  it('marks the highlighted archetype row with aria-current and a visible label', () => {
+    render(<EquilibriumPanel data={makeResponse()} highlightArchetypeId="dragapult-dusknoir" />);
+    const row = screen.getByTestId('equilibrium-archetype-dragapult-dusknoir');
+    expect(row).toHaveAttribute('aria-current', 'true');
+    expect(within(row).getByText(i18n.t('meta:equilibrium.yourArchetype'))).toBeInTheDocument();
+    expect(screen.getByTestId('equilibrium-archetype-grimmsnarl-ex')).not.toHaveAttribute(
+      'aria-current',
+    );
+  });
+
+  it('shows a one-line summary for the highlighted archetype above the rows', () => {
+    render(<EquilibriumPanel data={makeResponse()} highlightArchetypeId="dragapult-dusknoir" />);
+    const summary = screen.getByTestId('equilibrium-your-summary');
+    expect(summary).toHaveTextContent('Dragapult Dusknoir');
+    expect(summary).toHaveTextContent('15.5');
+    expect(summary).toHaveTextContent('0.0');
+  });
+
+  it('shows a hint when the highlighted archetype is not part of the run', () => {
+    render(<EquilibriumPanel data={makeResponse()} highlightArchetypeId="n-zoroark" />);
+    expect(screen.getByTestId('equilibrium-your-summary')).toHaveTextContent(
+      i18n.t('meta:equilibrium.yourMissing'),
+    );
+  });
+
+  it('renders unchanged without highlightArchetypeId', () => {
+    render(<EquilibriumPanel data={makeResponse()} />);
+    expect(screen.queryByTestId('equilibrium-your-summary')).toBeNull();
+    expect(document.querySelector('[aria-current]')).toBeNull();
+  });
+});

@@ -162,6 +162,10 @@
     "myField": "My field",
     "myMatchups": "Your record per opponent",
     "loading": "Loading the field …",
-    "unavailable": "The field is unavailable right now. Please try again later."
+    "unavailable": "The field is unavailable right now. Please try again later.",
+    "globalField": "Global field",
+    "myFieldTab": "My field",
+    "notInWindow": "Your archetype was not played in this window. Widen the window or sync the meta.",
+    "perspectiveTitle": "{{deck}} against your field"
   }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import i18n from '../../i18n';
 import { PredictionPanel } from './PredictionPanel';
 import type { FieldAnalysisArchetype, MetaWindow } from '../../lib/api';
@@ -42,11 +42,11 @@ vi.mock('../../store/dashboardStore', () => ({
   useDashboardStore: () => storeState,
 }));
 
+let matchupRows: unknown[] = [];
 vi.mock('../../lib/api', () => ({
-  getMetaMatchups: vi.fn().mockResolvedValue({
-    rows: [],
-    matchupSource: { trainerHillImportedAt: null },
-  }),
+  getMetaMatchups: vi.fn(() =>
+    Promise.resolve({ rows: matchupRows, matchupSource: { trainerHillImportedAt: null } }),
+  ),
   getArchetypeLists: vi.fn().mockResolvedValue({ lists: [], total: 0 }),
 }));
 
@@ -55,6 +55,7 @@ beforeEach(async () => {
   localStorage.clear();
   setLocalMetaSpy.mockClear();
   storeState = { localMeta: [], setLocalMeta: setLocalMetaSpy };
+  matchupRows = [];
 });
 
 afterEach(() => {
@@ -154,5 +155,75 @@ describe('PredictionPanel — one-time legacy field migration (Spec 10 Slice D)'
     storeState.localMeta = ['Dragapult ex'];
     render(<PredictionPanel archetypes={[archetype({ sharePct: 12.3 })]} window={WINDOW} />);
     expect(setLocalMetaSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('PredictionPanel fixed perspective (Spec 7 §5.5, AC 4)', () => {
+  const row = (deck1: string, deck2: string, wins: number, losses: number) => ({
+    deck1,
+    deck2,
+    wins,
+    losses,
+    ties: 0,
+    total: wins + losses,
+    winRate: (wins / (wins + losses)) * 100,
+  });
+  const ARCH = [
+    archetype({ archetypeId: 'gardevoir-ex', archetypeName: 'Gardevoir ex', sharePct: 20 }),
+    archetype({ archetypeId: 'raging-bolt-ex', archetypeName: 'Raging Bolt ex', sharePct: 10 }),
+  ];
+
+  beforeEach(() => {
+    storeState.localMeta = ['Gardevoir ex', 'Raging Bolt ex'];
+    // Raging Bolt beats Gardevoir hard → it would be "best positioned".
+    matchupRows = [
+      row('raging-bolt-ex', 'gardevoir-ex', 18, 2),
+      row('gardevoir-ex', 'raging-bolt-ex', 2, 18),
+      row('dragapult-ex', 'gardevoir-ex', 12, 8),
+      row('dragapult-ex', 'raging-bolt-ex', 8, 12),
+    ];
+  });
+
+  it('hides the perspective picker and the best-positioned line with perspectiveArchetypeId', async () => {
+    render(
+      <PredictionPanel
+        archetypes={ARCH}
+        window={WINDOW}
+        perspectiveArchetypeId="dragapult-ex"
+        perspectiveArchetypeName="Dragapult ex"
+      />,
+    );
+    await screen.findByText(/Dragapult ex/, { selector: 'h3' });
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByText(/best positioned/i)).toBeNull();
+  });
+
+  it('shows lists of the own archetype even if another deck scores higher', async () => {
+    const api = await import('../../lib/api');
+    render(
+      <PredictionPanel
+        archetypes={ARCH}
+        window={WINDOW}
+        perspectiveArchetypeId="dragapult-ex"
+        perspectiveArchetypeName="Dragapult ex"
+      />,
+    );
+    await screen.findByText(/Dragapult ex/, { selector: 'h3' });
+    // The lists fetch runs in a passive effect, which can flush after the heading is in the DOM.
+    await waitFor(() =>
+      expect(vi.mocked(api.getArchetypeLists)).toHaveBeenCalledWith(
+        'dragapult-ex',
+        expect.objectContaining({ limit: 3 }),
+      ),
+    );
+    expect(vi.mocked(api.getArchetypeLists)).not.toHaveBeenCalledWith(
+      'raging-bolt-ex',
+      expect.anything(),
+    );
+  });
+
+  it('keeps the old behaviour without perspectiveArchetypeId (picker, best positioned)', async () => {
+    render(<PredictionPanel archetypes={ARCH} window={WINDOW} />);
+    expect(await screen.findByRole('combobox')).toBeInTheDocument();
   });
 });

@@ -56,6 +56,7 @@ import {
   getArchetypeStats,
   getUserPreferences,
   saveUserPreferences,
+  updateDeck,
 } from '../db/queries';
 import { isArchetypeCoachUiEnabled } from '../lib/featureFlags';
 import type { Deck } from '../types';
@@ -736,6 +737,18 @@ describe('dashboardStore preferences + coach navigation (Spec 7 §5.1, plan S4)'
     expect(useDashboardStore.getState().activeArchetypeId).toBe('gardevoir-ex');
   });
 
+  it('loadPreferences migrates from another deck when the active deck has an invalid slug', async () => {
+    const invalid = { ...DECK_A, id: 9, archetype: "N's Zoroark" };
+    useDashboardStore.setState({ activeDeck: invalid, decks: [invalid, DECK_B] } as never);
+    mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
+    mockedSavePrefs.mockResolvedValue({
+      activeArchetypeId: 'gardevoir-ex',
+      activeDeckIdByArchetype: {},
+    });
+    await useDashboardStore.getState().loadPreferences();
+    expect(mockedSavePrefs).toHaveBeenCalledWith({ activeArchetypeId: 'gardevoir-ex' });
+  });
+
   it('loadPreferences leaves activeArchetypeId null (→ onboarding) without any source', async () => {
     useDashboardStore.setState({ activeDeck: null } as never);
     mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
@@ -925,5 +938,108 @@ describe('dashboardStore preferences + coach navigation (Spec 7 §5.1, plan S4)'
     expect(useDashboardStore.getState().metaWindow).toEqual({ days: 30, online: true, bo1: true });
     useDashboardStore.getState().setMetaWindow({ days: 14, online: false, bo1: true });
     expect(useDashboardStore.getState().metaWindow).toEqual({ days: 14, online: false, bo1: true });
+  });
+});
+
+describe('archetype-scoped archetypeStats (Spec 7 AC 4)', () => {
+  const mockedFlag = vi.mocked(isArchetypeCoachUiEnabled);
+  const DRAGA = { ...DECK_A, id: 1, archetype: 'dragapult-ex' };
+  const ZORO = { ...DECK_B, id: 2, archetype: 'n-zoroark', archetypeName: "N's Zoroark" };
+  const LOGS = [
+    {
+      deckId: 1,
+      archetype: 'Gardevoir ex',
+      result: 'W',
+      eventType: 'Online',
+      eventDate: '2026-09-01',
+      notes: '',
+    },
+    {
+      deckId: 2,
+      archetype: 'Gardevoir ex',
+      result: 'L',
+      eventType: 'Online',
+      eventDate: '2026-09-01',
+      notes: '',
+    },
+  ] as never;
+  const ALL_DECKS_STATS = [{ archetype: 'Gardevoir ex', encounters: 2 }] as never;
+
+  beforeEach(() => {
+    mockedFlag.mockReset().mockReturnValue(false);
+    mockedGetDecks.mockResolvedValue([DRAGA, ZORO]);
+    mockedGetOpponentLogs.mockResolvedValue(LOGS);
+    mockedGetArchetypeStats.mockResolvedValue(ALL_DECKS_STATS);
+    useDashboardStore.setState({
+      activeDeckId: 1,
+      activeArchetypeId: 'dragapult-ex',
+      activeDeckIdByArchetype: {},
+    } as never);
+  });
+
+  const gardevoir = () =>
+    useDashboardStore.getState().archetypeStats.find((s) => s.archetype === 'Gardevoir ex');
+
+  it('with the flag on, archetypeStats only count logs of decks of the active archetype', async () => {
+    mockedFlag.mockReturnValue(true);
+    await useDashboardStore.getState().refresh();
+    expect(gardevoir()).toMatchObject({ encounters: 1, wins: 1, losses: 0 });
+  });
+
+  it('with the flag off, archetypeStats keep counting all decks', async () => {
+    await useDashboardStore.getState().refresh();
+    expect(gardevoir()).toMatchObject({ encounters: 2 });
+  });
+
+  it('without an active archetype (onboarding), archetypeStats keep counting all decks', async () => {
+    mockedFlag.mockReturnValue(true);
+    useDashboardStore.setState({ activeArchetypeId: null } as never);
+    await useDashboardStore.getState().refresh();
+    expect(gardevoir()).toMatchObject({ encounters: 2 });
+  });
+
+  it('setActiveArchetype re-scopes archetypeStats', async () => {
+    mockedFlag.mockReturnValue(true);
+    vi.mocked(saveUserPreferences).mockResolvedValue({
+      activeArchetypeId: 'n-zoroark',
+      activeDeckIdByArchetype: {},
+    });
+    await useDashboardStore.getState().setActiveArchetype('n-zoroark');
+    expect(gardevoir()).toMatchObject({ encounters: 1, wins: 0, losses: 1 });
+  });
+});
+
+describe('reassignDeckArchetype (Spec 7 Scheibe 2, A7)', () => {
+  const LEGACY = {
+    id: 7,
+    archetype: 'N Zoroark',
+    archetypeName: 'N Zoroark',
+    variant: 'x',
+    createdAt: '2026-01-01',
+  };
+  beforeEach(() => {
+    vi.mocked(updateDeck)
+      .mockReset()
+      .mockResolvedValue(undefined as never);
+    mockedGetDecks.mockResolvedValue([DECK_A, LEGACY]);
+  });
+
+  it('moves a deck to the active archetype and refreshes', async () => {
+    useDashboardStore.setState({
+      activeArchetypeId: 'dragapult-ex',
+      decks: [DECK_A, LEGACY],
+    } as never);
+    await useDashboardStore.getState().reassignDeckArchetype(7);
+    expect(updateDeck).toHaveBeenCalledWith(7, {
+      archetype: 'dragapult-ex',
+      archetypeName: 'Dragapult ex',
+    });
+    expect(mockedGetDecks).toHaveBeenCalled();
+  });
+
+  it('does nothing without an active archetype', async () => {
+    useDashboardStore.setState({ activeArchetypeId: null, decks: [DECK_A, LEGACY] } as never);
+    await useDashboardStore.getState().reassignDeckArchetype(7);
+    expect(updateDeck).not.toHaveBeenCalled();
   });
 });

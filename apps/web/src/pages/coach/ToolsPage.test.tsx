@@ -29,16 +29,42 @@ vi.mock('../../hooks/useMetaEquilibrium', () => ({
 
 const seen: Record<string, unknown> = {};
 vi.mock('../../components/meta/ArchetypeDetail', () => ({
-  ArchetypeDetail: (p: Record<string, unknown>) => {
-    seen.detail = p;
-    return <div data-testid="archetype-detail" />;
+  ArchetypeDetail: () => {
+    throw new Error('ArchetypeDetail must not render on Tools (Scheibe 2)');
   },
 }));
+vi.mock('../../components/tools/ArchetypeMetaSummary', () => ({
+  ArchetypeMetaSummary: (p: Record<string, unknown>) => {
+    seen.summary = p;
+    return <div data-testid="meta-summary" />;
+  },
+}));
+vi.mock('../../components/tools/TournamentListsPanel', () => ({
+  TournamentListsPanel: (p: Record<string, unknown>) => {
+    seen.lists = p;
+    return <div data-testid="tournament-lists" />;
+  },
+}));
+vi.mock('../../components/tools/CardStatsPanel', () => ({
+  CardStatsPanel: (p: Record<string, unknown>) => {
+    seen.cardStats = p;
+    return <div data-testid="card-stats" />;
+  },
+}));
+vi.mock('../../components/meta/MetaWindowControl', () => ({
+  MetaWindowControl: () => <div data-testid="window-control" />,
+}));
 vi.mock('../../components/meta/MatchupMatrix', () => ({
-  MatchupMatrix: () => <div data-testid="matchup-matrix" />,
+  MatchupMatrix: (p: Record<string, unknown>) => {
+    seen.matrix = p;
+    return <div data-testid="matchup-matrix" />;
+  },
 }));
 vi.mock('../../components/meta/EquilibriumPanel', () => ({
-  EquilibriumPanel: () => <div data-testid="equilibrium" />,
+  EquilibriumPanel: (p: Record<string, unknown>) => {
+    seen.equilibrium = p;
+    return <div data-testid="equilibrium" />;
+  },
 }));
 vi.mock('../../components/layout/CollapsibleSection', () => ({
   CollapsibleSection: ({
@@ -81,16 +107,35 @@ function section(title: RegExp): HTMLElement {
 }
 
 describe('ToolsPage (Spec 7 §5.6, Scheibe 1: unfiltered)', () => {
-  it('embeds ArchetypeDetail for the active archetype without a back button', () => {
+  it('renders the window control, summary and tournament lists for the active archetype', () => {
     render(<ToolsPage />);
-    expect(screen.getByTestId('archetype-detail')).toBeInTheDocument();
-    expect(seen.detail).toMatchObject({
+    expect(screen.getByTestId('window-control')).toBeInTheDocument();
+    expect(seen.summary).toMatchObject({
       archetypeId: 'dragapult-ex',
       archetypeName: 'Dragapult ex',
       window: WINDOW,
     });
-    expect((seen.detail as { onBack?: unknown }).onBack).toBeUndefined();
+    expect(seen.lists).toMatchObject({ archetypeId: 'dragapult-ex', window: WINDOW });
     expect(section(/Tournament lists/).dataset.open).toBe('true');
+  });
+
+  it('keeps the section order: summary, tournament lists, matrix, game theory', () => {
+    render(<ToolsPage />);
+    const titles = screen.getAllByTestId('collapsible').map((s) => s.dataset.title);
+    // A6 adds card statistics between tournament lists and the matrix.
+    expect(titles).toEqual([
+      'Tournament lists',
+      'Card statistics',
+      'Matchup matrix',
+      'Game theory (experimental)',
+    ]);
+    expect(section(/Card statistics/).dataset.open).toBe('false');
+    expect(seen.cardStats).toEqual({ archetypeId: 'dragapult-ex', days: 14 });
+    const summary = screen.getByTestId('meta-summary');
+    expect(
+      summary.compareDocumentPosition(section(/Tournament lists/)) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('has the matchup matrix and game theory collapsed, equilibrium for the window days', () => {
@@ -100,6 +145,8 @@ describe('ToolsPage (Spec 7 §5.6, Scheibe 1: unfiltered)', () => {
     expect(within(section(/Game theory/)).getByTestId('equilibrium')).toBeInTheDocument();
     expect(section(/Game theory/).dataset.open).toBe('false');
     expect(equilibriumDays).toBe(14);
+    expect(seen.matrix).toMatchObject({ focusArchetypeId: 'dragapult-ex' });
+    expect(seen.equilibrium).toMatchObject({ highlightArchetypeId: 'dragapult-ex' });
   });
 
   it('links to Limitless and TrainerHill in a new tab safely', () => {

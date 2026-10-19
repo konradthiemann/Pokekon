@@ -8,7 +8,7 @@ import { SidePanel } from './SidePanel';
 
 /** Deck name / variant / slug editing and "new variant" — extracted from
  *  DeckPage so the coach layout's Deck › My lists can use it too (Spec 7 §6). */
-export function DeckSettingsWidget() {
+export function DeckSettingsWidget({ lockArchetype = false }: { lockArchetype?: boolean } = {}) {
   const { t } = useTranslation('deck');
   const { activeDeck, updateCurrentDeck, duplicateDeckAsVariant } = useDashboardStore();
 
@@ -31,17 +31,24 @@ export function DeckSettingsWidget() {
 
   if (!activeDeck) return null;
 
-  const dirty =
-    archetypeName.trim() !== (activeDeck.archetypeName ?? '') ||
-    variant.trim() !== (activeDeck.variant ?? '') ||
-    archetype.trim() !== (activeDeck.archetype ?? '');
+  const dirty = lockArchetype
+    ? variant.trim() !== (activeDeck.variant ?? '')
+    : archetypeName.trim() !== (activeDeck.archetypeName ?? '') ||
+      variant.trim() !== (activeDeck.variant ?? '') ||
+      archetype.trim() !== (activeDeck.archetype ?? '');
 
   const handleSave = async () => {
-    await updateCurrentDeck({
-      archetype: archetype.trim(),
-      archetypeName: archetypeName.trim(),
-      variant: variant.trim(),
-    });
+    // Coach layout (Spec 7 E13): the archetype comes from the header switch,
+    // only the variant name is edited here.
+    await updateCurrentDeck(
+      lockArchetype
+        ? { variant: variant.trim() }
+        : {
+            archetype: archetype.trim(),
+            archetypeName: archetypeName.trim(),
+            variant: variant.trim(),
+          },
+    );
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   };
@@ -62,18 +69,24 @@ export function DeckSettingsWidget() {
     >
       <div className="flex flex-col gap-4 h-full">
         <div className="space-y-2">
-          <div>
-            <label className="block text-[11px] uppercase tracking-wider text-slate-500 mb-1 font-bold">
-              {t('settings.archetype')}
-            </label>
-            <input
-              type="text"
-              value={archetypeName}
-              onChange={(e) => setArchetypeName(e.target.value)}
-              placeholder={t('settings.archetypePlaceholder')}
-              className="input w-full px-3 py-1.5 text-sm"
-            />
-          </div>
+          {lockArchetype ? (
+            <p className="text-xs text-slate-600">
+              {t('settings.archetypeLocked', { name: activeDeck.archetypeName })}
+            </p>
+          ) : (
+            <div>
+              <label className="block text-[11px] uppercase tracking-wider text-slate-500 mb-1 font-bold">
+                {t('settings.archetype')}
+              </label>
+              <input
+                type="text"
+                value={archetypeName}
+                onChange={(e) => setArchetypeName(e.target.value)}
+                placeholder={t('settings.archetypePlaceholder')}
+                className="input w-full px-3 py-1.5 text-sm"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-[11px] uppercase tracking-wider text-slate-500 mb-1 font-bold">
               {t('settings.variantLabel')}
@@ -86,7 +99,7 @@ export function DeckSettingsWidget() {
               className="input w-full px-3 py-1.5 text-sm"
             />
           </div>
-          {showAdvanced ? (
+          {lockArchetype ? null : showAdvanced ? (
             <div>
               <label className="block text-[11px] uppercase tracking-wider text-slate-500 mb-1 font-bold">
                 {t('settings.slugLabel')}
@@ -110,7 +123,7 @@ export function DeckSettingsWidget() {
           )}
           <button
             onClick={handleSave}
-            disabled={!archetypeName.trim() || !dirty}
+            disabled={(!lockArchetype && !archetypeName.trim()) || !dirty}
             className="btn-primary w-full justify-center text-xs disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {saved

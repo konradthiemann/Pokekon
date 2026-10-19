@@ -32,11 +32,19 @@ vi.mock('../../components/deck/DeckPanel', () => ({
   DeckPanel: () => <div data-testid="deck-panel" />,
 }));
 vi.mock('../../components/deck/DeckSettingsWidget', () => ({
-  DeckSettingsWidget: () => <div data-testid="deck-settings" />,
+  DeckSettingsWidget: (p: { lockArchetype?: boolean }) => {
+    seen.lockArchetype = p.lockArchetype;
+    return <div data-testid="deck-settings" />;
+  },
+}));
+vi.mock('../../components/deck/OtherArchetypeDecks', () => ({
+  OtherArchetypeDecks: () => <div data-testid="other-archetypes" />,
 }));
 vi.mock('../../components/deck/DeckAnalyticsPanel', () => ({
-  DeckAnalyticsPanel: (p: { omitTurnQuality?: boolean }) => {
+  DeckAnalyticsPanel: (p: { omitTurnQuality?: boolean; decks: unknown; allLogs: unknown }) => {
     seen.omitTurnQuality = p.omitTurnQuality;
+    seen.analyticsDecks = p.decks;
+    seen.analyticsLogs = p.allLogs;
     return <div data-testid="deck-analytics" />;
   },
 }));
@@ -120,5 +128,26 @@ describe('DeckHubPage (Spec 7 §5.3)', () => {
     render(<DeckHubPage />);
     expect(screen.getByTestId('list-setup')).toBeInTheDocument();
     expect(screen.queryByTestId('deck-panel')).toBeNull();
+  });
+});
+
+describe('DeckHubPage scoped to the active archetype (Spec 7 Scheibe 2, A7)', () => {
+  it('passes only decks and logs of the active archetype to DeckAnalyticsPanel', () => {
+    const other = { id: 9, archetype: 'n-zoroark', archetypeName: "N's Zoroark" };
+    store.decks = [DECK, other];
+    store.opponentLogs = [{ deckId: 3 }, { deckId: 9 }];
+    render(<DeckHubPage />);
+    expect(seen.analyticsDecks).toEqual([DECK]);
+    expect(seen.analyticsLogs).toEqual([{ deckId: 3 }]);
+  });
+
+  it('renders DeckSettingsWidget with lockArchetype', () => {
+    render(<DeckHubPage />);
+    expect(seen.lockArchetype).toBe(true);
+  });
+
+  it('shows OtherArchetypeDecks on My lists', () => {
+    render(<DeckHubPage />);
+    expect(screen.getByTestId('other-archetypes')).toBeInTheDocument();
   });
 });

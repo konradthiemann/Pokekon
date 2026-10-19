@@ -46,6 +46,10 @@ import {
 } from '../lib/preferences';
 import { isArchetypeCoachUiEnabled } from '../lib/featureFlags';
 import { pickMigrationArchetype, resolveActiveDeckId } from '../lib/coach/activeDeck';
+import { logsOfArchetype } from '../lib/coach/start';
+import { computeArchetypeStats } from '../lib/archetypeStats';
+import { archetypeDisplayName } from '../lib/coach/archetypeName';
+import { KNOWN_ARCHETYPES } from '../constants/archetypes';
 import { META_DEFAULT_DAYS } from '../components/meta/metaWindow';
 
 // `loadCardStats` can be in flight from two independent, network-timing-
@@ -184,6 +188,9 @@ interface DashboardState {
   loadPreferences: () => Promise<void>;
   /** Persists the coached archetype and switches to its remembered deck. */
   setActiveArchetype: (archetypeId: string) => Promise<void>;
+  /** Moves a deck (e.g. a legacy free-text archetype) to the coached
+   *  archetype via the existing deck update route. No-op without one. */
+  reassignDeckArchetype: (deckId: number) => Promise<void>;
   setCoachTab: (tab: CoachTab) => void;
   setDeckView: (view: DeckView) => void;
   setMetaWindow: (window: MetaWindow) => void;
@@ -304,7 +311,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           ? get().loadCardStats(activeDeck.archetype)
           : Promise.resolve();
 
-      const [deckCards, deckSnapshots, opponentLogs, metaSnapshots, archetypeStats] =
+      const [deckCards, deckSnapshots, opponentLogs, metaSnapshots, allDecksStats] =
         await Promise.all([
           getDeckCards(activeDeckId ?? undefined),
           getDeckSnapshots(activeDeckId ?? undefined),
@@ -313,6 +320,17 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           getArchetypeStats(),
           cardStatsPromise,
         ]);
+
+      // Coach layout (Spec 7 AC 4): the own record per opponent counts only the
+      // coached archetype's decks — Start, Opponents, "Mein Spielstil" and the
+      // deck tips all read this slice. Old layout / onboarding: all decks.
+      const archetypeStats =
+        isArchetypeCoachUiEnabled() && activeArchetypeId !== null
+          ? computeArchetypeStats(
+              logsOfArchetype(opponentLogs, decks, activeArchetypeId),
+              metaSnapshots,
+            )
+          : allDecksStats;
 
       set({
         decks,
@@ -505,6 +523,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       activeArchetypeId = pickMigrationArchetype({
         legacySlug: readLegacyDeckArchSlug(),
         activeDeck: get().activeDeck,
+        decks: get().decks,
       });
       if (activeArchetypeId !== null) {
         try {
@@ -532,6 +551,20 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       activeArchetypeId: archetypeId,
       deckArchSlug: archetypeId,
       activeDeckIdByArchetype: prefs.activeDeckIdByArchetype,
+    });
+    await get().refresh();
+  },
+
+  reassignDeckArchetype: async (deckId) => {
+    const { activeArchetypeId, decks } = get();
+    if (!activeArchetypeId) return;
+    await updateDeck(deckId, {
+      archetype: activeArchetypeId,
+      archetypeName: archetypeDisplayName(activeArchetypeId, {
+        known: KNOWN_ARCHETYPES,
+        field: [],
+        decks: decks.filter((d) => d.archetype === activeArchetypeId),
+      }),
     });
     await get().refresh();
   },

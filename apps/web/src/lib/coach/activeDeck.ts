@@ -38,13 +38,20 @@ export function resolveActiveDeckId(input: {
   return newest?.id ?? null;
 }
 
-/** One-time migration source: a valid legacy slug first, else the active deck's archetype. */
+/** One-time migration source: a valid legacy slug, else the active deck's
+ *  archetype, else the newest deck with a valid slug (legacy free-text decks
+ *  must not force an account with valid decks into onboarding). */
 export function pickMigrationArchetype(input: {
   legacySlug: string | null;
   activeDeck: Deck | null;
+  decks: readonly Deck[];
 }): string | null {
   const legacy = input.legacySlug?.trim() ?? null;
   if (isValidSlug(legacy)) return legacy;
   const fromDeck = input.activeDeck?.archetype ?? null;
-  return isValidSlug(fromDeck) ? fromDeck : null;
+  if (isValidSlug(fromDeck)) return fromDeck;
+  const newestValid = [...input.decks]
+    .filter((d) => isValidSlug(d.archetype))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  return newestValid?.archetype ?? null;
 }

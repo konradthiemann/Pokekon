@@ -256,7 +256,10 @@
     "sourceBlend": "Echte Daten: {{ownGames}} Online-Bo1-Matches ({{ownPairs}} Paarungen) · {{fallback}} Paarungen via TrainerHill (Näherung) · Winrate aus Sicht des Zeilen-Decks",
     "conflictNote_one": "· {{count}} Paarung weicht >15pp von TrainerHill ab",
     "conflictNote_other": "· {{count}} Paarungen weichen >15pp von TrainerHill ab",
-    "reload": "Matchup-Daten neu laden"
+    "reload": "Matchup-Daten neu laden",
+    "showFull": "Ganze Matrix anzeigen",
+    "hideFull": "Nur deine Zeile",
+    "focusMissing": "Für deinen Archetyp gibt es in diesem Zeitfenster keine Matchup-Daten."
   },
   "metaShareChart": {
     "empty": "Keine Meta-Daten geladen.",
@@ -332,6 +335,9 @@
     "source": "Stand {{computedAt}}, Fenster {{days}} Tage, {{runs}} Durchläufe, Seed {{seed}}",
     "sourceImputed": "{{pct}} % der Matchup-Zellen ohne Daten",
     "empty": "Noch nicht berechnet.",
-    "methodNote": "Die Berechnung geht von einem Nullsummenspiel aus (Win-Rate + Gegner-Win-Rate = 100 %) und symmetrisiert widersprüchliche Matchup-Zahlen zwischen zwei Decks. Sie berücksichtigt keine Korrelationen zwischen Matchups und ist nur so gut wie die zugrunde liegenden Turnierdaten."
+    "methodNote": "Die Berechnung geht von einem Nullsummenspiel aus (Win-Rate + Gegner-Win-Rate = 100 %) und symmetrisiert widersprüchliche Matchup-Zahlen zwischen zwei Decks. Sie berücksichtigt keine Korrelationen zwischen Matchups und ist nur so gut wie die zugrunde liegenden Turnierdaten.",
+    "yourArchetype": "Dein Archetyp",
+    "yourSummary": "{{name}}: {{share}} % Anteil → {{weight}} % im Gleichgewicht",
+    "yourMissing": "Dein Archetyp ist in dieser Berechnung nicht enthalten."
   }
 }

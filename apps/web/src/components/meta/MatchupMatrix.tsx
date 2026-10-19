@@ -43,13 +43,18 @@ const MIN_GAMES_FILTER_OPTIONS = [1, 10, 20, 50] as const;
 export function MatchupMatrix({
   window,
   iconsById,
+  focusArchetypeId,
 }: {
   window: MetaWindow;
   iconsById: Record<string, string[]>;
+  /** Coach Tools (Spec 7 §5.6): show only this archetype's row (all columns)
+   *  until the user expands the full matrix. */
+  focusArchetypeId?: string;
 }) {
   const { t } = useTranslation('meta');
   const [minGames, setMinGames] = useState<number>(1);
   const [labelsOpen, setLabelsOpen] = useState(false);
+  const [showFull, setShowFull] = useState(false);
   const [entries, setEntries] = useState<MatchupRow[] | null>(null);
   const [source, setSource] = useState<MatchupSource | null>(null);
   const [loading, setLoading] = useState(true);
@@ -114,6 +119,12 @@ export function MatchupMatrix({
     return { decks, matrix };
   }, [entries]);
 
+  const focusMissing = focusArchetypeId !== undefined && !decks.includes(focusArchetypeId);
+  const rowDecks =
+    focusArchetypeId !== undefined && !showFull && !focusMissing
+      ? decks.filter((d) => d === focusArchetypeId)
+      : decks;
+
   if (loading) {
     return (
       <div className="-m-4 py-16 flex items-center justify-center gap-2 text-slate-500 text-sm font-semibold">
@@ -152,6 +163,16 @@ export function MatchupMatrix({
             ))}
           </select>
         </div>
+        {focusArchetypeId !== undefined && !focusMissing && (
+          <button
+            type="button"
+            onClick={() => setShowFull((v) => !v)}
+            aria-expanded={showFull}
+            className="btn-ghost min-h-[44px] text-xs"
+          >
+            {showFull ? t('matchupMatrix.hideFull') : t('matchupMatrix.showFull')}
+          </button>
+        )}
         <span className="hidden md:inline">·</span>
         <span>{t('matchupMatrix.perspectiveNote')}</span>
         <span className="hidden md:inline">·</span>
@@ -174,6 +195,12 @@ export function MatchupMatrix({
           </span>
         </div>
       </div>
+
+      {focusMissing && (
+        <p className="border-b border-slate-200 px-4 py-2 text-xs text-slate-600">
+          {t('matchupMatrix.focusMissing')}
+        </p>
+      )}
 
       {/* Table */}
       <div className="overflow-x-auto">
@@ -230,7 +257,7 @@ export function MatchupMatrix({
           </thead>
 
           <tbody>
-            {decks.map((row) => (
+            {rowDecks.map((row) => (
               <tr
                 key={row}
                 className="border-b border-slate-100 hover:bg-brand-50/50 transition-colors"

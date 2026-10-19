@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TournamentDecklist } from '@pokekon/shared';
 import type { FieldAnalysisArchetype } from '../api';
-import { medoidToParsedCards, topFieldArchetypes } from './onboarding';
+import { medoidToParsedCards, ownDeckArchetypes, topFieldArchetypes } from './onboarding';
 
 function entry(archetypeId: string, sharePct: number): FieldAnalysisArchetype {
   return { archetypeId, archetypeName: archetypeId, sharePct } as FieldAnalysisArchetype;
@@ -53,5 +53,28 @@ describe('medoidToParsedCards', () => {
       set: 'TWM',
       number: '130',
     });
+  });
+});
+
+describe('ownDeckArchetypes', () => {
+  const d = (id: number, archetype: string, archetypeName = archetype) =>
+    ({ id, archetype, archetypeName, variant: '', createdAt: '2026-01-01' }) as const;
+
+  it('lists each valid archetype of the own decks once with its count, most first', () => {
+    expect(
+      ownDeckArchetypes([
+        d(1, 'n-zoroark', "N's Zoroark"),
+        d(2, 'dragapult-ex'),
+        d(3, 'dragapult-ex'),
+        d(4, 'N Zoroark'),
+      ]),
+    ).toEqual([
+      { slug: 'dragapult-ex', name: 'dragapult-ex', count: 2 },
+      { slug: 'n-zoroark', name: "N's Zoroark", count: 1 },
+    ]);
+  });
+
+  it('returns [] without decks', () => {
+    expect(ownDeckArchetypes([])).toEqual([]);
   });
 });

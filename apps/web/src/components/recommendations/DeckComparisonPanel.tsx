@@ -1,22 +1,8 @@
 import { Trans, useTranslation } from 'react-i18next';
 import { useDashboardStore } from '../../store/dashboardStore';
-import {
-  RefreshCw,
-  TrendingUp,
-  TrendingDown,
-  ArrowRightLeft,
-  GitCompare,
-  AlertTriangle,
-  BadgeCheck,
-  HelpCircle,
-  Minus,
-  Sparkles,
-  ThumbsDown,
-} from 'lucide-react';
-import type { ComponentType, SVGProps } from 'react';
-import { confidenceTier, formatWithInterval } from '../meta/confidence';
+import { RefreshCw, TrendingUp, TrendingDown, ArrowRightLeft, GitCompare } from 'lucide-react';
 import type { CardStat } from '../../lib/deckComparison';
-import type { CardPerformanceDelta, CardSignalTier } from '@pokekon/shared';
+import { CardDelta } from '../shared/CardDelta';
 
 function FrequencyBar({ pct }: { pct: number }) {
   const color = pct >= 75 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-slate-400';
@@ -26,77 +12,6 @@ function FrequencyBar({ pct }: { pct: number }) {
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
       <span className="text-xs text-slate-600 tabular-nums">{pct}%</span>
-    </div>
-  );
-}
-
-// Signal classification (plan .claude/plans/recommendation-to-prognosis.md
-// §3.7) — every tier gets both a distinct icon AND a distinct text label
-// (a11y precedent from the Spec-3 plan §3.6: "Label, nicht nur Farbe"), most
-// importantly `popularityParadox`, which must not read as just another
-// coloured badge.
-const TIER_ICONS: Record<CardSignalTier, ComponentType<SVGProps<SVGSVGElement>>> = {
-  insufficient: HelpCircle,
-  confirmed: BadgeCheck,
-  hiddenGem: Sparkles,
-  popularityParadox: AlertTriangle,
-  discouraged: ThumbsDown,
-  neutral: Minus,
-};
-
-const TIER_LABEL_KEYS: Record<CardSignalTier, string> = {
-  insufficient: 'comparison.delta.insufficient',
-  confirmed: 'comparison.delta.confirmed',
-  hiddenGem: 'comparison.delta.hiddenGem',
-  popularityParadox: 'comparison.delta.paradox',
-  discouraged: 'comparison.delta.discouraged',
-  neutral: 'comparison.delta.neutral',
-};
-
-const TIER_TEXT_CLASS: Record<CardSignalTier, string> = {
-  insufficient: 'text-slate-400',
-  confirmed: 'text-emerald-700',
-  hiddenGem: 'text-emerald-700',
-  popularityParadox: 'text-amber-700',
-  discouraged: 'text-red-700',
-  neutral: 'text-slate-500',
-};
-
-/**
- * The performance-delta half of a CardRow's two signals. `delta` is
- * `undefined` for the rare "mathematically undefined" case (empty
- * comparison group) — the tier alone (always `insufficient` there) still
- * renders. Every other tier carries a `delta` and shows a number; deriving a
- * number from anywhere else would be a second, forbidden formatting path.
- */
-function CardDelta({
-  delta,
-  tier,
-}: {
-  delta: CardPerformanceDelta | undefined;
-  tier: CardSignalTier;
-}) {
-  const { t } = useTranslation('recommendations');
-  const Icon = TIER_ICONS[tier];
-  // Band width feeds the SAME confidenceTier() classification used for
-  // matchup intervals — no second tier-emphasis logic.
-  const emphasis = delta ? confidenceTier(delta.widthPct) : 'veryLow';
-  const dimmed = emphasis === 'low' || emphasis === 'veryLow' ? 'opacity-75' : '';
-
-  return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-7 text-xs">
-      <Icon
-        data-testid={`tier-icon-${tier}`}
-        className={`w-3.5 h-3.5 shrink-0 ${TIER_TEXT_CLASS[tier]}`}
-        aria-hidden="true"
-      />
-      <span className={`font-medium ${TIER_TEXT_CLASS[tier]}`}>{t(TIER_LABEL_KEYS[tier])}</span>
-      {tier !== 'insufficient' && delta && (
-        <span className={`tabular-nums text-slate-500 ${dimmed}`}>
-          {formatWithInterval(delta.deltaPp, delta.lowPct - 50, delta.highPct - 50)}
-        </span>
-      )}
-      <span className="text-slate-400 italic">{t('comparison.delta.correlationNote')}</span>
     </div>
   );
 }
