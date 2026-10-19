@@ -28,7 +28,7 @@ function fakeSteps(overrides: Partial<ScheduledJobSteps> = {}): {
       calls.push('computeEquilibrium');
       return { windows: [7, 14, 21, 28] };
     }),
-    hasEquilibriumRun: vi.fn(async () => true),
+    latestEquilibriumAt: vi.fn(async () => new Date('2026-10-19T06:05:00Z')),
     ...overrides,
   };
   return { steps, calls };
@@ -49,7 +49,7 @@ describe('runScheduledJobs', () => {
     expect(result.steps[1]?.result).toEqual({ archetypesProcessed: 5 });
   });
 
-  it('skips the equilibrium on other weekdays once a run exists', async () => {
+  it('skips the equilibrium on other weekdays while the last run is at most 7 days old', async () => {
     const { steps, calls } = fakeSteps();
     const result = await runScheduledJobs(db, { now: TUESDAY, steps });
 
@@ -59,10 +59,43 @@ describe('runScheduledJobs', () => {
   });
 
   it('computes the equilibrium on any weekday while none exists yet (cold start)', async () => {
-    const { steps, calls } = fakeSteps({ hasEquilibriumRun: vi.fn(async () => false) });
+    const { steps, calls } = fakeSteps({ latestEquilibriumAt: vi.fn(async () => null) });
     await runScheduledJobs(db, { now: TUESDAY, steps });
 
     expect(calls).toContain('computeEquilibrium');
+  });
+
+  it('catches up on any weekday when the last run is older than 7 days (missed Monday)', async () => {
+    const { steps, calls } = fakeSteps({
+      latestEquilibriumAt: vi.fn(async () => new Date('2026-10-12T06:05:00Z')),
+    });
+    await runScheduledJobs(db, { now: TUESDAY, steps });
+
+    expect(calls).toContain('computeEquilibrium');
+  });
+
+  it('runs the equilibrium when its freshness check itself fails', async () => {
+    const { steps, calls } = fakeSteps({
+      latestEquilibriumAt: vi.fn(async () => {
+        throw new Error('db hiccup');
+      }),
+    });
+    const result = await runScheduledJobs(db, { now: TUESDAY, steps });
+
+    expect(calls).toEqual(['syncMeta', 'computeCardStats', 'computeEquilibrium']);
+    expect(result.ok).toBe(true);
+  });
+
+  it('a failed equilibrium fails the run but keeps the earlier results', async () => {
+    const { steps } = fakeSteps({
+      computeEquilibrium: vi.fn(async () => {
+        throw new Error('simplex');
+      }),
+    });
+    const result = await runScheduledJobs(db, { now: MONDAY, steps });
+
+    expect(result.ok).toBe(false);
+    expect(result.steps.map((s) => s.status)).toEqual(['ok', 'ok', 'failed']);
   });
 
   it('forceEquilibrium runs it regardless of the weekday', async () => {

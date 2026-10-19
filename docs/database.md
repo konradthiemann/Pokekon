@@ -611,7 +611,7 @@ Precomputed Nash equilibrium analysis per analysis window, filled by the `comput
 
 ### Job: `computeEquilibrium`
 
-Reads all tournament standings in the online-Bo1 scope for a given window (7/14/21/28 days), computes the Nash equilibrium over the matchup matrix, and persists to the two tables above. In production it runs Mondays (and on any day while no run is stored yet) in the `meta-jobs` cron (`jobs/runScheduledJobs.ts`); manually via `npm run job:compute-equilibrium -w @pokekon/api` [--dry-run].
+Reads all tournament standings in the online-Bo1 scope for a given window (7/14/21/28 days), computes the Nash equilibrium over the matchup matrix, and persists to the two tables above. In production it runs Mondays (and on any day while the newest run is missing or older than 7 days) in the `meta-jobs` cron (`jobs/runScheduledJobs.ts`); manually via `npm run job:compute-equilibrium -w @pokekon/api` [--dry-run].
 
 **Process:**
 1. For each window, fetch tournament data and build the constant-sum payoff matrix via `buildPayoffMatrix()`

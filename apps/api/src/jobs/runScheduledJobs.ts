@@ -7,14 +7,15 @@
 //   1. syncMeta           — daily, fetches Limitless into tournaments/standings
 //   2. computeCardStats   — daily, after the sync (reads what it wrote)
 //   3. computeEquilibrium — Mondays (the previous ISO week is complete), or
-//      on any day while no run exists yet, so a fresh database does not wait
-//      up to a week for its first result.
+//      on any day while the newest run is missing or older than 7 days, so a
+//      fresh database or a missed/failed Monday does not wait a whole week.
 // A failed step never blocks the later ones: stats recomputed from the data
 // already stored beat no stats. Any failure fails the run (exit code 1), so
 // Railway shows the cron run as failed.
 
 import { fileURLToPath } from 'node:url';
 import { closeDb, getDb, type Db } from '../db/index.js';
+import { max } from 'drizzle-orm';
 import { metaEquilibriumRuns } from '../db/schema.js';
 import { computeCardStats } from './computeCardStats.js';
 import { computeEquilibrium } from './computeEquilibrium.js';
@@ -40,25 +41,25 @@ export interface ScheduledJobSteps {
   syncMeta: (db: Db) => Promise<unknown>;
   computeCardStats: (db: Db) => Promise<unknown>;
   computeEquilibrium: (db: Db) => Promise<unknown>;
-  /** Whether any equilibrium run is stored yet (cold start → false). */
-  hasEquilibriumRun: (db: Db) => Promise<boolean>;
+  /** computedAt of the newest equilibrium run (cold start → null). */
+  latestEquilibriumAt: (db: Db) => Promise<Date | null>;
 }
 
 const MONDAY = 1; // Date#getUTCDay
+const MAX_EQUILIBRIUM_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-export async function hasEquilibriumRun(db: Db): Promise<boolean> {
-  const rows = await db
-    .select({ windowDays: metaEquilibriumRuns.windowDays })
-    .from(metaEquilibriumRuns)
-    .limit(1);
-  return rows.length > 0;
+export async function latestEquilibriumAt(db: Db): Promise<Date | null> {
+  const [row] = await db
+    .select({ latest: max(metaEquilibriumRuns.computedAt) })
+    .from(metaEquilibriumRuns);
+  return row?.latest ?? null;
 }
 
 const defaultSteps: ScheduledJobSteps = {
   syncMeta: (db) => runMetaSync(db),
   computeCardStats: (db) => computeCardStats(db),
   computeEquilibrium: (db) => computeEquilibrium(db),
-  hasEquilibriumRun,
+  latestEquilibriumAt,
 };
 
 async function runStep(
@@ -80,6 +81,18 @@ async function runStep(
   }
 }
 
+/** True when the newest run is missing or older than 7 days. A failing check
+ *  counts as stale: one extra computation beats a silently skipped week. */
+async function equilibriumStale(db: Db, steps: ScheduledJobSteps, now: Date): Promise<boolean> {
+  try {
+    const latest = await steps.latestEquilibriumAt(db);
+    return latest === null || now.getTime() - latest.getTime() > MAX_EQUILIBRIUM_AGE_MS;
+  } catch (err) {
+    console.error('[scheduledJobs] equilibrium freshness check failed:', err);
+    return true;
+  }
+}
+
 export async function runScheduledJobs(
   db: Db,
   opts: { now?: Date; steps?: Partial<ScheduledJobSteps>; forceEquilibrium?: boolean } = {},
@@ -94,7 +107,7 @@ export async function runScheduledJobs(
   const equilibriumDue =
     opts.forceEquilibrium === true ||
     now.getUTCDay() === MONDAY ||
-    !(await steps.hasEquilibriumRun(db));
+    (await equilibriumStale(db, steps, now));
   outcomes.push(
     equilibriumDue
       ? await runStep('computeEquilibrium', () => steps.computeEquilibrium(db))

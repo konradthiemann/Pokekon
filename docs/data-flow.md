@@ -569,7 +569,7 @@ shape is the shared `DeckAnalytics` contract in `@pokekon/shared`.
 
 ```mermaid
 sequenceDiagram
-    participant Cron as meta-jobs cron (Mondays or cold start)
+    participant Cron as meta-jobs cron (Mondays, or newest run missing / older than 7 days)
     participant Job as computeEquilibrium
     participant DB as PostgreSQL
     participant SharedLib as @pokekon/shared

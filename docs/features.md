@@ -668,7 +668,7 @@ To track whether the meta is favoring a deck, we compare the **week-over-week fi
 
 ### Data and computation
 
-**Precomputed weekly:** The job `computeEquilibrium` runs once per week (Mondays, after `syncMeta` and `computeCardStats`, in the scheduled `meta-jobs` cron — plus on any day while no run is stored yet), reads the default-scope (online, Bo1) tournament data for four analysis windows (7 / 14 / 21 / 28 days), computes the equilibrium for each, and persists to two tables: `meta_equilibrium_runs` (one row per window, carrying run-level metadata: game value, support size, robustness counters, imputation rate) and `meta_equilibrium_archetypes` (one row per archetype per window, with weights, payoffs, coverage, robustness percentiles, and trend data).
+**Precomputed weekly:** The job `computeEquilibrium` runs once per week (Mondays, after `syncMeta` and `computeCardStats`, in the scheduled `meta-jobs` cron — plus on any day while the newest run is missing or older than 7 days), reads the default-scope (online, Bo1) tournament data for four analysis windows (7 / 14 / 21 / 28 days), computes the equilibrium for each, and persists to two tables: `meta_equilibrium_runs` (one row per window, carrying run-level metadata: game value, support size, robustness counters, imputation rate) and `meta_equilibrium_archetypes` (one row per archetype per window, with weights, payoffs, coverage, robustness percentiles, and trend data).
 
 **API:** `GET /api/meta/equilibrium?days=7..180` returns the precomputed run for a snapped window (7 / 14 / 21 / 28 days). Cold start (before first job run) returns `computedAt: null`, `run: null`, `archetypes: []` — an honest empty state, never an error.
 

@@ -131,16 +131,27 @@ it runs `npm run job:scheduled -w @pokekon/api`
 
 1. `syncMeta` — daily (Limitless → `tournaments` / `tournament_standings` / `meta_snapshots`)
 2. `computeCardStats` — daily, after the sync (`archetype_card_stats`)
-3. `computeEquilibrium` — Mondays, or on any day while no run is stored yet
+3. `computeEquilibrium` — Mondays, or on any day while the newest run is missing
+   or older than 7 days (missed or failed Monday)
    (`meta_equilibrium_runs` / `meta_equilibrium_archetypes`)
 
 A failed step does not stop the later ones; any failure exits with code 1, so the
 cron run shows as failed in Railway. The service only needs `DATABASE_URL`
 (reference the same Postgres as `api`) and no public domain. It does **not** run
-migrations — the `api` service's `preDeployCommand` does. `--force-equilibrium`
-computes the equilibrium regardless of the weekday (manual first run). Each job
+migrations — the `api` service's `preDeployCommand` does.
+`npm run job:scheduled -w @pokekon/api -- --force-equilibrium` computes the
+equilibrium regardless of the weekday. Each job
 also stays runnable on its own (`job:sync-meta`, `job:compute-card-stats`,
 `job:compute-equilibrium`, each with `--dry-run` where supported).
+
+**Setting the service up (once, in the Railway dashboard):** new service from the
+GitHub repo `konradthiemann/Pokekon`, branch `main` → *Settings*: config-as-code
+path `/railway.jobs.json`, *Wait for CI* on (the deploy workflow's typecheck +
+test gate), watch paths `apps/api/**`, `packages/shared/**`, `package-lock.json`,
+`railway.jobs.json`; variable `DATABASE_URL` = reference to the Postgres the
+`api` service uses; no domain. The CI workflow only deploys `api`; this service
+follows `main` through its GitHub connection. First fill after setup: trigger the
+cron run once by hand (dry-runs of the single jobs first, see their `--dry-run`).
 
 Without this service the precomputed tables stay empty: the card-stats and
 equilibrium routes then answer with the cold start (`computedAt: null`), and the
@@ -220,6 +231,7 @@ tcg/                      # repo root (npm workspaces)
 ├── docs/                 # Markdown docs (source of truth)
 ├── .claude/              # agents, commands, plans
 ├── railway.json          # Railway build + deploy (single-origin) + preDeployCommand
+├── railway.jobs.json     # Railway cron service `meta-jobs` (daily scheduled jobs)
 └── package.json          # workspaces root
 ```
 
