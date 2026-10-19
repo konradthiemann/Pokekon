@@ -262,14 +262,21 @@ localStorage-backed preferences, async-operation flags, and UI state. The
 `await get().refresh()` to keep the store consistent.
 
 **Server-side preferences (Spec 7 §5.1).** `hydrate()` is the initial load once a
-session exists (`App.tsx`, and `WelcomeScreen` after seeding the demo): `refresh()`
-→ `loadPreferences()` (`GET /api/preferences` → `activeArchetypeId`,
-`activeDeckIdByArchetype`, `preferencesStatus`) → with `archetypeCoachUi` on, a
-second `refresh()`. When the server has no archetype yet, `loadPreferences()`
-migrates **once**: a valid legacy localStorage slug (`tcg-deck-arch-slug-v1`,
+session exists (`App.tsx`, and `WelcomeScreen` after seeding the demo):
+`loadPreferences({ migrate: false })` (`GET /api/preferences` → `activeArchetypeId`,
+`activeDeckIdByArchetype`, `preferencesStatus`) → `refresh()`. Because the
+preferences come first, that single `refresh()` already resolves the coached
+archetype's deck and own record — a normal start loads each endpoint once. A failed
+`GET` (`preferencesStatus: 'error'`) still runs the `refresh()`. When the server has
+no archetype yet, `migrateArchetype()` runs **once** after the refresh, since it
+needs the loaded decks: a valid legacy localStorage slug (`tcg-deck-arch-slug-v1`,
 deleted only after the migrated value was saved), else the active deck's
-archetype, else the newest deck with a valid slug, else `null` (→ onboarding). This runs for **every** account, flag on or
-off — a single extra `GET` per load (plus at most one `PATCH` for the migration);
+archetype, else the newest deck with a valid slug, else `null` (→ onboarding, no
+second refresh). Only a migrated archetype with `archetypeCoachUi` on costs a
+second `refresh()`. Called on its own (the coach layout's retry),
+`loadPreferences()` migrates directly and reports `'ready'` only afterwards. This
+runs for **every** account, flag on or off — a single extra `GET` per load (plus
+at most one `PATCH` for the migration);
 nothing changes visibly with the flag off except that the deck comparison now
 knows the archetype. Active-deck resolution lives in the pure
 `lib/coach/activeDeck.ts`: flag off = legacy rule (current deck if it exists, else

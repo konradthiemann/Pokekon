@@ -887,6 +887,98 @@ describe('dashboardStore preferences + coach navigation (Spec 7 §5.1, plan S4)'
     expect(useDashboardStore.getState().activeDeckId).toBe(1);
   });
 
+  it('hydrate with a server archetype (normal start) fires each start request exactly once', async () => {
+    mockedFlag.mockReturnValue(true);
+    mockedGetDecks.mockResolvedValue([DECK_A, DECK_B]);
+    mockedGetPrefs.mockResolvedValue({
+      activeArchetypeId: 'gardevoir-ex',
+      activeDeckIdByArchetype: {},
+    });
+    mockedFetchCardStats.mockResolvedValue({
+      archetypeId: 'gardevoir-ex',
+      windowDays: 30,
+      online: true,
+      bo1: true,
+      computedAt: '2026-06-01T00:00:00.000Z',
+      listsAnalyzed: 20,
+      cards: CARD_STATS,
+    });
+    useDashboardStore.setState({ activeDeckId: 1 } as never);
+    await useDashboardStore.getState().hydrate();
+    expect(mockedGetPrefs).toHaveBeenCalledTimes(1);
+    expect(mockedGetDecks).toHaveBeenCalledTimes(1);
+    expect(mockedGetDeckCards).toHaveBeenCalledTimes(1);
+    expect(mockedGetDeckCards).toHaveBeenCalledWith(2);
+    expect(mockedGetDeckSnapshots).toHaveBeenCalledTimes(1);
+    expect(mockedGetOpponentLogs).toHaveBeenCalledTimes(1);
+    expect(mockedGetLatestMetaSnapshots).toHaveBeenCalledTimes(1);
+    expect(mockedGetArchetypeStats).toHaveBeenCalledTimes(1);
+    expect(mockedFetchCardStats).toHaveBeenCalledTimes(1);
+    expect(mockedFetchCardStats).toHaveBeenCalledWith('gardevoir-ex');
+    expect(mockedSavePrefs).not.toHaveBeenCalled();
+    expect(useDashboardStore.getState().activeDeckId).toBe(2);
+  });
+
+  it('hydrate migrates from the loaded decks when the server has no archetype, then re-resolves', async () => {
+    mockedFlag.mockReturnValue(true);
+    mockedGetDecks.mockResolvedValue([DECK_A, DECK_B]);
+    mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
+    mockedSavePrefs.mockResolvedValue({
+      activeArchetypeId: 'gardevoir-ex',
+      activeDeckIdByArchetype: {},
+    });
+    useDashboardStore.setState({ activeDeckId: 2 } as never);
+    await useDashboardStore.getState().hydrate();
+    expect(mockedSavePrefs).toHaveBeenCalledWith({ activeArchetypeId: 'gardevoir-ex' });
+    // The migration needs the decks (first refresh); the coached archetype
+    // only exists afterwards, so the deck is re-resolved once more.
+    expect(mockedGetDecks).toHaveBeenCalledTimes(2);
+    const s = useDashboardStore.getState();
+    expect(s.activeArchetypeId).toBe('gardevoir-ex');
+    expect(s.preferencesStatus).toBe('ready');
+    expect(s.activeDeckId).toBe(2);
+  });
+
+  it('hydrate with the flag off still migrates from the active deck with a single refresh', async () => {
+    mockedGetDecks.mockResolvedValue([DECK_A, DECK_B]);
+    mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
+    mockedSavePrefs.mockResolvedValue({
+      activeArchetypeId: 'gardevoir-ex',
+      activeDeckIdByArchetype: {},
+    });
+    useDashboardStore.setState({ activeDeckId: 2 } as never);
+    await useDashboardStore.getState().hydrate();
+    expect(mockedSavePrefs).toHaveBeenCalledWith({ activeArchetypeId: 'gardevoir-ex' });
+    expect(mockedGetDecks).toHaveBeenCalledTimes(1);
+    expect(useDashboardStore.getState().deckArchSlug).toBe('gardevoir-ex');
+  });
+
+  it('hydrate on a cold start (no archetype, no decks) refreshes once and leads to onboarding', async () => {
+    mockedFlag.mockReturnValue(true);
+    mockedGetDecks.mockResolvedValue([]);
+    mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
+    await useDashboardStore.getState().hydrate();
+    expect(mockedGetDecks).toHaveBeenCalledTimes(1);
+    expect(mockedSavePrefs).not.toHaveBeenCalled();
+    const s = useDashboardStore.getState();
+    expect(s.activeArchetypeId).toBeNull();
+    expect(s.preferencesStatus).toBe('ready');
+  });
+
+  it('hydrate still loads the data once when the preferences GET fails', async () => {
+    mockedFlag.mockReturnValue(true);
+    mockedGetDecks.mockResolvedValue([DECK_A, DECK_B]);
+    mockedGetPrefs.mockRejectedValue(new Error('offline'));
+    await useDashboardStore.getState().hydrate();
+    expect(mockedGetDecks).toHaveBeenCalledTimes(1);
+    expect(mockedSavePrefs).not.toHaveBeenCalled();
+    const s = useDashboardStore.getState();
+    expect(s.preferencesStatus).toBe('error');
+    expect(s.activeArchetypeId).toBeNull();
+    expect(s.decks).toEqual([DECK_A, DECK_B]);
+    expect(s.refreshError).toBe(false);
+  });
+
   it('refresh flags refreshError on failure and clears it on the next success', async () => {
     mockedGetDecks.mockRejectedValueOnce(new Error('500'));
     await useDashboardStore.getState().refresh();
@@ -896,11 +988,11 @@ describe('dashboardStore preferences + coach navigation (Spec 7 §5.1, plan S4)'
     expect(useDashboardStore.getState().refreshError).toBe(false);
   });
 
-  it('isHydrating is true for the whole hydrate (both refreshes), false afterwards', async () => {
+  it('isHydrating is true for the whole hydrate (both refreshes of a migration), false afterwards', async () => {
     mockedFlag.mockReturnValue(true);
-    mockedGetDecks.mockResolvedValue([DECK_A, DECK_B]);
-    mockedGetPrefs.mockResolvedValue({
-      activeArchetypeId: 'gardevoir-ex',
+    mockedGetPrefs.mockResolvedValue({ activeArchetypeId: null, activeDeckIdByArchetype: {} });
+    mockedSavePrefs.mockResolvedValue({
+      activeArchetypeId: 'dragapult-ex',
       activeDeckIdByArchetype: {},
     });
     const seen: boolean[] = [];
