@@ -138,7 +138,8 @@ interface DashboardState {
   /** The last refresh() failed (cleared by the next successful one). */
   refreshError: boolean;
   /** hydrate() is running — the coach layout waits so no deck of another
-   *  archetype flashes between its two refreshes. */
+   *  archetype flashes before preferences and data are in (or between the
+   *  two refreshes of a migration). */
   isHydrating: boolean;
   /** Set by the demo entry while the guest account is being seeded, so the
    *  coach layout shows a skeleton instead of the onboarding. */
@@ -162,9 +163,11 @@ interface DashboardState {
 
   // Actions
   refresh: () => Promise<void>;
-  /** Initial load once a session exists: refresh → loadPreferences (the
-   *  migration needs the active deck) → with `archetypeCoachUi` on, a second
-   *  refresh so the active deck belongs to the coached archetype. */
+  /** Initial load once a session exists: loadPreferences (without migration)
+   *  → refresh, which already resolves the coached archetype's deck. Only when
+   *  the server has no archetype yet: migrateArchetype (needs the loaded
+   *  decks) → with `archetypeCoachUi` on and an archetype migrated, a second
+   *  refresh. */
   hydrate: () => Promise<void>;
   setDemoSeedPending: (pending: boolean) => void;
   setActiveTab: (tab: DashboardTab) => void;
@@ -182,10 +185,15 @@ interface DashboardState {
   }) => Promise<void>;
   saveCurrentDeckSnapshot: (label: string) => Promise<number>;
   setLocalMeta: (archetypes: string[]) => void;
-  /** GET /api/preferences; when the server has no archetype yet, migrates once
-   *  from the legacy localStorage slug or the active deck (Spec 7 E5). Never
-   *  throws — a failure sets `preferencesStatus: 'error'`. */
-  loadPreferences: () => Promise<void>;
+  /** GET /api/preferences; when the server has no archetype yet, runs
+   *  `migrateArchetype()` unless `{ migrate: false }`. Never throws — a
+   *  failure sets `preferencesStatus: 'error'`. */
+  loadPreferences: (opts?: { migrate?: boolean }) => Promise<void>;
+  /** One-time migration (Spec 7 E5) while no archetype is set: the legacy
+   *  localStorage slug, else the active deck, else the newest valid deck —
+   *  so it needs the decks loaded. Returns the migrated archetype, or null
+   *  (→ onboarding). */
+  migrateArchetype: () => Promise<string | null>;
   /** Persists the coached archetype and switches to its remembered deck. */
   setActiveArchetype: (archetypeId: string) => Promise<void>;
   /** Moves a deck (e.g. a legacy free-text archetype) to the coached
@@ -364,9 +372,16 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   hydrate: async () => {
     set({ isHydrating: true });
     try {
+      // Preferences first, so the coach layout's single refresh already
+      // resolves the deck and the own record of the coached archetype. Only
+      // the one-time migration needs the decks: it runs after the refresh and
+      // costs a second one.
+      await get().loadPreferences({ migrate: false });
       await get().refresh();
-      await get().loadPreferences();
-      if (isArchetypeCoachUiEnabled()) await get().refresh();
+      const { preferencesStatus, activeArchetypeId } = get();
+      if (preferencesStatus !== 'ready' || activeArchetypeId !== null) return;
+      const migrated = await get().migrateArchetype();
+      if (migrated !== null && isArchetypeCoachUiEnabled()) await get().refresh();
     } finally {
       set({ isHydrating: false });
     }
@@ -505,7 +520,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     set({ localMeta: archetypes });
   },
 
-  loadPreferences: async () => {
+  loadPreferences: async ({ migrate = true } = {}) => {
     set({ preferencesStatus: 'loading' });
     let prefs;
     try {
@@ -516,33 +531,35 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       return;
     }
 
-    let activeArchetypeId = prefs.activeArchetypeId;
-    if (activeArchetypeId === null) {
-      // One-time migration (Spec 7 E5): existing accounts keep their archetype
-      // instead of being sent through onboarding.
-      activeArchetypeId = pickMigrationArchetype({
-        legacySlug: readLegacyDeckArchSlug(),
-        activeDeck: get().activeDeck,
-        decks: get().decks,
-      });
-      if (activeArchetypeId !== null) {
-        try {
-          await saveUserPreferences({ activeArchetypeId });
-          clearLegacyDeckArchSlug();
-        } catch (err) {
-          // Keep the migrated value for this session; the legacy key stays,
-          // so the next load retries the same migration.
-          console.warn('[DashboardStore] persisting the migrated archetype failed:', err);
-        }
-      }
-    }
-
     set({
-      activeArchetypeId,
-      deckArchSlug: activeArchetypeId ?? '',
+      activeArchetypeId: prefs.activeArchetypeId,
+      deckArchSlug: prefs.activeArchetypeId ?? '',
       activeDeckIdByArchetype: prefs.activeDeckIdByArchetype,
-      preferencesStatus: 'ready',
     });
+    if (migrate && prefs.activeArchetypeId === null) await get().migrateArchetype();
+    // 'ready' only after the migration, so no onboarding flashes in between.
+    set({ preferencesStatus: 'ready' });
+  },
+
+  migrateArchetype: async () => {
+    // Existing accounts keep their archetype instead of being sent through
+    // onboarding.
+    const activeArchetypeId = pickMigrationArchetype({
+      legacySlug: readLegacyDeckArchSlug(),
+      activeDeck: get().activeDeck,
+      decks: get().decks,
+    });
+    if (activeArchetypeId === null) return null;
+    try {
+      await saveUserPreferences({ activeArchetypeId });
+      clearLegacyDeckArchSlug();
+    } catch (err) {
+      // Keep the migrated value for this session; the legacy key stays, so
+      // the next load retries the same migration.
+      console.warn('[DashboardStore] persisting the migrated archetype failed:', err);
+    }
+    set({ activeArchetypeId, deckArchSlug: activeArchetypeId });
+    return activeArchetypeId;
   },
 
   setActiveArchetype: async (archetypeId) => {
