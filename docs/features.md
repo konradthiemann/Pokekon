@@ -510,7 +510,7 @@ This is honest communication: acknowledge the noise, show the uncertainty, let t
 
 ### Data pipeline
 
-`GET /api/meta/archetypes/:archetypeId/card-stats?days=7..180` returns precomputed deltas from the `archetype_card_stats` table. The job `computeCardStats` runs once per sync window (separate from `syncMeta`, typically after it) and rewrites the table for each (archetype, window) pair in a single transaction. Cold start (empty table) yields `computedAt: null` and `cards: []`; the UI tolerates this gracefully.
+`GET /api/meta/archetypes/:archetypeId/card-stats?days=7..180` returns precomputed deltas from the `archetype_card_stats` table. The job `computeCardStats` runs daily right after `syncMeta` in the scheduled `meta-jobs` cron (`jobs/runScheduledJobs.ts`, see [getting-started.md](./getting-started.md) → *Scheduled jobs*) and rewrites the table for each (archetype, window) pair in a single transaction. Cold start (empty table) yields `computedAt: null` and `cards: []`; the UI tolerates this gracefully.
 
 ---
 
@@ -668,7 +668,7 @@ To track whether the meta is favoring a deck, we compare the **week-over-week fi
 
 ### Data and computation
 
-**Precomputed weekly:** The job `computeEquilibrium` runs once per week (Monday recommended, after `syncMeta` completes), reads the default-scope (online, Bo1) tournament data for four analysis windows (7 / 14 / 21 / 28 days), computes the equilibrium for each, and persists to two tables: `meta_equilibrium_runs` (one row per window, carrying run-level metadata: game value, support size, robustness counters, imputation rate) and `meta_equilibrium_archetypes` (one row per archetype per window, with weights, payoffs, coverage, robustness percentiles, and trend data).
+**Precomputed weekly:** The job `computeEquilibrium` runs once per week (Mondays, after `syncMeta` and `computeCardStats`, in the scheduled `meta-jobs` cron — plus on any day while no run is stored yet), reads the default-scope (online, Bo1) tournament data for four analysis windows (7 / 14 / 21 / 28 days), computes the equilibrium for each, and persists to two tables: `meta_equilibrium_runs` (one row per window, carrying run-level metadata: game value, support size, robustness counters, imputation rate) and `meta_equilibrium_archetypes` (one row per archetype per window, with weights, payoffs, coverage, robustness percentiles, and trend data).
 
 **API:** `GET /api/meta/equilibrium?days=7..180` returns the precomputed run for a snapped window (7 / 14 / 21 / 28 days). Cold start (before first job run) returns `computedAt: null`, `run: null`, `archetypes: []` — an honest empty state, never an error.
 

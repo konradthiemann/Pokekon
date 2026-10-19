@@ -426,9 +426,9 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant Engine as @pokekon/shared
 
-    Note over Admin/Cron: Runs on schedule (separate cron after syncMeta)
+    Note over Admin/Cron: Daily in the meta-jobs cron (runScheduledJobs.ts), right after syncMeta
 
-    Admin/Cron->>Job: npm run job:compute-card-stats [--dry-run]
+    Admin/Cron->>Job: computeCardStats(db) — or manually: npm run job:compute-card-stats [--dry-run]
     Job->>DB: SELECT tournaments, tournament_standings WHERE online=true, swiss_mode='BO1', window_days in (7,14,21,28)
     DB-->>Job: standings + tournaments.players
 
@@ -453,7 +453,9 @@ sequenceDiagram
     Job-->>Admin/Cron: CardStatsJobResult {computedAt, windows, archetypesProcessed, archetypesSkipped, rowsWritten, listsWithoutData, dryRun}
 ```
 
-The job runs separately from `syncMeta` (no direct coupling). Both rows in a single
+The job stays its own module without a direct coupling to `syncMeta`; only the
+scheduled runner (`jobs/runScheduledJobs.ts`) orders them, and a failed sync still
+lets the card stats recompute from the data already stored. Both rows in a single
 (archetype, window) are written atomically, guaranteeing readers never see a
 partially-computed state. `computedAt` marks the point in time the run occurred;
 the UI surfaces this alongside each card's delta so users understand freshness.
@@ -567,12 +569,12 @@ shape is the shared `DeckAnalytics` contract in `@pokekon/shared`.
 
 ```mermaid
 sequenceDiagram
-    participant Cron as Railway Cron (Monday)
+    participant Cron as meta-jobs cron (Mondays or cold start)
     participant Job as computeEquilibrium
     participant DB as PostgreSQL
     participant SharedLib as @pokekon/shared
 
-    Cron->>Job: invoke (daily or weekly, post-syncMeta)
+    Cron->>Job: invoke (runScheduledJobs.ts, after syncMeta + computeCardStats)
     Job->>DB: For each window (7/14/21/28 days):
     Note over Job: Load tournament_standings + tournaments (online, bo1 scope)
     DB-->>Job: Match data (wins, losses, ties per pair)
