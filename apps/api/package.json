@@ -17,7 +17,8 @@
     "job:sync-meta": "node dist/jobs/syncMeta.js",
     "job:backfill-winrates": "node dist/jobs/backfillMetaWinRates.js",
     "job:compute-card-stats": "node dist/jobs/computeCardStats.js",
-    "job:compute-equilibrium": "node dist/jobs/computeEquilibrium.js"
+    "job:compute-equilibrium": "node dist/jobs/computeEquilibrium.js",
+    "job:scheduled": "node dist/jobs/runScheduledJobs.js"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.16",

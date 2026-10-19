@@ -45,6 +45,7 @@ import { computeCardStats } from './jobs/computeCardStats.js';
 // expected to fail module resolution until the implementer adds it (same
 // red-state pattern as computeCardStats above).
 import { computeEquilibrium } from './jobs/computeEquilibrium.js';
+import { latestEquilibriumAt } from './jobs/runScheduledJobs.js';
 // Scheibe G (plan §3.9, §4 step 13): the I/O-side fact-set builder and the
 // content-hash helper — neither exists yet, expected to fail module
 // resolution until the implementer adds lib/synthesisFacts.ts.
@@ -3349,6 +3350,26 @@ describe('computeEquilibrium job (plan §3.6/§3.7, step 15)', () => {
     const result = await computeEquilibrium(db, { resamples: 50, seed: 1 });
     expect(result.windowsSkipped).toBe(0);
     expect(result.windows).toEqual([...EQUILIBRIUM_WINDOWS]);
+  });
+
+  it('latestEquilibriumAt (scheduled-jobs freshness check) is null on empty tables, the run time after a run', async () => {
+    await clearEquilibriumTables();
+    expect(await latestEquilibriumAt(db)).toBeNull();
+
+    await seedEquilibriumTournament('eq-has-run-1', equilibriumDaysAgo(1), 10, [
+      ...Array.from({ length: 5 }, () => equilibriumStanding('eq-has-a')),
+      ...Array.from({ length: 3 }, () => equilibriumStanding('eq-has-b')),
+      ...Array.from({ length: 2 }, () => equilibriumStanding('eq-has-c')),
+    ]);
+    await seedEquilibriumMatchup('eq-has-run-1', 'eq-has-a', 'eq-has-b', 60, 40);
+    await seedEquilibriumMatchup('eq-has-run-1', 'eq-has-b', 'eq-has-c', 60, 40);
+    await seedEquilibriumMatchup('eq-has-run-1', 'eq-has-c', 'eq-has-a', 60, 40);
+    const before = Date.now();
+    await computeEquilibrium(db, { windows: [7], resamples: 50, seed: 1 });
+
+    const latest = await latestEquilibriumAt(db);
+    expect(latest).toBeInstanceOf(Date);
+    expect(latest!.getTime()).toBeGreaterThanOrEqual(before - 1000);
   });
 });
 

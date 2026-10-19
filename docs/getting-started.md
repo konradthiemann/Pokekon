@@ -91,8 +91,10 @@ with `DATABASE_URL="…" ./scripts/demo-local.sh`. See [demo-mode.md](./demo-mod
 | `npm run test` | Vitest across workspaces |
 | `npm run format` / `format:check` | Prettier write / check |
 
-API-only: `db:generate` / `db:migrate` (Drizzle), `job:sync-meta` (meta cron),
-`migrate:deploy` (programmatic migrator used on deploy).
+API-only: `db:generate` / `db:migrate` (Drizzle), `job:scheduled` (the daily cron:
+sync → card stats → equilibrium, see *Scheduled jobs* below), the single jobs
+`job:sync-meta` / `job:compute-card-stats` / `job:compute-equilibrium` /
+`job:backfill-winrates`, `migrate:deploy` (programmatic migrator used on deploy).
 
 ---
 
@@ -119,6 +121,41 @@ Railway variables (never in the browser bundle):
 
 CI deploy needs a repo secret `RAILWAY_TOKEN` (Railway project token). The docs
 site deploys separately to GitHub Pages via `.github/workflows/docs.yml`.
+
+### Scheduled jobs (`meta-jobs` cron service)
+
+The meta pipeline runs in a **second Railway service** of the same repo, configured
+by `railway.jobs.json` (service setting *Config-as-code path*): daily at 06:00 UTC
+it runs `npm run job:scheduled -w @pokekon/api`
+(`apps/api/src/jobs/runScheduledJobs.ts`) and exits. Order and cadence:
+
+1. `syncMeta` — daily (Limitless → `tournaments` / `tournament_standings` / `meta_snapshots`)
+2. `computeCardStats` — daily, after the sync (`archetype_card_stats`)
+3. `computeEquilibrium` — Mondays, or on any day while the newest run is missing
+   or older than 7 days (missed or failed Monday)
+   (`meta_equilibrium_runs` / `meta_equilibrium_archetypes`)
+
+A failed step does not stop the later ones; any failure exits with code 1, so the
+cron run shows as failed in Railway. The service only needs `DATABASE_URL`
+(reference the same Postgres as `api`) and no public domain. It does **not** run
+migrations — the `api` service's `preDeployCommand` does.
+`npm run job:scheduled -w @pokekon/api -- --force-equilibrium` computes the
+equilibrium regardless of the weekday. Each job
+also stays runnable on its own (`job:sync-meta`, `job:compute-card-stats`,
+`job:compute-equilibrium`, each with `--dry-run` where supported).
+
+**Setting the service up (once, in the Railway dashboard):** new service from the
+GitHub repo `konradthiemann/Pokekon`, branch `main` → *Settings*: config-as-code
+path `/railway.jobs.json`, *Wait for CI* on (the deploy workflow's typecheck +
+test gate), watch paths `apps/api/**`, `packages/shared/**`, `package-lock.json`,
+`railway.jobs.json`; variable `DATABASE_URL` = reference to the Postgres the
+`api` service uses; no domain. The CI workflow only deploys `api`; this service
+follows `main` through its GitHub connection. First fill after setup: trigger the
+cron run once by hand (dry-runs of the single jobs first, see their `--dry-run`).
+
+Without this service the precomputed tables stay empty: the card-stats and
+equilibrium routes then answer with the cold start (`computedAt: null`), and the
+meta data only refreshes when someone presses "Sync Live Meta".
 
 ---
 
@@ -184,7 +221,7 @@ tcg/                      # repo root (npm workspaces)
 │   │   │   ├── db/               # schema.ts (Drizzle), index.ts (pg pool)
 │   │   │   ├── routes/           # decks, snapshots, logs, analytics, analysis, meta
 │   │   │   ├── ai/               # provider abstraction + GitHub Models adapter
-│   │   │   ├── jobs/             # syncMeta.ts (meta cron)
+│   │   │   ├── jobs/             # runScheduledJobs.ts (daily cron) → syncMeta, computeCardStats, computeEquilibrium
 │   │   │   ├── lib/              # crypto, deckAnalytics, matchLogPipeline
 │   │   │   └── migrate.ts        # programmatic migrator (preDeployCommand)
 │   │   └── drizzle/              # generated SQL migrations
@@ -194,6 +231,7 @@ tcg/                      # repo root (npm workspaces)
 ├── docs/                 # Markdown docs (source of truth)
 ├── .claude/              # agents, commands, plans
 ├── railway.json          # Railway build + deploy (single-origin) + preDeployCommand
+├── railway.jobs.json     # Railway cron service `meta-jobs` (daily scheduled jobs)
 └── package.json          # workspaces root
 ```
 
